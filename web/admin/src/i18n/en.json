@@ -1346,5 +1346,37 @@
       "panel_cert_expiring": "expires in {{days}} days",
       "panel_cert_expired": "has expired"
     }
+  },
+  "accountID": {
+    "label": "Account ID",
+    "change": "Change ID",
+    "hint": "Use an unused positive integer. Subscription links, credentials and existing records are preserved."
+  },
+  "siteReset": {
+    "title": "Reset site",
+    "description": "Clear Captain’s business data and console settings to start again.",
+    "open": "Review site reset",
+    "irreversible": "This cannot be undone",
+    "warning": "Users, other staff accounts, plans, orders, subscriptions, nodes, certificates stored in the panel, statistics and all console settings will be deleted. Back up anything you need before continuing.",
+    "loading": "Loading affected records…",
+    "previewFailed": "Could not load the reset preview.",
+    "retry": "Retry",
+    "admin": "Keep {{email}} as administrator ID 1, with the same password and enabled two-factor authentication. All sessions, API tokens, subscription links and node pairings will be revoked. Sign in again after resetting.",
+    "preserved": "Deployment files (config.yaml, HTTPS certificates and custom static site files), existing backups and external DNS records are kept. Configuration supplied in config.yaml, including payment gateways, still applies.",
+    "nodesWarning": "Remote bosun programs and their cached configurations are not removed. Nodes may continue serving old users. Stop or clean up those nodes before resetting, then pair them again.",
+    "nodesAcknowledge": "I have handled the remote nodes and understand that resetting Captain will not stop them.",
+    "password": "Current administrator password",
+    "codeHint": "Enter a fresh code that has not already been used to sign in.",
+    "confirmation": "Confirmation",
+    "confirmationHint": "Type RESET exactly to confirm deletion.",
+    "execute": "Delete data and reset",
+    "counts": {
+      "users": "Customers",
+      "staff": "Staff (one admin retained)",
+      "nodes": "Nodes",
+      "plans": "Plans",
+      "orders": "Orders",
+      "subscriptions": "Subscriptions"
+    }
   }
 }

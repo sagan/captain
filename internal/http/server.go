@@ -289,6 +289,20 @@ func (s *Server) Handler() http.Handler {
 	// Any write under /api/admin (whichever package registered it) may
 	// change what nodes should run: drop the cached node state after it.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Long polling only builds an immutable agent identity snapshot. Holding
+		// the read lock across its wait would needlessly stall ID edits.
+		if r.URL.Path != "/api/agent/state" {
+			accounts := &s.state.Store.Accounts
+			renumber := r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/id") && (strings.HasPrefix(r.URL.Path, "/api/admin/users/") || strings.HasPrefix(r.URL.Path, "/api/admin/admins/"))
+			reset := r.Method == http.MethodPost && r.URL.Path == "/api/admin/system/reset"
+			if renumber || reset {
+				accounts.Lock()
+				defer accounts.Unlock()
+			} else {
+				accounts.RLock()
+				defer accounts.RUnlock()
+			}
+		}
 		if r.Method != http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/admin/") && s.state != nil {
 			defer s.state.Invalidate()
 		}

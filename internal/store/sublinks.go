@@ -158,15 +158,15 @@ func (s *Store) ConsumeSubLink(ctx context.Context, code string) error {
 
 // ---- two-factor ---------------------------------------------------------------------
 
-// TOTP returns the user's secret and whether it is enforced.
+// TOTP returns the staff account's secret and whether it is enforced.
 func (s *Store) TOTP(ctx context.Context, userID int64) (secret string, enabled bool, err error) {
 	var en int
-	err = s.db.QueryRowContext(ctx, `SELECT totp_secret, totp_enabled FROM users WHERE id = ?`, userID).Scan(&secret, &en)
+	err = s.db.QueryRowContext(ctx, `SELECT totp_secret, totp_enabled FROM staff WHERE id = ?`, userID).Scan(&secret, &en)
 	return secret, en == 1, wrapNotFound(err)
 }
 
 // SetTOTP stores a secret and its enforcement flag.
 func (s *Store) SetTOTP(ctx context.Context, userID int64, secret string, enabled bool) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE users SET totp_secret = ?, totp_enabled = ?, updated_at = ? WHERE id = ?`, secret, boolInt(enabled), now(), userID)
+	_, err := s.db.ExecContext(ctx, `UPDATE staff SET totp_secret = ?, totp_enabled = ?, updated_at = ? WHERE id = ?`, secret, boolInt(enabled), now(), userID)
 	return err
 }

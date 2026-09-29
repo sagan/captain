@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AccountIDEditor } from '../components/AccountIDEditor'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { when } from '../lib/format'
@@ -37,7 +38,7 @@ export default function AdminsPage() {
         <Table.Tbody>
           {(q.data ?? []).map((s) => (
             <Table.Tr key={s.id}>
-              <Table.Td><Text size="sm" fw={600}>{s.email}</Text>{s.id === me?.id && <Text size="xs" c="dimmed">{t('admins.you')}</Text>}</Table.Td>
+              <Table.Td><Text size="sm" fw={600}>{s.email}</Text><Text size="xs" c="dimmed">#{s.id}</Text>{s.id === me?.id && <Text size="xs" c="dimmed">{t('admins.you')}</Text>}</Table.Td>
               <Table.Td><Badge color={roleColor[s.role]} variant="light">{t(`admins.roles.${s.role}`)}</Badge></Table.Td>
               <Table.Td><Badge color={s.status === 'active' ? 'teal' : 'gray'}>{s.status === 'active' ? t('common.enabled') : t('common.disabled')}</Badge></Table.Td>
               <Table.Td><Text size="xs" c="dimmed">{when(s.created_at)}</Text></Table.Td>
@@ -52,6 +53,7 @@ export default function AdminsPage() {
       <Card mt="md"><Text size="sm" fw={600} mb={4}>{t('admins.matrix')}</Text><Text size="xs" c="dimmed" style={{ whiteSpace: 'pre-line' }}>{t('admins.matrixText')}</Text></Card>
       <Modal opened={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? t('admins.create') : t('common.edit')}>
         <form onSubmit={form.onSubmit((v) => (editing === 'new' ? create : update).mutate(v))}><Stack>
+          {editing && editing !== 'new' && <AccountIDEditor key={editing.id} id={editing.id} endpoint={`/api/admin/admins/${editing.id}/id`} onChanged={() => setEditing(null)} />}
           <TextInput label={t('admins.email')} required disabled={editing !== 'new'} {...form.getInputProps('Email')} />
           <PasswordInput label={t('admins.password')} placeholder={editing === 'new' ? '' : t('mail.keep')} required={editing === 'new'} {...form.getInputProps('Password')} />
           <Select label={t('admins.role')} data={roles} allowDeselect={false} {...form.getInputProps('Role')} />

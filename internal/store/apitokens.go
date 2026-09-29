@@ -82,6 +82,6 @@ func (s *Store) UserByAPIToken(ctx context.Context, plain string) (*domain.User,
 		return nil, "", ErrNotFound
 	}
 	_, _ = s.db.ExecContext(ctx, `UPDATE api_tokens SET last_used_at = ? WHERE id = ?`, now(), id)
-	u, err := s.UserByID(ctx, userID)
+	u, err := s.StaffByID(ctx, userID)
 	return u, scope, err
 }

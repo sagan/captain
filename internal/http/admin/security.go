@@ -104,7 +104,7 @@ func (h *handlers) createStaff(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	if err := h.Store.CreateUser(r.Context(), u); err != nil {
+	if err := h.Store.CreateStaff(r.Context(), u); err != nil {
 		fail(w, http.StatusConflict, "email already registered")
 		return
 	}
@@ -116,7 +116,7 @@ func (h *handlers) updateStaff(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &in) {
 		return
 	}
-	target, err := h.Store.UserByID(r.Context(), idOf(r))
+	target, err := h.Store.StaffByID(r.Context(), idOf(r))
 	if err != nil || !target.IsStaff() {
 		fail(w, http.StatusNotFound, "no such staff account")
 		return
@@ -159,13 +159,13 @@ func (h *handlers) updateStaff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if hash != "" {
-		_ = h.Store.DeleteUserSessions(r.Context(), target.ID)
+		_ = h.Store.DeleteStaffSessions(r.Context(), target.ID)
 	}
 	h.listStaff(w, r)
 }
 
 func (h *handlers) deleteStaff(w http.ResponseWriter, r *http.Request) {
-	target, err := h.Store.UserByID(r.Context(), idOf(r))
+	target, err := h.Store.StaffByID(r.Context(), idOf(r))
 	if err != nil || !target.IsStaff() {
 		fail(w, http.StatusNotFound, "no such staff account")
 		return

@@ -32,7 +32,7 @@ func TestPurchaseFlow(t *testing.T) {
 	}
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 
 	// Stripe's API is faked; EPay only needs a URL.
 	stripeAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

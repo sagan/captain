@@ -103,6 +103,9 @@ var ErrRenewNotQueue = errors.New("orders: you already hold this plan; renew it 
 // plan on payment (stacking next to, or renewing, what they have), "queue"
 // holds it until their current plans lapse.
 func (o *Orders) CreateWith(ctx context.Context, user *domain.User, planID int64, periodDays int, couponCode, gateway, clientIP, activation string) (*domain.Order, *payment.Checkout, error) {
+	if user.Role != domain.RoleUser {
+		return nil, nil, errors.New("orders: customer account required")
+	}
 	if activation != "" && activation != "queue" {
 		return nil, nil, fmt.Errorf("orders: activation must be empty or \"queue\"")
 	}

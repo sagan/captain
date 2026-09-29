@@ -6,6 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AccountIDEditor } from '../components/AccountIDEditor'
+import { useAuth } from '../lib/auth'
 import { api, type Group as UGroup, type HwidDevice, type OnlineDevice, type Page, type Plan, type SubRequest, type UserRow } from '../lib/api'
 import { bytes, money, when } from '../lib/format'
 import { toast } from '../lib/notify'
@@ -22,6 +24,7 @@ import { SegmentedControl } from '@mantine/core'
 
 export default function UsersPage() {
   const { t } = useTranslation()
+  const { me } = useAuth()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [debounced] = useDebouncedValue(search, 300)
@@ -91,6 +94,7 @@ export default function UsersPage() {
       <Drawer opened={sel !== null} onClose={() => setSel(null)} position="right" size="lg" title={sel?.email}>
         {sel && (
           <Stack gap="lg">
+            {me?.role === 'admin' && <AccountIDEditor key={sel.id} id={sel.id} endpoint={`/api/admin/users/${sel.id}/id`} onChanged={() => setSel(null)} />}
             <Group gap="xl">
               <div><Text size="xs" c="dimmed">{t('users.uuid')}</Text><Group gap={4}><Code>{sel.uuid}</Code><Copy value={sel.uuid} /></Group></div>
               <div><Text size="xs" c="dimmed">{t('users.createdAt')}</Text><Text size="sm">{when(sel.created_at)}</Text></div>

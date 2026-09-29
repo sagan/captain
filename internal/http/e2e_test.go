@@ -104,7 +104,7 @@ func TestEndToEnd(t *testing.T) {
 	}
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	if err := st.CreateUser(context.Background(), adminUser); err != nil {
+	if err := st.CreateStaff(context.Background(), adminUser); err != nil {
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
@@ -326,15 +326,16 @@ func TestAdminLists(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	c := &client{t: t, srv: srv}
 	c.do("POST", "/api/admin/login", map[string]string{"Email": "admin@test", "Password": "password123"}, nil)
-	c.do("POST", "/api/admin/users", map[string]string{"Email": "a@test", "Password": "password123"}, nil)
+	_, created, _ := c.do("POST", "/api/admin/users", map[string]string{"Email": "a@test", "Password": "password123"}, nil)
+	u := mustJSON[map[string]any](t, created)
 	_, b, _ := c.do("POST", "/api/admin/plans", map[string]any{"Name": "p", "PriceCents": 100, "PeriodDays": 30}, nil)
 	plan := mustJSON[map[string]any](t, b)
-	c.do("POST", "/api/admin/users/2/grant", map[string]any{"PlanID": plan["ID"]}, nil)
+	c.do("POST", "/api/admin/users/"+itoa(int64(u["id"].(float64)))+"/grant", map[string]any{"PlanID": plan["ID"]}, nil)
 	// Every list endpoint must answer 200 with the expected shape.
 	for _, path := range []string{"/api/admin/users?q=a&page=1", "/api/admin/users", "/api/admin/orders", "/api/admin/plans", "/api/admin/groups", "/api/admin/entries", "/api/admin/nodes", "/api/admin/dashboard"} {
 		code, body, _ := c.do("GET", path, nil, nil)
@@ -346,7 +347,7 @@ func TestAdminLists(t *testing.T) {
 	if !strings.Contains(string(b), `"plan_name":"p"`) || !strings.Contains(string(b), `"total":1`) {
 		t.Fatalf("users list: %s", b)
 	}
-	if code, _, _ := c.do("PATCH", "/api/admin/users/2", map[string]any{"Status": "banned"}, nil); code != 200 {
+	if code, _, _ := c.do("PATCH", "/api/admin/users/"+itoa(int64(u["id"].(float64))), map[string]any{"Status": "banned"}, nil); code != 200 {
 		t.Fatal("update user")
 	}
 	_, b, _ = c.do("GET", "/api/admin/users", nil, nil)
@@ -354,7 +355,7 @@ func TestAdminLists(t *testing.T) {
 		t.Fatalf("banned not reflected: %s", b)
 	}
 	// A banned account's subscription URL is refused outright, no usage header.
-	_, b, _ = c.do("GET", "/api/admin/users/2", nil, nil)
+	_, b, _ = c.do("GET", "/api/admin/users/"+itoa(int64(u["id"].(float64))), nil, nil)
 	banned := mustJSON[map[string]any](t, b)
 	anon := &client{t: t, srv: srv}
 	if code, body, hdr := anon.do("GET", "/sub/"+banned["sub_token"].(string)+"?client=clash", nil, nil); code != http.StatusForbidden || hdr.Get("Subscription-Userinfo") != "" {
@@ -373,7 +374,7 @@ func TestDeviceLimit(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	c := &client{t: t, srv: srv}
@@ -425,7 +426,7 @@ func TestNodeUpgradeRequest(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	c := &client{t: t, srv: srv}
@@ -480,7 +481,7 @@ func TestLoginRateLimit(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	c := &client{t: t, srv: srv}
@@ -505,7 +506,7 @@ func TestSecureCookie(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	body, _ := json.Marshal(map[string]string{"Email": "admin@test", "Password": "password123"})
@@ -535,7 +536,7 @@ func TestACMESettingsReachNodes(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	c := &client{t: t, srv: srv}
@@ -656,7 +657,7 @@ func TestSubscriptionURLsAndHosts(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	server := New(cfg, st, slog.Default())
 	srv := httptest.NewServer(server.Handler())
 	defer srv.Close()
@@ -727,7 +728,7 @@ func TestEntryDefaultsFromInbound(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	c := &client{t: t, srv: srv}
@@ -762,7 +763,7 @@ func TestMailVerificationAndReset(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	ms := mail.Settings{Provider: "smtp", FromAddress: "noreply@test", VerifyRegistration: true, Reminders: true}
 	ms.SMTP.Host = "smtp.test"
 	_ = st.SetSetting(context.Background(), mail.SettingKey, ms)
@@ -854,7 +855,7 @@ func TestPeriodsCouponsInvites(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	ac := &client{t: t, srv: srv}
@@ -955,7 +956,7 @@ func TestAgentLongPoll(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	c := &client{t: t, srv: srv}
@@ -996,7 +997,7 @@ func TestRegistrationLimits(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	ac := &client{t: t, srv: srv}
@@ -1108,7 +1109,7 @@ func TestNodeInstallScript(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	ac := &client{t: t, srv: srv}
@@ -1147,7 +1148,7 @@ func TestOpsBatch(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	ac := &client{t: t, srv: srv}
@@ -1303,7 +1304,7 @@ func TestSurplusAndMultiLevelCommission(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	ac := &client{t: t, srv: srv}
@@ -1445,7 +1446,7 @@ func TestStaffRolesAndWebhooks(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	web := New(cfg, st, slog.Default())
 	web.Hooks().Sync = true
 	srv := httptest.NewServer(web.Handler())
@@ -1569,7 +1570,7 @@ func TestProbePageAndBeats(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	web := New(cfg, st, slog.Default())
 	srv := httptest.NewServer(web.Handler())
 	defer srv.Close()
@@ -1806,7 +1807,7 @@ func TestExternalNodesAndRouting(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	ac := &client{t: t, srv: srv}
@@ -1946,7 +1947,7 @@ func TestSubscriptionAdjustments(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	ac := &client{t: t, srv: srv}
@@ -2013,7 +2014,7 @@ func TestSpeedtest(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	ac := &client{t: t, srv: srv}
@@ -2087,7 +2088,7 @@ func TestAPITokensAndMCP(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	ac := &client{t: t, srv: srv}
@@ -2181,7 +2182,7 @@ func TestSubLinksAndTOTP(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	user, _ := admin.NewUser("u@test", "password123", "user")
 	_ = st.CreateUser(context.Background(), user)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
@@ -2332,7 +2333,7 @@ func TestBackups(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	fake := &fakeObjectStore{}
@@ -2450,7 +2451,7 @@ func TestDomainsAndIssuedCertificates(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	issuer := &fakeIssuer{t: t}
 	server := New(cfg, st, slog.Default(), Options{CertIssuer: issuer})
 	srv := httptest.NewServer(server.Handler())
@@ -2588,7 +2589,7 @@ func TestLineIngresses(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	ac := &client{t: t, srv: srv}
@@ -2742,7 +2743,7 @@ func TestAutoDNS(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	cf := &fakeCloudflare{}
 	cfSrv := httptest.NewServer(cf)
 	defer cfSrv.Close()
@@ -2826,7 +2827,7 @@ func TestDeviceLimitRelay(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	c := &client{t: t, srv: srv}

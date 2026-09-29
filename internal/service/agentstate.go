@@ -41,6 +41,14 @@ type cachedState struct {
 	at time.Time
 }
 
+// Reset forgets all state belonging to the previous installation. Call while
+// holding Store.Accounts exclusively so a reused user ID cannot inherit a hold.
+func (a *AgentState) Reset() {
+	a.mu.Lock()
+	a.held, a.cache = nil, nil
+	a.mu.Unlock()
+}
+
 // deviceWindow is how far back online IPs count toward the device limit.
 const deviceWindow = 3 * time.Minute
 
@@ -277,7 +285,7 @@ func toSpecUsers(list []*domain.User, over map[int64]bool, limits map[int64]int,
 		if over[u.ID] {
 			continue
 		}
-		su := spec.User{ID: u.ID, Name: u.UUID, UUID: u.UUID, Password: u.UUID, DeviceLimit: limits[u.ID], SpeedLimitMbps: speeds[u.ID]}
+		su := spec.User{ID: u.AgentID, Name: u.UUID, UUID: u.UUID, Password: u.UUID, DeviceLimit: limits[u.ID], SpeedLimitMbps: speeds[u.ID]}
 		if q, ok := quotas[u.ID]; ok {
 			su.QuotaBytes, su.QuotaDays = q.Bytes, q.Days
 		}
@@ -305,4 +313,15 @@ func revision(st *agentproto.State) string {
 	}{st.Node, st.Users, st.Forwards, st.Probe, st.Komari, st.DStatus, jobs})
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:8])
+}
+
+// MoveUserID retains a device hold when the visible account ID changes.
+func (a *AgentState) MoveUserID(oldID, newID int64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if v, ok := a.held[oldID]; ok {
+		a.held[newID] = v
+		delete(a.held, oldID)
+	}
+	a.cache = nil
 }

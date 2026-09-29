@@ -235,7 +235,7 @@ func (h *handlers) callback(w http.ResponseWriter, r *http.Request) {
 	email := strings.ToLower(strings.TrimSpace(cl.Email))
 	verified := cl.EmailVerified || cl.CasdoorVerified || p.TrustEmail
 
-	user, err := h.resolveUser(ctx, r, p, cl.Subject, email, verified, f.Link)
+	user, err := h.resolveUser(ctx, r, p, cl.Subject, email, verified, f.Link, strings.HasPrefix(f.Next, "/admin"))
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -270,38 +270,47 @@ func (h *handlers) callback(w http.ResponseWriter, r *http.Request) {
 // resolveUser maps a provider subject to a Captain user: an existing link,
 // else the signed-in user when linking, else a verified-email match, else a
 // new account when registration allows it.
-func (h *handlers) resolveUser(ctx context.Context, r *http.Request, p *store.OIDCProvider, subject, email string, verified, link bool) (*domain.User, error) {
+func (h *handlers) resolveUser(ctx context.Context, r *http.Request, p *store.OIDCProvider, subject, email string, verified, link, staff bool) (*domain.User, error) {
+	byID, byEmail, updateEmail := h.Store.UserByID, h.Store.UserByEmail, h.Store.UpdateUserEmail
+	byIdentity, linkIdentity := h.Store.UserByIdentity, h.Store.LinkIdentity
+	if staff {
+		byID, byEmail, updateEmail = h.Store.StaffByID, h.Store.StaffByEmail, h.Store.UpdateStaffEmail
+		byIdentity, linkIdentity = h.Store.StaffByIdentity, h.Store.LinkStaffIdentity
+	}
 	if link {
 		u := h.Resolve(r)
-		if u == nil {
+		if u == nil || u.IsStaff() != staff {
 			return nil, errors.New("sign in first to link a login")
 		}
-		if other, err := h.Store.UserByIdentity(ctx, p.ID, subject); err == nil && other != u.ID {
+		if other, err := byIdentity(ctx, p.ID, subject); err == nil && other != u.ID {
 			return nil, errors.New("this external account is already linked to another user")
 		}
-		return u, h.Store.LinkIdentity(ctx, u.ID, p.ID, subject, email)
+		return u, linkIdentity(ctx, u.ID, p.ID, subject, email)
 	}
-	if uid, err := h.Store.UserByIdentity(ctx, p.ID, subject); err == nil {
-		u, err := h.Store.UserByID(ctx, uid)
+	if uid, err := byIdentity(ctx, p.ID, subject); err == nil {
+		u, err := byID(ctx, uid)
 		if err != nil {
 			return nil, err
 		}
 		// Follow an email change at the provider, unless the new address
 		// already belongs to another account.
 		if verified && email != "" && email != u.Email {
-			if _, taken := h.Store.UserByEmail(ctx, email); taken != nil {
-				if err := h.Store.UpdateUserEmail(ctx, u.ID, email); err == nil {
+			if _, taken := byEmail(ctx, email); taken != nil {
+				if err := updateEmail(ctx, u.ID, email); err == nil {
 					u.Email = email
-					_ = h.Store.LinkIdentity(ctx, u.ID, p.ID, subject, email)
+					_ = linkIdentity(ctx, u.ID, p.ID, subject, email)
 				}
 			}
 		}
 		return u, nil
 	}
 	if email != "" && verified {
-		if u, err := h.Store.UserByEmail(ctx, email); err == nil {
-			return u, h.Store.LinkIdentity(ctx, u.ID, p.ID, subject, email)
+		if u, err := byEmail(ctx, email); err == nil {
+			return u, linkIdentity(ctx, u.ID, p.ID, subject, email)
 		}
+	}
+	if staff {
+		return nil, errors.New("no staff account for this login")
 	}
 	if !h.Registration && !p.AutoRegister {
 		return nil, errors.New("no account for this login and registration is closed")
@@ -338,7 +347,7 @@ func (h *handlers) resolveUser(ctx context.Context, r *http.Request, p *store.OI
 		h.Log.Warn("trial grant", "user", u.ID, "err", err)
 	}
 	h.Hooks.Emit(ctx, webhook.UserRegistered, map[string]any{"user_id": u.ID, "email": u.Email, "invited_by": u.InvitedBy, "method": "oidc:" + p.ID})
-	return u, h.Store.LinkIdentity(ctx, u.ID, p.ID, subject, email)
+	return u, linkIdentity(ctx, u.ID, p.ID, subject, email)
 }
 
 // identities lists the signed-in user's external logins.
@@ -348,7 +357,11 @@ func (h *handlers) identities(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "sign in first"})
 		return
 	}
-	list, err := h.Store.IdentitiesByUser(r.Context(), u.ID)
+	listIdentities := h.Store.IdentitiesByUser
+	if u.IsStaff() {
+		listIdentities = h.Store.IdentitiesByStaff
+	}
+	list, err := listIdentities(r.Context(), u.ID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -362,7 +375,11 @@ func (h *handlers) unlink(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "sign in first"})
 		return
 	}
-	if err := h.Store.UnlinkIdentity(r.Context(), u.ID, r.PathValue("id")); err != nil {
+	unlink := h.Store.UnlinkIdentity
+	if u.IsStaff() {
+		unlink = h.Store.UnlinkStaffIdentity
+	}
+	if err := unlink(r.Context(), u.ID, r.PathValue("id")); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}

@@ -111,6 +111,16 @@ Settings → Mail.
 curl -fsSL https://raw.githubusercontent.com/zeptop-dev/captain/master/install.sh | sh
 ```
 
+Console accounts and customers are stored separately in the same database,
+with independent IDs; the first customer on a new installation is user 1.
+An administrator manages the console; create a separate customer account to
+purchase a plan or use a subscription. See [account migration details](docs/ADMIN.md#staff-roles).
+Administrators can change customer and staff IDs from their detail/edit views,
+keeping subscriptions, credentials and account history intact.
+Settings → Reset site clears business data and console settings, retaining the
+current administrator's login and deployment files. See [reset scope and node
+cleanup](docs/ADMIN.md#reset-site) before using it.
+
 The installer asks for the panel domain and an admin account, picks Docker
 when Docker is present and a systemd service otherwise, obtains a
 certificate, and prints the console URL with the credentials. Piped through

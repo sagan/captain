@@ -52,7 +52,7 @@ func newPortalRig(t *testing.T, registration bool, seed ...func(*store.Store)) *
 	}
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	if err := st.CreateUser(context.Background(), adminUser); err != nil {
+	if err := st.CreateStaff(context.Background(), adminUser); err != nil {
 		t.Fatal(err)
 	}
 	for _, f := range seed {

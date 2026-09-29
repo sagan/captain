@@ -140,8 +140,25 @@ func (h *handlers) state(w http.ResponseWriter, r *http.Request) {
 		wait = 50 * time.Second
 	}
 	deadline := time.Now().Add(wait)
+	tokenHash := auth.SHA256Hex(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 	for {
+		h.Store.Accounts.RLock()
+		// A reset can reuse node IDs while this long poll is asleep. Resolve
+		// the token again under the same lock as the state snapshot; never
+		// let an old authenticated Node pointer read a new installation.
+		fresh, err := h.Store.NodeByTokenHash(r.Context(), tokenHash)
+		if err != nil {
+			h.Store.Accounts.RUnlock()
+			if errors.Is(err, store.ErrNotFound) {
+				fail(w, http.StatusUnauthorized, "unknown token")
+			} else {
+				fail(w, http.StatusInternalServerError, "internal error")
+			}
+			return
+		}
+		n = fresh
 		st, err := h.State.Cached(r.Context(), n, time.Now())
+		h.Store.Accounts.RUnlock()
 		if err != nil {
 			h.Log.Error("build state", "node", n.ID, "err", err)
 			fail(w, http.StatusInternalServerError, "internal error")
@@ -200,10 +217,14 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 	// A node may only account for users it actually serves: a compromised
 	// box must not be able to drain other users' quotas or trip their
 	// device limits.
-	allowed, err := h.Store.NodeUserIDs(ctx, n.ID)
+	agentIDs, err := h.Store.NodeAgentUserIDs(ctx, n.ID)
 	if err != nil {
 		h.Log.Error("node users", "node", n.ID, "err", err)
-		allowed = map[int64]bool{}
+		agentIDs = map[int64]int64{}
+	}
+	allowed := map[int64]bool{}
+	for _, id := range agentIDs {
+		allowed[id] = true
 	}
 	// Agents from bosun v0.36 say which inbound each delta went through:
 	// the daily bucket is exact and the charge goes to that inbound's
@@ -217,6 +238,7 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 	dropped := 0
 	samples := make([]store.TrafficSample, 0, len(rep.Traffic))
 	for _, t := range rep.Traffic {
+		t.UserID = agentIDs[t.UserID]
 		if !allowed[t.UserID] || t.Up < 0 || t.Down < 0 {
 			dropped++
 			continue

@@ -27,12 +27,12 @@ var ErrDisabled = errors.New("subscription: account disabled")
 
 // Lines returns what the user may connect to, or ErrNoAccess.
 func (s *Subscription) Lines(ctx context.Context, u *domain.User, at time.Time) ([]subscription.Line, subscription.Account, error) {
+	if u.Role != domain.RoleUser || u.Status != "active" {
+		return nil, subscription.Account{}, ErrDisabled
+	}
 	subs, err := s.Store.ActiveSubscriptions(ctx, u.ID)
 	if err != nil {
 		return nil, subscription.Account{}, err
-	}
-	if u.Status != "active" {
-		return nil, subscription.Account{}, ErrDisabled
 	}
 	usable := usableSubs(subs, at)
 	if len(usable) == 0 {
@@ -55,7 +55,7 @@ func (s *Subscription) Lines(ctx context.Context, u *domain.User, at time.Time) 
 	for _, r := range rows {
 		lines = append(lines, subscription.Line{
 			Name: vars.Expand(subscription.WithFlag(r.Entry.Name, r.Entry.DisplayHost, r.Entry.Region, ss.AutoFlags)), Host: r.Entry.DisplayHost, Port: r.Entry.DisplayPort,
-			Inbound: r.Inbound.Spec(), UUID: u.UUID, UserID: u.ID, Password: u.UUID, Tags: r.Entry.Tags, Extra: r.Entry.ClientExtra,
+			Inbound: r.Inbound.Spec(), UUID: u.UUID, UserID: u.AgentID, Password: u.UUID, Tags: r.Entry.Tags, Extra: r.Entry.ClientExtra,
 		})
 	}
 	// External nodes (imported share links) follow the panel's own entries.
@@ -140,7 +140,7 @@ func (s *Subscription) EntryLinks(ctx context.Context, u *domain.User) ([]EntryL
 	for _, r := range rows {
 		l := subscription.Line{
 			Name: vars.Expand(subscription.WithFlag(r.Entry.Name, r.Entry.DisplayHost, r.Entry.Region, ss.AutoFlags)), Host: r.Entry.DisplayHost, Port: r.Entry.DisplayPort,
-			Inbound: r.Inbound.Spec(), UUID: u.UUID, UserID: u.ID, Password: u.UUID, Tags: r.Entry.Tags,
+			Inbound: r.Inbound.Spec(), UUID: u.UUID, UserID: u.AgentID, Password: u.UUID, Tags: r.Entry.Tags,
 		}
 		out = append(out, EntryLink{EntryID: r.Entry.ID, Name: l.Name, Protocol: string(r.Inbound.Protocol), Host: l.Host, Port: l.Port, URI: subscription.ShareURI(l), Blocked: hidden[r.Entry.ID]})
 	}

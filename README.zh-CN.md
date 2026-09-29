@@ -106,6 +106,13 @@ HWID 设备识别、`/sub` 上的响应规则、每天 `VACUUM INTO` 备份并�
 curl -fsSL https://raw.githubusercontent.com/zeptop-dev/captain/master/install.sh | sh
 ```
 
+后台员工账号和普通用户在同一个数据库中分表存放，独立编号，新安装的第一个普通用户从 1 开始。
+管理员只管理后台；购买套餐或使用订阅需要另建普通用户。旧数据的迁移规则见
+[账号说明](docs/ADMIN.md#staff-roles)。
+管理员可在用户详情和员工编辑窗口中修改对应的数字 ID，订阅链接、凭据和账号历史会保留。
+“设置 → 重置整站”可清空业务数据和后台设置，保留当前管理员登录和部署文件。
+执行前请查看[重置范围及节点清理说明](docs/ADMIN.md#reset-site)。
+
 安装脚本会询问面板域名和管理员账号，有 Docker 就用 Docker，没有就
 装成 systemd 服务，申请证书，最后打印出后台地址和登录凭据。用管道
 交给 `sh` 执行时，脚本自身不会落盘。

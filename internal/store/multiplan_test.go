@@ -19,7 +19,7 @@ func TestMultiPlan(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	s := New(conn)
 	ctx := context.Background()
-	at := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
+	at := time.Now().UTC().Truncate(time.Second)
 
 	gA, _ := s.CreateGroup(ctx, "A")
 	gB, _ := s.CreateGroup(ctx, "B")

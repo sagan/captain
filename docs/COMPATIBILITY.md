@@ -52,6 +52,24 @@ Not covered by any promise: the admin console's internal HTTP calls beyond
 the routes above, log line wording, the MCP tool list (it follows the
 features), and anything documented as experimental.
 
+## Account separation (migration 52)
+
+Console and customer accounts now have independent ID namespaces in the same
+SQLite file. The migration preserves existing IDs, customer subscription credentials and management
+API response shapes stay unchanged. New installations start customer IDs at
+1. Staff sign-in to the customer portal is refused; using a subscription
+requires a separate customer account. This fixes subscriptions that the old
+portal allowed staff to purchase but never provisioned to a node. Existing
+staff customer history is preserved as disabled customer records; see
+[ADMIN.md](ADMIN.md#staff-roles). No newer bosun is required.
+
+Migration 53 adds an immutable internal node identity, initially equal to
+each customer's existing ID. Administrators may explicitly change customer
+and staff IDs through the new ID endpoints; scripts addressing those accounts
+must then use the new ID. Subscription URLs, proxy credentials and the agent
+protocol stay unchanged. Older bosun nodes continue to report the same wire
+IDs; Captain maps them to the current customer IDs before billing.
+
 ## Captain ↔ bosun
 
 A node is always safe to run **newer** than the panel: bosun ignores state

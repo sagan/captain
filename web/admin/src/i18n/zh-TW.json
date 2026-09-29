@@ -1346,5 +1346,37 @@
       "panel_cert_expiring": "{{days}} 天後到期",
       "panel_cert_expired": "已過期"
     }
+  },
+  "accountID": {
+    "label": "帳號 ID",
+    "change": "修改 ID",
+    "hint": "請輸入未被使用的正整數。訂閱連結、認證憑證和現有記錄保持不變。"
+  },
+  "siteReset": {
+    "title": "重設全站",
+    "description": "清空 Captain 的業務資料和後台設定，重新開始使用。",
+    "open": "查看重設範圍",
+    "irreversible": "此操作無法復原",
+    "warning": "將刪除使用者、其他員工帳號、方案、訂單、訂閱、節點、面板中儲存的憑證、統計紀錄及全部後台設定。請先備份需要保留的資料。",
+    "loading": "正在統計受影響的資料…",
+    "previewFailed": "無法讀取重設範圍。",
+    "retry": "重試",
+    "admin": "保留 {{email}}，管理員 ID 恢復為 1，密碼和已啟用的兩步驟驗證不變。所有登入工作階段、API token、訂閱連結和節點配對均失效，重設後需重新登入。",
+    "preserved": "保留部署檔案（config.yaml、HTTPS 憑證及自訂靜態網站檔案）、既有備份和外部 DNS 紀錄。config.yaml 中的設定，包括支付閘道，仍然生效。",
+    "nodesWarning": "不會解除安裝遠端 bosun，也不會清除節點快取的執行設定，節點可能繼續服務舊使用者。請先停用或清理節點，重設後重新配對。",
+    "nodesAcknowledge": "我已處理遠端節點，並理解重設 Captain 不會停止這些節點。",
+    "password": "目前管理員密碼",
+    "codeHint": "請輸入尚未用於登入的新驗證碼。",
+    "confirmation": "確認文字",
+    "confirmationHint": "完整輸入 RESET，確認刪除資料。",
+    "execute": "刪除資料並重設",
+    "counts": {
+      "users": "一般使用者",
+      "staff": "員工帳號（保留一名管理員）",
+      "nodes": "節點",
+      "plans": "方案",
+      "orders": "訂單",
+      "subscriptions": "訂閱"
+    }
   }
 }

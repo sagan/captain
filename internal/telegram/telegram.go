@@ -245,6 +245,8 @@ func (b *Bot) Poll(ctx context.Context) error {
 
 // handle answers one command.
 func (b *Bot) handle(ctx context.Context, chatID int64, text string) string {
+	b.Store.Accounts.RLock()
+	defer b.Store.Accounts.RUnlock()
 	cmd, arg, _ := strings.Cut(text, " ")
 	cmd = strings.ToLower(strings.TrimSpace(cmd))
 	if i := strings.IndexByte(cmd, '@'); i > 0 {

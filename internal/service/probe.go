@@ -93,6 +93,24 @@ func (p *Probe) Invalidate() {
 	p.mu.Unlock()
 }
 
+// Reset discards the old installation's node samples and pending alerts.
+// The caller holds Store.Accounts exclusively against requests and jobs.
+func (p *Probe) Reset() {
+	p.mu.Lock()
+	p.live = nil
+	p.settings = store.ProbeSettings{}
+	p.fetched, p.started = time.Time{}, time.Time{}
+	p.gen++
+	p.mu.Unlock()
+	p.alertMu.Lock()
+	if p.alertTimer != nil {
+		p.alertTimer.Stop()
+		p.alertTimer = nil
+	}
+	p.pending = nil
+	p.alertMu.Unlock()
+}
+
 // AgentConfig is what a node receives in its state.
 func (p *Probe) AgentConfig(ctx context.Context, nodeID int64) *spec.Probe {
 	s := p.Settings(ctx)

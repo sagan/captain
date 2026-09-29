@@ -70,6 +70,15 @@ func (d *DynLimit) Invalidate() {
 	d.mu.Unlock()
 }
 
+// Reset clears both settings and traffic windows before account IDs are reused.
+func (d *DynLimit) Reset() {
+	d.mu.Lock()
+	d.recent = nil
+	d.settings = store.DynLimitSettings{}
+	d.fetched = time.Time{}
+	d.mu.Unlock()
+}
+
 // sample is one report's delta for a user: bytes accumulated over the
 // window that ended at end.
 type sample struct {
@@ -254,4 +263,13 @@ func ValidateWindows(windows []string) error {
 		}
 	}
 	return nil
+}
+
+func (d *DynLimit) MoveUserID(oldID, newID int64) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if v, ok := d.recent[oldID]; ok {
+		d.recent[newID] = v
+		delete(d.recent, oldID)
+	}
 }

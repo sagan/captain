@@ -129,12 +129,12 @@ func (h *handlers) requireUser(next http.HandlerFunc) http.HandlerFunc {
 			fail(w, http.StatusForbidden, "cross-site request refused")
 			return
 		}
-		u, _, err := h.Sessions.Resolve(r.Context(), c.Value)
+		u, staffSession, err := h.Sessions.Resolve(r.Context(), c.Value)
 		if err != nil {
 			fail(w, http.StatusInternalServerError, "internal error")
 			return
 		}
-		if u == nil || u.Status != "active" {
+		if u == nil || staffSession || u.Role != domain.RoleUser || u.Status != "active" {
 			fail(w, http.StatusUnauthorized, "not logged in")
 			return
 		}

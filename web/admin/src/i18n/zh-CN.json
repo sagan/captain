@@ -1346,5 +1346,37 @@
       "panel_cert_expiring": "{{days}} 天后到期",
       "panel_cert_expired": "已过期"
     }
+  },
+  "accountID": {
+    "label": "账号 ID",
+    "change": "修改 ID",
+    "hint": "请输入未被占用的正整数。订阅链接、认证凭据和已有记录保持不变。"
+  },
+  "siteReset": {
+    "title": "重置整站",
+    "description": "清空 Captain 的业务数据和后台设置，重新开始使用。",
+    "open": "查看重置范围",
+    "irreversible": "此操作无法撤销",
+    "warning": "将删除用户、其他员工账号、套餐、订单、订阅、节点、面板中保存的证书、统计记录及全部后台设置。请先备份需要保留的数据。",
+    "loading": "正在统计受影响的数据…",
+    "previewFailed": "无法读取重置范围。",
+    "retry": "重试",
+    "admin": "保留 {{email}}，管理员 ID 恢复为 1，密码和已启用的两步验证不变。所有登录会话、API token、订阅链接和节点配对均失效，重置后需要重新登录。",
+    "preserved": "保留部署文件（config.yaml、HTTPS 证书及自定义静态站点文件）、已有备份和外部 DNS 记录。config.yaml 中的配置，包括支付网关，仍然生效。",
+    "nodesWarning": "不会卸载远端 bosun，也不会清除节点缓存的运行配置，节点可能继续服务旧用户。请先停用或清理节点，重置后重新配对。",
+    "nodesAcknowledge": "我已处理远端节点，并理解重置 Captain 不会停止这些节点。",
+    "password": "当前管理员密码",
+    "codeHint": "请输入尚未用于登录的新验证码。",
+    "confirmation": "确认文字",
+    "confirmationHint": "准确输入 RESET，确认删除数据。",
+    "execute": "删除数据并重置",
+    "counts": {
+      "users": "普通用户",
+      "staff": "员工账号（保留一名管理员）",
+      "nodes": "节点",
+      "plans": "套餐",
+      "orders": "订单",
+      "subscriptions": "订阅"
+    }
   }
 }

@@ -99,6 +99,8 @@ func Register(mux *http.ServeMux, d Deps) {
 	mux.HandleFunc("POST /api/admin/login", h.sameOrigin(h.login))
 	mux.HandleFunc("POST /api/admin/logout", h.logout)
 	mux.HandleFunc("GET /api/admin/me", h.requireAdmin(h.me))
+	mux.HandleFunc("GET /api/admin/system/reset", h.requireAdmin(h.resetPreview))
+	mux.HandleFunc("POST /api/admin/system/reset", h.requireAdmin(h.resetSite))
 	mux.HandleFunc("GET /api/admin/dashboard", h.requireAdmin(h.dashboard))
 
 	mux.HandleFunc("GET /api/admin/nodes", h.requireAdmin(h.listNodes))
@@ -160,6 +162,8 @@ func Register(mux *http.ServeMux, d Deps) {
 		mux.HandleFunc("GET /api/admin/metrics", h.requireAdmin(func(w http.ResponseWriter, r *http.Request) { d.Metrics.ServeHTTP(w, r) }))
 	}
 	mux.HandleFunc("GET /api/admin/users/{id}", h.requireAdmin(h.getUser))
+	mux.HandleFunc("PUT /api/admin/users/{id}/id", h.requireAdmin(h.changeUserID))
+	mux.HandleFunc("PUT /api/admin/admins/{id}/id", h.requireAdmin(h.changeStaffID))
 	mux.HandleFunc("PATCH /api/admin/users/{id}", h.requireAdmin(h.updateUser))
 	mux.HandleFunc("DELETE /api/admin/users/{id}", h.requireAdmin(h.deleteUser))
 	mux.HandleFunc("POST /api/admin/users/{id}/grant", h.requireAdmin(h.grantPlan))
@@ -280,6 +284,10 @@ func (h *handlers) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 				fail(w, http.StatusForbidden, "this token is read-only")
 				return
 			}
+			if u != nil && r.URL.Path == "/api/admin/system/reset" {
+				fail(w, http.StatusForbidden, "site reset requires a console session")
+				return
+			}
 			if u != nil && strings.HasPrefix(r.URL.Path, "/api/admin/admins") {
 				fail(w, http.StatusForbidden, "staff accounts can only be managed from the console")
 				return
@@ -356,7 +364,7 @@ func (h *handlers) login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	u, err := h.Store.UserByEmail(r.Context(), in.Email)
+	u, err := h.Store.StaffByEmail(r.Context(), in.Email)
 	hash := ""
 	if err == nil {
 		hash = u.PasswordHash
@@ -387,7 +395,7 @@ func (h *handlers) login(w http.ResponseWriter, r *http.Request) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"totp": true, "error": "authenticator code required"})
 			return
 		}
-		if !auth.VerifyTOTPOnce(strconv.FormatInt(u.ID, 10), secret, in.Code, time.Now()) {
+		if !auth.VerifyTOTPOnce("staff:"+auth.SHA256Hex(secret), secret, in.Code, time.Now()) {
 			if h.Logins != nil {
 				h.Logins.Fail(ip)
 			}

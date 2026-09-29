@@ -275,7 +275,7 @@ func cmdAdmin(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := st.CreateUser(context.Background(), u); err != nil {
+	if err := st.CreateStaff(context.Background(), u); err != nil {
 		return err
 	}
 	log.Info("admin created", "id", u.ID, "email", u.Email)

@@ -350,5 +350,9 @@ func NewUser(email, password, role string) (*domain.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &domain.User{Email: email, PasswordHash: hash, Role: role, UUID: auth.UUID(), SubToken: auth.Token(24), Status: "active"}, nil
+	u := &domain.User{Email: email, PasswordHash: hash, Role: role, Status: "active"}
+	if role == domain.RoleUser {
+		u.UUID, u.SubToken = auth.UUID(), auth.Token(24)
+	}
+	return u, nil
 }

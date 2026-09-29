@@ -8,6 +8,11 @@ AI agent in [MCP.md](MCP.md). Paths below are the binary install
 (`/etc/captain/config.yaml`, `/var/lib/captain`); with Docker the data
 directory is the `captain-data` volume mounted at `/var/lib/captain`.
 
+To start over without reinstalling the service, use **Settings → Reset site**.
+Read [the reset scope](ADMIN.md#reset-site), export needed backups and stop or
+clean up remote nodes first. Resetting Captain does not uninstall bosun or
+remove deployment files and existing backups.
+
 ## One process, one SQLite file
 
 `internal/db/db.go` opens the database with `journal_mode=WAL`,

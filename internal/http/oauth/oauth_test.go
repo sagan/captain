@@ -75,7 +75,7 @@ func TestOIDCLogin(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	var srv *httptest.Server
 	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cfg.BaseURL = srv.URL
@@ -142,6 +142,33 @@ func TestOIDCLogin(t *testing.T) {
 	resp, _ = c3.Get(srv.URL + "/api/admin/me")
 	if resp.StatusCode != 200 {
 		t.Fatalf("admin should be signed in through oidc: %d", resp.StatusCode)
+	}
+	// A staff OIDC session must not resolve customer ID 1 from the other table.
+	resp, _ = c3.Get(srv.URL + "/api/portal/me")
+	if resp.StatusCode != 401 {
+		t.Fatalf("staff OIDC session reached portal: %d", resp.StatusCode)
+	}
+	if sid, err := st.StaffByIdentity(context.Background(), "idp", "user-2"); err != nil || sid != adminUser.ID {
+		t.Fatalf("staff identity: %d %v", sid, err)
+	}
+	// No implicit customer may be created from a staff-only login when registration is closed.
+	cfg.Portal.Registration = false
+	portalJar, _ := cookiejar.New(nil)
+	staffAtPortal := &http.Client{Jar: portalJar}
+	resp, _ = staffAtPortal.Get(srv.URL + "/api/oauth/idp/start?next=/portal/")
+	if !strings.Contains(resp.Request.URL.String(), "/portal/login?error=") {
+		t.Fatal("staff identity reused as customer")
+	}
+	// Even a valid staff OIDC link cannot bypass TOTP.
+	if err := st.SetTOTP(context.Background(), adminUser.ID, "JBSWY3DPEHPK3PXP", true); err != nil {
+		t.Fatal(err)
+	}
+	totpJar, _ := cookiejar.New(nil)
+	totpClient := &http.Client{Jar: totpJar}
+	totpClient.Get(srv.URL + "/api/oauth/idp/start?next=/admin/")
+	resp, _ = totpClient.Get(srv.URL + "/api/admin/me")
+	if resp.StatusCode == 200 {
+		t.Fatal("OIDC bypassed staff TOTP")
 	}
 	// Registration closed and unknown user: refused with a message on the login page.
 	cfg.Portal.Registration = false

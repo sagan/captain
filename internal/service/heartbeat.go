@@ -55,6 +55,15 @@ func (h *Heartbeat) Invalidate() {
 	h.mu.Unlock()
 }
 
+// Reset removes settings and the last result from the previous installation.
+func (h *Heartbeat) Reset() {
+	h.mu.Lock()
+	h.settings = store.HeartbeatSettings{}
+	h.last = store.HeartbeatStatus{}
+	h.fetched = time.Time{}
+	h.mu.Unlock()
+}
+
 // Status is what the settings card shows: the last attempt and its result.
 func (h *Heartbeat) Status() store.HeartbeatStatus {
 	h.mu.Lock()

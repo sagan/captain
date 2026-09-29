@@ -12,7 +12,42 @@ Admin → Staff creates console accounts with a role:
 | **operator** | everything except settings, system, staff, the landing page, and the audit rules and log — those write every node's core config and record where users went |
 | **support** | tickets, plus read-only users, orders, plans and the dashboard. No connection log, no subscription links, and the user payloads leave the subscription token out |
 
+Console accounts (`staff`) and customers (`users`) are separate tables in the
+same SQLite database. Each has its own ID sequence: on a new installation,
+admin 1 and customer 1 are different accounts. Creating staff does not consume
+customer IDs. The same email may be used once in each table, with independent
+passwords, sessions and OIDC links. Staff accounts have no proxy UUID or
+subscription token; to use a subscription, create a customer and assign or
+purchase a plan. Console credentials and cookies cannot access the portal.
+
+Migration 52 preserves existing customer IDs, UUIDs and subscription URLs,
+and moves staff passwords, TOTP, API tokens and OIDC links to the console
+namespace. Valid console sessions survive; old staff sessions issued by the
+portal are revoked. If a former staff account has orders, subscriptions,
+balance or other customer history, that history remains attached to a disabled
+customer with no password. It cannot sign in or use a subscription until an
+administrator deliberately enables it; password login also needs a new
+customer password. Staff without customer history is removed from `users` entirely. Existing databases
+are not renumbered; restore the pre-upgrade snapshot to roll back this schema.
+
 The last admin cannot be demoted, disabled or deleted.
+
+**Change an account ID** — the customer detail drawer and the staff edit
+dialog each have a separate Change ID control. Only the `admin` role can
+use it, including for its own account. Choose an unused positive integer up
+to 9007199254740991; customer and staff IDs are checked in their own namespaces.
+An ID still referenced by another account's historical records is reserved.
+The operation preserves subscription URLs, proxy credentials, balances,
+orders, invitations, history, sessions, API tokens and two-factor setup.
+Scripts using the numeric account ID must use the new ID for later requests.
+
+The API is `PUT /api/admin/users/{id}/id` for customers or
+`PUT /api/admin/admins/{id}/id` for staff, with `{"id":42}` as the request
+and response body. Invalid IDs return 400, missing accounts 404 and occupied
+IDs 409. As with all staff management, a cookie session is required for the
+staff endpoint; API tokens cannot call it. Node accounting uses a separate
+immutable identity, so pending traffic reports cannot be billed to a new
+owner of the old account ID.
 
 **Two-factor sign-in** — Settings → Two-factor authentication: each staff
 account can add a TOTP authenticator, and the console then asks for the
@@ -51,9 +86,10 @@ A token carries its owner's role, narrowed by what it was issued with:
   `Referer` of the panel's own host, so a page on another site cannot drive
   the API with a victim's session even where `SameSite=Lax` would let the
   cookie through. `Authorization: Bearer` requests and reads are exempt.
-- **Session kinds** — a portal, OIDC or password-reset session never
-  reaches `/api/admin`, even for a staff account; the console needs the
-  admin login. Changing a password drops that user's sessions.
+- **Session kinds** — customer sessions (password, OIDC or password reset)
+  never reach `/api/admin`, and console sessions cannot enter authenticated
+  `/api/portal` routes. Console sign-in uses the staff namespace, with TOTP
+  when enabled. Changing a password drops only that account's sessions.
 - **Which address is "yours"** — behind a proxy, `X-Forwarded-For` read
   from the right, skipping trusted proxies. The full rules, and how to
   configure `trusted_proxies`, are in
@@ -149,6 +185,46 @@ both back out.
 Restore, upgrade and rollback procedures — including the `-wal`/`-shm`
 caveat that silently corrupts a careless restore — are in
 [OPERATIONS.md](OPERATIONS.md).
+
+## Reset site
+
+Settings → Reset site starts Captain over with an empty business database.
+Only an active **admin** using a console cookie session can preview or execute
+it; operator/support accounts, customer sessions and API tokens cannot. The
+confirmation dialog shows affected record counts, requires the current password,
+a fresh authenticator code when TOTP is enabled, and the exact text `RESET`.
+Failed credential attempts share the sign-in rate limit.
+
+- Deletes customers, other staff, plans, orders, subscriptions, balances, node
+  records, entries, panel-managed certificates, history and all database settings.
+  Old sessions, API tokens, subscription URLs and node pairings stop working.
+- Recreates the calling admin as ID 1 with the same email, password and enabled
+  TOTP. The first new customer is ID 1 independently. Everyone must sign in again;
+  the reset itself becomes the first new admin audit entry.
+- Preserves the database schema/migration version and all deployment files:
+  `config.yaml`, the panel's HTTPS certificates, ACME files, custom static site
+  files and existing local/remote backups. External DNS records are untouched.
+  Configuration supplied in `config.yaml`, including payment gateways, remains
+  in effect. This is not an uninstall or secure erasure of historical backups.
+- **Remote bosun processes and cached configurations are not cleared.** They can
+  continue serving existing users after losing the panel connection. Stop or
+  clean up those nodes first; then create new node records and pair again.
+  When node records exist, both the dialog and API require acknowledgement of
+  this condition.
+
+Take and download any backup you need **before** confirming. The reset does not
+make an automatic backup. Database cleanup, ID sequences and the retained admin
+are committed in one transaction; a database failure rolls the whole operation
+back. In-flight requests and jobs complete before resetting, and cached account
+and node state is discarded before new requests proceed. Long polls recheck their
+node token, including after a node ID is reused.
+
+`GET /api/admin/system/reset` returns counts for `users`, `staff`, `nodes`,
+`plans`, `orders` and `subscriptions`. `POST` to the same path accepts
+`{"password":"…","code":"…","confirmation":"RESET","nodes_acknowledged":true}`
+and returns `{"ok":true,"admin_id":1}`. `code` is required only with TOTP;
+`nodes_acknowledged` must be true when nodes exist. Success expires the cookie
+and the console returns to sign-in. No process restart is required.
 
 ## Interface languages
 

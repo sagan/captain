@@ -9,14 +9,17 @@ import (
 	"github.com/zeptop-dev/bosun/pkg/spec"
 )
 
+// User is a customer or an authenticated staff principal. Staff lives in its
+// own table; Role determines the ID namespace. Staff has no proxy credentials.
 type User struct {
+	AgentID      int64 // immutable numeric identity in the node protocol
 	ID           int64
 	InviteCode   string
 	InvitedBy    *int64
 	RegisterIP   string
 	Email        string
 	PasswordHash string
-	Role         string // "admin" | "user"
+	Role         string // "user" | "admin" | "operator" | "support"
 	UUID         string
 	SubToken     string
 	GroupID      *int64
@@ -57,7 +60,7 @@ func ValidStaffRole(r string) bool { return r == RoleAdmin || r == RoleOperator 
 
 type Session struct {
 	ID        string
-	UserID    int64
+	UserID    int64 // staff.id when Admin, users.id otherwise
 	ExpiresAt time.Time
 	// Admin is set only by the admin login (password + authenticator);
 	// portal, OIDC and password-reset sessions never reach /api/admin.

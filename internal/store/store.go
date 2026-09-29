@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -14,7 +15,9 @@ var ErrNotFound = errors.New("store: not found")
 
 // Store wraps the database handle.
 type Store struct {
-	db *sql.DB
+	// Accounts serializes renumbering and site resets with requests/jobs holding resolved IDs.
+	Accounts sync.RWMutex
+	db       *sql.DB
 }
 
 // New returns a store over db.

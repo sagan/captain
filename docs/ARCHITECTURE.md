@@ -67,6 +67,20 @@ Language and library choices:
   reach `/api/admin`. Staff can also use personal API tokens (`cap_…`, same
   role as the owner). Agents authenticate with a per-node token created at
   pairing time; the store keeps its SHA-256.
+- Staff accounts and customers occupy separate `staff` and `users` tables,
+  with independent ID sequences. Sessions carry exactly one of `staff_id` or
+  `user_id`; `admin` must match that foreign key. API tokens and TOTP belong
+  only to staff; OIDC links use `staff_identities` or `identities` according
+  to the login destination. Never resolve a staff ID through `UserByID`, even
+  when the numbers or emails match. Only customers have proxy credentials.
+- Account IDs can be edited by an administrator. `store.ChangeAccountID`
+  moves every relational reference in one transaction; the `Accounts` lock
+  prevents requests and background jobs from retaining an obsolete numeric
+  owner across the move. Customer `agent_id` is allocated separately and
+  never changes or gets reused. Agent state and ID-derived subscription
+  fields use it; reports map it back to the current account before billing.
+  This prevents an offline node's delayed traffic from charging a new owner
+  of a reused management ID. Add new account references to `account_ids.go`.
 - Frontends built by pnpm + Vite (`make web` before `go build`); dev serves
   them with a proxy to the Go API (`/api`, `/sub` → 127.0.0.1:8080).
 - Logging is `log/slog` text on stderr; `log_level` in the config.

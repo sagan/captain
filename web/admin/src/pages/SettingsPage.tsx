@@ -27,6 +27,7 @@ import { KomariCard } from '../components/KomariCard'
 import { ConnLogCard } from '../components/ConnLogCard'
 import { AuditRulesCard } from '../components/AuditRulesCard'
 import { DynLimitCard } from '../components/DynLimitCard'
+import { ResetSiteCard } from '../components/ResetSiteCard'
 
 export default function SettingsPage() {
   const { t } = useTranslation()
@@ -164,6 +165,7 @@ export default function SettingsPage() {
           <Text size="xs" c="dimmed" mt="xs">{t('settings.oidcCallback')} <code>{window.location.origin}/api/oauth/&lt;id&gt;/callback</code></Text>
         </Card>
         <UpdateCard />
+        {me?.role === 'admin' && <ResetSiteCard />}
         <Card><Text size="sm" c="dimmed">{t('settings.version')}: {me?.version ?? '—'}</Text></Card>
       </Stack>
     </>

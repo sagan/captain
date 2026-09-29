@@ -3,18 +3,19 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/zeptop-dev/captain/internal/domain"
 )
 
-const userCols = "id, email, password_hash, role, uuid, sub_token, group_id, balance_cents, status, created_at, updated_at, COALESCE(invite_code, ''), invited_by, hwid_limit, first_connected_at, lang"
+const userCols = "id, email, password_hash, role, uuid, sub_token, group_id, balance_cents, status, created_at, updated_at, COALESCE(invite_code, ''), invited_by, hwid_limit, first_connected_at, lang, agent_id"
 
 func scanUser(row interface{ Scan(...any) error }) (*domain.User, error) {
 	var u domain.User
 	var group, invitedBy, hwid, firstConn sql.NullInt64
 	var created, updated int64
-	if err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.UUID, &u.SubToken, &group, &u.BalanceCents, &u.Status, &created, &updated, &u.InviteCode, &invitedBy, &hwid, &firstConn, &u.Lang); err != nil {
+	if err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.UUID, &u.SubToken, &group, &u.BalanceCents, &u.Status, &created, &updated, &u.InviteCode, &invitedBy, &hwid, &firstConn, &u.Lang, &u.AgentID); err != nil {
 		return nil, wrapNotFound(err)
 	}
 	u.GroupID = int64Ptr(group)
@@ -33,19 +34,43 @@ func scanUser(row interface{ Scan(...any) error }) (*domain.User, error) {
 
 // CreateUser inserts a user and sets its ID.
 func (s *Store) CreateUser(ctx context.Context, u *domain.User) error {
+	if u.Role == "" {
+		u.Role = domain.RoleUser
+	}
+	if u.Role != domain.RoleUser {
+		return errors.New("customer role must be user")
+	}
 	ts := now()
 	if u.InviteCode == "" {
 		u.InviteCode = newInviteCode()
 	}
-	res, err := s.db.ExecContext(ctx, `INSERT INTO users (email, password_hash, role, uuid, sub_token, group_id, balance_cents, status, created_at, updated_at, invite_code, invited_by, register_ip)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.Email, u.PasswordHash, u.Role, u.UUID, u.SubToken, nullInt64(u.GroupID), u.BalanceCents, u.Status, ts, ts, u.InviteCode, nullInt64(u.InvitedBy), u.RegisterIP)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var highest int64
+	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(id),0) FROM users`).Scan(&highest); err != nil {
+		return err
+	}
+	if highest >= MaxAccountID {
+		return ErrAccountID
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE account_sequences SET value = value + 1 WHERE name = 'agent'`); err != nil {
+		return err
+	}
+	if err = tx.QueryRowContext(ctx, `SELECT value FROM account_sequences WHERE name = 'agent'`).Scan(&u.AgentID); err != nil {
+		return err
+	}
+	res, err := tx.ExecContext(ctx, `INSERT INTO users (email, password_hash, role, uuid, sub_token, group_id, balance_cents, status, created_at, updated_at, invite_code, invited_by, register_ip, agent_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.Email, u.PasswordHash, u.Role, u.UUID, u.SubToken, nullInt64(u.GroupID), u.BalanceCents, u.Status, ts, ts, u.InviteCode, nullInt64(u.InvitedBy), u.RegisterIP, u.AgentID)
 	if err != nil {
 		return err
 	}
 	u.ID, _ = res.LastInsertId()
 	u.CreatedAt, u.UpdatedAt = unix(ts), unix(ts)
-	return nil
+	return tx.Commit()
 }
 
 func (s *Store) UserByEmail(ctx context.Context, email string) (*domain.User, error) {
@@ -94,7 +119,11 @@ func (s *Store) UsersWithAccess(ctx context.Context, groupID *int64, at time.Tim
 
 // CreateSession stores a session.
 func (s *Store) CreateSession(ctx context.Context, sess *domain.Session) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO sessions (id, user_id, expires_at, created_at, admin) VALUES (?, ?, ?, ?, ?)`,
+	column := "user_id"
+	if sess.Admin {
+		column = "staff_id"
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO sessions (id, `+column+`, expires_at, created_at, admin) VALUES (?, ?, ?, ?, ?)`,
 		sess.ID, sess.UserID, sess.ExpiresAt.Unix(), now(), boolInt(sess.Admin))
 	return err
 }
@@ -104,10 +133,14 @@ func (s *Store) CreateSession(ctx context.Context, sess *domain.Session) error {
 func (s *Store) SessionUser(ctx context.Context, id string, at time.Time) (*domain.User, bool, error) {
 	var uid int64
 	var admin int
-	if err := s.db.QueryRowContext(ctx, `SELECT user_id, admin FROM sessions WHERE id = ? AND expires_at > ?`, id, at.Unix()).Scan(&uid, &admin); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(user_id, staff_id), admin FROM sessions WHERE id = ? AND expires_at > ?`, id, at.Unix()).Scan(&uid, &admin); err != nil {
 		return nil, false, wrapNotFound(err)
 	}
-	u, err := s.UserByID(ctx, uid)
+	lookup := s.UserByID
+	if admin == 1 {
+		lookup = s.StaffByID
+	}
+	u, err := lookup(ctx, uid)
 	if err != nil {
 		return nil, false, err
 	}
@@ -129,12 +162,12 @@ func (s *Store) UserByUUID(ctx context.Context, uuid string) (*domain.User, erro
 	return scanUser(s.db.QueryRowContext(ctx, `SELECT `+userCols+` FROM users WHERE uuid = ?`, uuid))
 }
 
-// NodeUserIDs is the set of users a node may report traffic or client
-// addresses for: active users with an active subscription who can reach
+// NodeAgentUserIDs maps immutable wire IDs to account IDs for the users
+// a node may report traffic or client addresses for: active users with an active subscription who can reach
 // at least one of the node's enabled inbounds (ungrouped inbound = anyone,
 // grouped = the user's own group or a group of one of their plans).
-func (s *Store) NodeUserIDs(ctx context.Context, nodeID int64) (map[int64]bool, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT u.id FROM users u
+func (s *Store) NodeAgentUserIDs(ctx context.Context, nodeID int64) (map[int64]int64, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT u.agent_id, u.id FROM users u
 		WHERE u.status = 'active' AND u.role = 'user'
 		  AND EXISTS (SELECT 1 FROM subscriptions sub WHERE sub.user_id = u.id AND sub.status = 'active')
 		  AND (EXISTS (SELECT 1 FROM inbounds i WHERE i.node_id = ? AND i.enabled = 1 AND i.group_id IS NULL)
@@ -145,13 +178,13 @@ func (s *Store) NodeUserIDs(ctx context.Context, nodeID int64) (map[int64]bool, 
 		return nil, err
 	}
 	defer rows.Close()
-	out := map[int64]bool{}
+	out := map[int64]int64{}
 	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
+		var wire, id int64
+		if err := rows.Scan(&wire, &id); err != nil {
 			return nil, err
 		}
-		out[id] = true
+		out[wire] = id
 	}
 	return out, rows.Err()
 }
@@ -246,25 +279,6 @@ func (s *Store) UpdateUser(ctx context.Context, id int64, status string, groupID
 	return nil
 }
 
-// UpdateStaff is UpdateUser for a staff account: the admins API guards
-// who may call it (and keeps the last admin), so the role filter that
-// protects staff from the customer endpoints does not apply here.
-func (s *Store) UpdateStaff(ctx context.Context, id int64, status string, passwordHash string) error {
-	if passwordHash != "" {
-		if _, err := s.db.ExecContext(ctx, `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ? AND role <> 'user'`, passwordHash, now(), id); err != nil {
-			return err
-		}
-	}
-	res, err := s.db.ExecContext(ctx, `UPDATE users SET status = ?, updated_at = ? WHERE id = ?`, status, now(), id)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	return nil
-}
-
 // RotateSubToken issues a new subscription token.
 func (s *Store) RotateSubToken(ctx context.Context, id int64, token string) error {
 	res, err := s.db.ExecContext(ctx, `UPDATE users SET sub_token = ?, updated_at = ? WHERE id = ? AND role = 'user'`, token, now(), id)
@@ -331,43 +345,6 @@ func (s *Store) ListGroups(ctx context.Context) ([]domain.Group, error) {
 // UpdateUserEmail changes a user's login email.
 func (s *Store) UpdateUserEmail(ctx context.Context, id int64, email string) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE users SET email = ?, updated_at = ? WHERE id = ?`, email, now(), id)
-	return err
-}
-
-// ListStaff returns console accounts (every role but "user").
-func (s *Store) ListStaff(ctx context.Context) ([]*domain.User, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+userCols+` FROM users WHERE role != 'user' ORDER BY id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []*domain.User
-	for rows.Next() {
-		u, err := scanUser(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, u)
-	}
-	return out, rows.Err()
-}
-
-// SetRole changes a user's role.
-func (s *Store) SetRole(ctx context.Context, id int64, role string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE users SET role = ?, updated_at = ? WHERE id = ?`, role, now(), id)
-	return err
-}
-
-// CountAdmins returns how many full admins exist (the last one cannot go).
-func (s *Store) CountAdmins(ctx context.Context) (int, error) {
-	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active'`).Scan(&n)
-	return n, err
-}
-
-// DeleteStaff removes a console account (never a plain user).
-func (s *Store) DeleteStaff(ctx context.Context, id int64) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ? AND role != 'user'`, id)
 	return err
 }
 

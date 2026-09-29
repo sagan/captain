@@ -45,7 +45,7 @@ func newRig(t *testing.T) *rig {
 	}
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	if err := st.CreateUser(context.Background(), adminUser); err != nil {
+	if err := st.CreateStaff(context.Background(), adminUser); err != nil {
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
@@ -149,7 +149,7 @@ func TestAuditAutoBanTrustsOnlyPanelRules(t *testing.T) {
 func TestAuditNeverBansStaff(t *testing.T) {
 	r := newRig(t)
 	op, _ := admin.NewUser("op@test", "password123", "operator")
-	if err := r.st.CreateUser(context.Background(), op); err != nil {
+	if err := r.st.CreateStaff(context.Background(), op); err != nil {
 		t.Fatal(err)
 	}
 	r.c.do("PUT", "/api/admin/settings/audit", map[string]any{"auto_ban_hits": 1, "window_hours": 24}, nil)
@@ -162,8 +162,8 @@ func TestAuditNeverBansStaff(t *testing.T) {
 			{At: time.Now().Unix(), User: op.UUID, ClientIP: "203.0.113.30", Host: "tracker.test", Port: 443, RuleID: rules[0].ID, Action: "block"},
 		}}, nil)
 	}
-	if got := r.status(op.ID); got != "active" {
-		t.Fatalf("staff account banned by audit rules: %s", got)
+	if got, err := r.st.StaffByID(context.Background(), op.ID); err != nil || got.Status != "active" {
+		t.Fatalf("staff account changed by audit rules: %v %v", got, err)
 	}
 }
 
@@ -279,7 +279,7 @@ func TestSupportRoleCannotSeeCredentials(t *testing.T) {
 	r := newRig(t)
 	uid, _ := r.user("cust@test")
 	sup, _ := admin.NewUser("sup@test", "password123", "support")
-	if err := r.st.CreateUser(context.Background(), sup); err != nil {
+	if err := r.st.CreateStaff(context.Background(), sup); err != nil {
 		t.Fatal(err)
 	}
 	s := &client{t: t, srv: r.srv}
@@ -312,7 +312,7 @@ func TestSupportRoleCannotSeeCredentials(t *testing.T) {
 func TestOperatorCannotTouchAudit(t *testing.T) {
 	r := newRig(t)
 	op, _ := admin.NewUser("op2@test", "password123", "operator")
-	if err := r.st.CreateUser(context.Background(), op); err != nil {
+	if err := r.st.CreateStaff(context.Background(), op); err != nil {
 		t.Fatal(err)
 	}
 	c := &client{t: t, srv: r.srv}
@@ -556,7 +556,7 @@ func TestAdminLogRecordsWritesOnly(t *testing.T) {
 	// Operators and support cannot read it.
 	for _, role := range []string{"operator", "support"} {
 		u, _ := admin.NewUser(role+"@log.test", "password123", role)
-		if err := r.st.CreateUser(context.Background(), u); err != nil {
+		if err := r.st.CreateStaff(context.Background(), u); err != nil {
 			t.Fatal(err)
 		}
 		c := &client{t: t, srv: r.srv}

@@ -16,8 +16,8 @@ import (
 	"github.com/zeptop-dev/captain/internal/store"
 )
 
-// A portal session for a staff account must not open the admin console:
-// only the admin login (password + authenticator) mints admin sessions.
+// Console credentials cannot create a portal session; only the console
+// login (password + authenticator) mints staff sessions.
 func TestPortalSessionCannotReachAdmin(t *testing.T) {
 	cfg := config.Default()
 	cfg.BaseURL = "http://test"
@@ -25,13 +25,13 @@ func TestPortalSessionCannotReachAdmin(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 
 	viaPortal := &client{t: t, srv: srv}
-	if code, b, _ := viaPortal.do("POST", "/api/portal/login", map[string]string{"email": "admin@test", "password": "password123"}, nil); code != 200 {
-		t.Fatalf("portal login: %d %s", code, b)
+	if code, b, _ := viaPortal.do("POST", "/api/portal/login", map[string]string{"email": "admin@test", "password": "password123"}, nil); code != 401 {
+		t.Fatalf("staff portal login: %d %s", code, b)
 	}
 	if code, _, _ := viaPortal.do("GET", "/api/admin/nodes", nil, nil); code != 401 {
 		t.Fatalf("portal session reached the admin API: %d", code)
@@ -63,7 +63,7 @@ func TestNodeReportScopedToItsUsers(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	c := &client{t: t, srv: srv}
@@ -122,7 +122,7 @@ func TestNodeJobChangesRevision(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	c := &client{t: t, srv: srv}
@@ -154,7 +154,7 @@ func TestMetricsEndpoint(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 	anon := &client{t: t, srv: srv}
@@ -182,7 +182,7 @@ func TestCrossSiteWritesRefused(t *testing.T) {
 	_ = db.Migrate(context.Background(), conn, "sqlite")
 	st := store.New(conn)
 	adminUser, _ := admin.NewUser("admin@test", "password123", "admin")
-	_ = st.CreateUser(context.Background(), adminUser)
+	_ = st.CreateStaff(context.Background(), adminUser)
 	srv := httptest.NewServer(New(cfg, st, slog.Default()).Handler())
 	defer srv.Close()
 

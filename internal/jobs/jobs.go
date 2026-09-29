@@ -89,6 +89,8 @@ func (r *Runner) Run(ctx context.Context) {
 
 // Tick runs every job once.
 func (r *Runner) Tick(ctx context.Context) {
+	r.Store.Accounts.RLock()
+	defer r.Store.Accounts.RUnlock()
 	now := time.Now()
 	log := r.Log.With("component", "jobs")
 	report := func(name string, n int64, err error) {

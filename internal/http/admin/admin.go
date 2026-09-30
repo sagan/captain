@@ -91,11 +91,12 @@ const cookieName = "captain_session"
 
 type handlers struct {
 	Deps
+	passkeyStarts ratelimit.Limiter
 }
 
 // Register mounts the admin routes.
 func Register(mux *http.ServeMux, d Deps) {
-	h := &handlers{Deps: d}
+	h := &handlers{Deps: d, passkeyStarts: ratelimit.Limiter{Max: 20, Window: time.Minute, Lock: time.Minute}}
 	mux.HandleFunc("POST /api/admin/login", h.sameOrigin(h.login))
 	mux.HandleFunc("POST /api/admin/logout", h.logout)
 	mux.HandleFunc("GET /api/admin/me", h.requireAdmin(h.me))
@@ -116,6 +117,8 @@ func Register(mux *http.ServeMux, d Deps) {
 	mux.HandleFunc("GET /api/admin/nodes/{id}/jobs/{job}", h.requireAdmin(h.getNodeJob))
 	mux.HandleFunc("GET /api/admin/nodes/{id}/network-diagnostics", h.requireAdmin(h.networkDiagnostics))
 	mux.HandleFunc("POST /api/admin/nodes/upgrade-all", h.requireAdmin(h.upgradeAllNodes))
+	h.registerPasskeys(mux)
+	h.registerUserManagement(mux)
 	h.registerOps(mux)
 	h.registerExternal(mux)
 	h.registerSpeedtest(mux)
@@ -124,6 +127,9 @@ func Register(mux *http.ServeMux, d Deps) {
 	h.registerDomains(mux)
 	h.registerIngresses(mux)
 	h.registerSubTemplates(mux)
+	h.registerSubscriptionProfiles(mux)
+	h.registerConfigPresets(mux)
+	h.registerInfraAssets(mux)
 	h.registerSubDesign(mux)
 	mux.HandleFunc("GET /api/admin/coupons", h.requireAdmin(h.listCoupons))
 	mux.HandleFunc("POST /api/admin/coupons", h.requireAdmin(h.createCoupon))
@@ -284,15 +290,15 @@ func (h *handlers) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 			// interactive login, so a leaked token cannot mint an admin.
 			var scope string
 			u, scope, _ = h.Store.UserByAPIToken(r.Context(), tok)
-			if u != nil && scope == store.ScopeRead && r.Method != http.MethodGet {
-				fail(w, http.StatusForbidden, "this token is read-only")
+			if u != nil && !store.TokenAllowsRequest(scope, r.Method, r.URL.Path, r.Pattern) {
+				fail(w, http.StatusForbidden, "this token does not permit that operation")
 				return
 			}
 			if u != nil && r.URL.Path == "/api/admin/system/reset" {
 				fail(w, http.StatusForbidden, "site reset requires a console session")
 				return
 			}
-			if u != nil && strings.HasPrefix(r.URL.Path, "/api/admin/admins") {
+			if u != nil && (strings.HasPrefix(r.URL.Path, "/api/admin/admins") || strings.HasPrefix(r.URL.Path, "/api/admin/passkeys")) {
 				fail(w, http.StatusForbidden, "staff accounts can only be managed from the console")
 				return
 			}
@@ -387,7 +393,7 @@ func (h *handlers) login(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	if !u.IsStaff() {
+	if !u.IsStaff() || u.Status != "active" {
 		fail(w, http.StatusForbidden, "admin only")
 		return
 	}
@@ -506,7 +512,7 @@ func allowed(role, method, path string) bool {
 		return true
 	case domain.RoleSupport:
 		switch {
-		case path == "/api/admin/me", path == "/api/admin/logout", path == "/api/admin/dashboard", strings.HasPrefix(path, "/api/admin/tokens"), strings.HasPrefix(path, "/api/admin/2fa"):
+		case path == "/api/admin/me", path == "/api/admin/logout", path == "/api/admin/dashboard", strings.HasPrefix(path, "/api/admin/tokens"), strings.HasPrefix(path, "/api/admin/2fa"), strings.HasPrefix(path, "/api/admin/passkeys"):
 			return true
 		case strings.HasPrefix(path, "/api/admin/tickets"):
 			return true

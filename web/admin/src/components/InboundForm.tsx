@@ -6,6 +6,7 @@ import type { Group as UGroup, Inbound, Ingress } from '../lib/api'
 import { IngressFields, emptyIngress, type IngressValues } from './IngressesCard'
 import { RealityScan, type RealityResult } from './RealityScan'
 import { api, type NodeJob } from '../lib/api'
+import { ConfigPresets } from './ConfigPresets'
 import { useCoreSelection } from '../lib/coreSelection'
 
 // REALITY helpers over the settings JSON.
@@ -140,6 +141,7 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
   return (
     <form onSubmit={form.onSubmit(submit)}>
       <Stack>
+        <ConfigPresets kind="inbound" current={() => ({ ...JSON.parse(form.values.Settings || '{}'), tag: form.values.Tag, protocol: form.values.Protocol, listen: form.values.Listen, port: form.values.Port, core: form.values.Core })} onLoad={value => { const v = value as Record<string, unknown>; form.setValues({ Tag: String(v.tag), Protocol: String(v.protocol), Core: String(v.core ?? ''), Settings: JSON.stringify(stripIdentity(v), null, 2) }) }} affected={form.values.Tag ? [form.values.Tag] : []} />
         <div>
           <Text size="sm" fw={600}>{t('inbounds.recipe')}</Text>
           <Text size="xs" c="dimmed" mb="xs">{t('inbounds.recipeHint')}</Text>

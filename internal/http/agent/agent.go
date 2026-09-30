@@ -19,6 +19,7 @@ import (
 	"github.com/zeptop-dev/captain/internal/webhook"
 
 	"github.com/zeptop-dev/bosun/pkg/agentproto"
+	"github.com/zeptop-dev/bosun/pkg/spec"
 
 	"github.com/zeptop-dev/captain/internal/auth"
 	"github.com/zeptop-dev/captain/internal/domain"
@@ -212,7 +213,12 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 	}
 	// Traffic is attributed to the node's first inbound for daily stats; the
 	// subscription charge is per user regardless of inbound.
-	inbounds, _ := h.Store.InboundsByNode(ctx, n.ID)
+	inbounds, err := h.Store.InboundsByNode(ctx, n.ID)
+	if err != nil {
+		h.Log.Error("node inbounds", "err", err)
+		fail(w, 500, "internal error")
+		return
+	}
 	var inboundID int64
 	if len(inbounds) > 0 {
 		inboundID = inbounds[0].ID
@@ -223,7 +229,8 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 	agentIDs, err := h.Store.NodeAgentUserIDs(ctx, n.ID)
 	if err != nil {
 		h.Log.Error("node users", "node", n.ID, "err", err)
-		agentIDs = map[int64]int64{}
+		fail(w, 500, "internal error")
+		return
 	}
 	allowed := map[int64]bool{}
 	for _, id := range agentIDs {
@@ -233,7 +240,12 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 	// the daily bucket is exact and the charge goes to that inbound's
 	// group. Older agents (or cores that cannot tell) fall back to the
 	// node's groups as a whole.
-	groups, _ := h.Store.NodeGroups(ctx, n.ID)
+	groups, err := h.Store.NodeGroups(ctx, n.ID)
+	if err != nil {
+		h.Log.Error("node groups", "err", err)
+		fail(w, 500, "internal error")
+		return
+	}
 	byTag := map[string]*domain.Inbound{}
 	for _, ib := range inbounds {
 		byTag[ib.Tag] = ib
@@ -264,24 +276,32 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 		}
 		samples = append(samples, s)
 	}
-	// A report whose response was lost is re-sent unchanged under the same
-	// batch number: applying it again would charge the same traffic twice.
-	seen, err := h.Store.TrafficSeqSeen(ctx, n.ID, rep.TrafficSeq)
+	// Receipt and all billing/statistic counters commit together. Retries
+	// cannot consume a receipt after a failed write or recount node totals.
+	inTotals := map[int64]spec.Traffic{}
+	outTotals := map[string]spec.Traffic{}
+	for tag, t := range rep.Inbounds {
+		if ib, ok := byTag[tag]; ok && validTraffic(t) {
+			inTotals[ib.ID] = t
+		}
+	}
+	for tag, t := range rep.Outbounds {
+		if len(tag) <= 255 && spec.Plain(tag) && validTraffic(t) {
+			outTotals[tag] = t
+		}
+	}
+	if !store.ValidTrafficReceipt(rep.TrafficEpoch, rep.TrafficSeq) {
+		fail(w, 400, "invalid traffic receipt")
+		return
+	}
+	first, seen, err := h.Store.AcceptNodeTraffic(ctx, n.ID, rep.TrafficEpoch, rep.TrafficSeq, samples, inTotals, outTotals, now)
 	if err != nil {
-		h.Log.Error("traffic batch number", "node", n.ID, "err", err)
+		h.Log.Error("accept traffic", "node", n.ID, "err", err)
 		fail(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	var first []int64
 	if seen {
-		h.Log.Info("traffic batch already applied, skipping", "node", n.ID, "seq", rep.TrafficSeq)
 		samples = nil
-	} else if first, err = h.Store.AddTrafficSamples(ctx, samples, now); err != nil {
-		// Answering 200 here would make the node drop the deltas it just
-		// sent, so the traffic would be lost instead of retried.
-		h.Log.Error("add traffic", "node", n.ID, "samples", len(samples), "err", err)
-		fail(w, http.StatusInternalServerError, "internal error")
-		return
 	}
 	if h.Dyn != nil && len(samples) > 0 {
 		h.Dyn.Observe(ctx, samples, rep.TrafficWindowSeconds, now)
@@ -296,20 +316,6 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 	}
 	if dropped > 0 {
 		h.Log.Warn("traffic samples for users this node does not serve were dropped", "node", n.ID, "dropped", dropped)
-	}
-	for tag, t := range rep.Outbounds {
-		_ = h.Store.AddOutboundTraffic(ctx, n.ID, tag, t.Up, t.Down, now)
-	}
-	if len(rep.Inbounds) > 0 {
-		byTag := map[string]int64{}
-		for _, ib := range inbounds {
-			byTag[ib.Tag] = ib.ID
-		}
-		for tag, t := range rep.Inbounds {
-			if id, ok := byTag[tag]; ok {
-				_ = h.Store.AddInboundTraffic(ctx, id, t.Up, t.Down, now)
-			}
-		}
 	}
 	for name, ips := range rep.Online {
 		if u, err := h.Store.UserByUUID(ctx, name); err == nil && allowed[u.ID] {
@@ -547,4 +553,8 @@ func eventTime(unix int64, now time.Time) time.Time {
 		return now
 	}
 	return t
+}
+
+func validTraffic(t spec.Traffic) bool {
+	return t.Up >= 0 && t.Down >= 0 && t.Up <= maxTrafficDelta && t.Down <= maxTrafficDelta
 }

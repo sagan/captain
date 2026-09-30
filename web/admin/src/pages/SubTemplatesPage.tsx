@@ -6,6 +6,8 @@ import { api } from '../lib/api'
 import { toast } from '../lib/notify'
 import { PageHeader } from '../components/PageHeader'
 import { SubDesigner } from '../components/SubDesigner'
+import { SubTemplateLibrary } from '../components/SubTemplateLibrary'
+import { SubscriptionProfiles } from '../components/SubscriptionProfiles'
 import { ResponseRules } from '../components/ResponseRules'
 
 interface Data { templates: Record<string, string>; defaults: Record<string, string> }
@@ -28,10 +30,13 @@ export default function SubTemplatesPage() {
     onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['sub-templates'] }) }, onError: toast.err,
   })
   const names = Object.keys(q.data?.defaults ?? {})
+  const modes = [{ value: 'design', label: t('subTemplates.modeDesign') }, { value: 'text', label: t('subTemplates.modeText') }, { value: 'rules', label: t('subTemplates.modeRules') }, { value: 'library', label: t('subProfiles.library') }, { value: 'profiles', label: t('subProfiles.profiles') }]
   const isYaml = format === 'clash' || format === 'stash'
   return (
     <>
-      <PageHeader title={t('subTemplates.title')} subtitle={t('subTemplates.subtitle')} actions={<SegmentedControl size="xs" value={mode} onChange={setMode} data={[{ value: 'design', label: t('subTemplates.modeDesign') }, { value: 'text', label: t('subTemplates.modeText') }, { value: 'rules', label: t('subTemplates.modeRules') }]} />} />
+      <PageHeader title={t('subTemplates.title')} subtitle={t('subTemplates.subtitle')} actions={<><Select hiddenFrom="sm" w={260} aria-label={t('subTemplates.title')} value={mode} onChange={v => v && setMode(v)} data={modes} allowDeselect={false} /><SegmentedControl visibleFrom="sm" size="xs" value={mode} onChange={setMode} data={modes} /></>} />
+      {mode === 'library' && <SubTemplateLibrary />}
+      {mode === 'profiles' && <SubscriptionProfiles />}
       {mode === 'design' && <SubDesigner />}
       {mode === 'rules' && <ResponseRules />}
       {mode === 'text' && <Card>

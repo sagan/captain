@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"strings"
 	"testing"
@@ -89,11 +90,36 @@ func TestPublicSectionsMaskSnapshotAndHistory(t *testing.T) {
 		if code != 200 {
 			t.Fatalf("%s %d %s", p, code, b)
 		}
-		for _, secret := range []string{"private-os", "private-target", "private-process", `:73`, `:41`, `:52`, `:123`, `:456`, `:88`} {
+		for _, secret := range []string{"private-os", "private-target", "private-process"} {
 			if strings.Contains(string(b), secret) {
 				t.Fatalf("hidden data %s: %s", p, b)
 			}
 		}
+		// Check decoded numbers: searching for ":41" also matches a perfectly
+		// public last_seen timestamp whose seconds/minutes happen to be 41.
+		var decoded any
+		if err := json.Unmarshal(b, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		var check func(any)
+		check = func(v any) {
+			switch x := v.(type) {
+			case map[string]any:
+				for _, v := range x {
+					check(v)
+				}
+			case []any:
+				for _, v := range x {
+					check(v)
+				}
+			case float64:
+				switch x {
+				case 73, 41, 52, 123, 456, 88:
+					t.Fatalf("hidden numeric data %s: %s", p, b)
+				}
+			}
+		}
+		check(decoded)
 	}
 	// Masking must not mutate private live values.
 	_, b, _ := r.c.do("GET", "/api/admin/nodes/"+itoa(r.nodeID)+"/probe", nil, nil)

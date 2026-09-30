@@ -72,12 +72,20 @@ func (s *Store) AddTrafficSamples(ctx context.Context, samples []TrafficSample, 
 	if len(samples) == 0 {
 		return nil, nil
 	}
-	day := at.UTC().Truncate(24 * time.Hour).Unix()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
+	first, err := addTrafficSamplesTx(ctx, tx, samples, at)
+	if err != nil {
+		return nil, err
+	}
+	return first, tx.Commit()
+}
+
+func addTrafficSamplesTx(ctx context.Context, tx *sql.Tx, samples []TrafficSample, at time.Time) ([]int64, error) {
+	day := at.UTC().Truncate(24 * time.Hour).Unix()
 	ts := now()
 	var first []int64
 	seen := map[int64]bool{}
@@ -106,7 +114,7 @@ func (s *Store) AddTrafficSamples(ctx context.Context, samples []TrafficSample, 
 			}
 		}
 	}
-	return first, tx.Commit()
+	return first, nil
 }
 
 // UpsertOnline records client IPs seen for a user on a node.

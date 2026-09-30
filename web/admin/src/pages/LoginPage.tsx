@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { api, ApiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { Brand } from '../components/AppLayout'
+import { loginWithPasskey, passkeysAvailable } from '../lib/passkeys'
 import { pageBackground } from '../theme'
 
 export default function LoginPage() {
@@ -20,6 +21,12 @@ export default function LoginPage() {
     setBusy(true); setError('')
     try { await api.post('/api/admin/login', v); await refresh(); nav('/') } catch (e) { if (e instanceof ApiError && e.status === 428) setNeedCode(true); else setError(needCode ? t('login.badCode') : t('login.failed')) } finally { setBusy(false) }
   })
+  const passkeyLogin = async () => {
+    setBusy(true); setError('')
+    try { await loginWithPasskey(form.values.Code); await refresh(); nav('/') }
+    catch (e) { if (e instanceof ApiError && e.status === 428) { setNeedCode(true); setError(t('passkeys.needCode')) } else setError(t('passkeys.failed')) }
+    finally { setBusy(false) }
+  }
   return (
     <Center h="100vh" p="md" style={{ background: pageBackground }}>
       <Card w={400} p="xl">
@@ -35,6 +42,7 @@ export default function LoginPage() {
             {needCode && <TextInput label={t('login.code')} placeholder="123456" autoFocus {...form.getInputProps('Code')} />}
             {error && <Text c="red" size="sm">{error}</Text>}
             <Button type="submit" loading={busy}>{t('login.submit')}</Button>
+            {passkeysAvailable() && <Button type="button" variant="default" disabled={busy} onClick={passkeyLogin}>{t('passkeys.login')}</Button>}
           </Stack>
         </form>
       </Card>

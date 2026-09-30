@@ -49,3 +49,7 @@ agent has to state the change before doing it, and a read-only token is not
 offered them at all. Destructive operations (deleting users or nodes,
 rotating tokens, changing settings) are not exposed, and staff accounts
 cannot be touched with a token at all.
+
+## Additions in 1.8.0
+
+Fine-grained token resources/actions and exact REST endpoint grants also restrict MCP tools. Composite tools need every corresponding REST grant. A token never exceeds the staff role or its read-only base mode; existing tokens with no scope list retain their prior behavior. See [automation tokens](ADMIN_WORKFLOWS.md#automation-tokens).

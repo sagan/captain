@@ -38,6 +38,7 @@ const sections = [
     { to: '/articles', key: 'articles', icon: IconBook },
   ] },
   { key: 'system', items: [
+    { to: '/infrastructure', key: 'infrastructure', icon: IconServer },
     { to: '/admins', key: 'admins', icon: IconUserShield },
     { to: '/domains', key: 'domains', icon: IconCertificate },
     { to: '/site', key: 'site', icon: IconWorld },
@@ -65,7 +66,7 @@ export function AppLayout() {
   const active = (to: string) => (to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(to))
   // Support sees tickets, users and orders; operators everything but the system section.
   const role = me?.role ?? 'admin'
-  const visible = (to: string) => role === 'admin' ? true : role === 'operator' ? !['/site', '/settings', '/admins', '/sub-templates'].includes(to) : ['/', '/tickets', '/users', '/orders'].includes(to)
+  const visible = (to: string) => role === 'admin' ? true : role === 'operator' ? !['/site', '/settings', '/admins', '/sub-templates', '/infrastructure'].includes(to) : ['/', '/tickets', '/users', '/orders'].includes(to)
   const shown = sections.map((s) => ({ ...s, items: s.items.filter((it) => visible(it.to)) })).filter((s) => s.items.length > 0)
   const upd = useQuery({ queryKey: ['update'], queryFn: () => api.get<SystemUpdate>('/api/admin/system/update'), staleTime: 10 * 60_000, refetchInterval: 30 * 60_000, retry: false })
   const lang = languages.find((l) => l.code === i18n.language) ?? languages[0]
@@ -127,6 +128,7 @@ export function AppLayout() {
             <Menu shadow="md" position="top-end">
               <Menu.Target><ActionIcon variant="subtle" color="gray" aria-label="account menu"><IconDotsVertical size={18} /></ActionIcon></Menu.Target>
               <Menu.Dropdown>
+                <Menu.Item leftSection={<IconSettings size={16} />} onClick={() => { nav('/account'); close() }}>{t('passkeys.account')}</Menu.Item>
                 {role === 'admin' && <Menu.Item leftSection={<IconSettings size={16} />} onClick={() => { nav('/settings'); close() }}>{t('nav.settings')}</Menu.Item>}
                 <Menu.Item leftSection={<IconLogout size={16} />} color="red" onClick={async () => { await logout(); nav('/login') }}>{t('app.logout')}</Menu.Item>
               </Menu.Dropdown>

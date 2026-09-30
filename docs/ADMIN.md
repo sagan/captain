@@ -245,3 +245,7 @@ and the console returns to sign-in. No process restart is required.
 The console and the portal ship in 简体中文, 繁體中文, English, 日本語,
 Русский and 한국어. Every locale file is checked for parity in CI, and a key
 the sources use but no locale defines fails the build.
+
+## Additions in 1.8.0
+
+Staff Passkeys, scoped API tokens, user filtering/bulk operations and private metadata are described in [administration workflows](ADMIN_WORKFLOWS.md).

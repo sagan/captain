@@ -25,7 +25,7 @@ export const api = {
   post: <T>(url: string, body?: unknown) => request<T>('POST', url, body ?? {}),
   patch: <T>(url: string, body: unknown) => request<T>('PATCH', url, body),
   put: <T>(url: string, body: unknown) => request<T>('PUT', url, body),
-  del: <T>(url: string) => request<T>('DELETE', url),
+  del: <T>(url: string, body?: unknown) => request<T>('DELETE', url, body),
 }
 
 export interface Me { id: number; email: string; role: string; version?: string; totp?: boolean }

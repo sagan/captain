@@ -15,6 +15,7 @@ var ErrIDInUse = errors.New("ID is already in use")
 type accountRef struct{ table, column string }
 
 var customerRefs = []accountRef{
+	{"user_subscription_profiles", "user_id"},
 	{"sessions", "user_id"}, {"subscriptions", "user_id"}, {"orders", "user_id"},
 	{"identities", "user_id"}, {"notifications", "user_id"}, {"users", "invited_by"},
 	{"commissions", "inviter_id"}, {"commissions", "invitee_id"}, {"withdrawals", "user_id"},
@@ -23,7 +24,7 @@ var customerRefs = []accountRef{
 	{"sub_requests", "user_id"}, {"conn_log", "user_id"}, {"audit_log", "user_id"},
 	{"dyn_limits", "user_id"}, {"traffic_daily", "user_id"}, {"online_devices", "user_id"},
 }
-var staffRefs = []accountRef{{"sessions", "staff_id"}, {"api_tokens", "user_id"}, {"staff_identities", "user_id"}, {"admin_log", "user_id"}}
+var staffRefs = []accountRef{{"infra_payments", "staff_id"}, {"staff_passkey_users", "staff_id"}, {"staff_passkeys", "staff_id"}, {"passkey_challenges", "staff_id"}, {"user_bulk_jobs", "staff_id"}, {"sessions", "staff_id"}, {"api_tokens", "user_id"}, {"staff_identities", "user_id"}, {"admin_log", "user_id"}}
 
 // ChangeAccountID runs under Accounts' exclusive request lock. Foreign keys
 // are deferred only inside this transaction; every reference moves atomically.

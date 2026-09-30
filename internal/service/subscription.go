@@ -27,6 +27,16 @@ var ErrDisabled = errors.New("subscription: account disabled")
 
 // Lines returns what the user may connect to, or ErrNoAccess.
 func (s *Subscription) Lines(ctx context.Context, u *domain.User, at time.Time) ([]subscription.Line, subscription.Account, error) {
+	profile, err := s.Store.SubscriptionProfileForUser(ctx, u.ID)
+	if err != nil {
+		return nil, subscription.Account{}, err
+	}
+	return s.LinesWithProfile(ctx, u, at, profile)
+}
+
+// LinesWithProfile previews or serves one explicit presentation policy. Access
+// groups, quota checks and node credentials remain determined by the customer.
+func (s *Subscription) LinesWithProfile(ctx context.Context, u *domain.User, at time.Time, profile *store.SubscriptionProfile) ([]subscription.Line, subscription.Account, error) {
 	if u.Role != domain.RoleUser || u.Status != "active" {
 		return nil, subscription.Account{}, ErrDisabled
 	}
@@ -44,6 +54,11 @@ func (s *Subscription) Lines(ctx context.Context, u *domain.User, at time.Time) 
 	}
 	var ss SubscriptionSettings
 	_ = s.Store.GetSetting(ctx, SettingSubscription, &ss)
+	ApplySubscriptionProfile(&ss, profile)
+	prefix := ""
+	if profile != nil {
+		prefix = profile.Settings.RemarkPrefix
+	}
 	acct := account(usable)
 	vars := s.remarkVars(ctx, u, usable, acct, at)
 	lines := make([]subscription.Line, 0, len(rows)+len(ss.InfoLines))
@@ -54,7 +69,7 @@ func (s *Subscription) Lines(ctx context.Context, u *domain.User, at time.Time) 
 	}
 	for _, r := range rows {
 		lines = append(lines, subscription.Line{
-			Name: vars.Expand(subscription.WithFlag(r.Entry.Name, r.Entry.DisplayHost, r.Entry.Region, ss.AutoFlags)), Host: r.Entry.DisplayHost, Port: r.Entry.DisplayPort,
+			Name: vars.Expand(prefix + subscription.WithFlag(r.Entry.Name, r.Entry.DisplayHost, r.Entry.Region, ss.AutoFlags)), Host: r.Entry.DisplayHost, Port: r.Entry.DisplayPort,
 			Inbound: r.Inbound.Spec(), UUID: u.UUID, UserID: u.AgentID, Password: u.UUID, Tags: r.Entry.Tags, Extra: r.Entry.ClientExtra,
 		})
 	}
@@ -72,7 +87,7 @@ func (s *Subscription) Lines(ctx context.Context, u *domain.User, at time.Time) 
 		if err != nil {
 			continue
 		}
-		l.Name = vars.Expand(subscription.WithFlag(n.Name, l.Host, "", ss.AutoFlags))
+		l.Name = vars.Expand(prefix + subscription.WithFlag(n.Name, l.Host, "", ss.AutoFlags))
 		lines = append(lines, l)
 	}
 	return lines, acct, nil
@@ -133,13 +148,22 @@ func (s *Subscription) EntryLinks(ctx context.Context, u *domain.User) ([]EntryL
 	}
 	var ss SubscriptionSettings
 	_ = s.Store.GetSetting(ctx, SettingSubscription, &ss)
+	profile, err := s.Store.SubscriptionProfileForUser(ctx, u.ID)
+	if err != nil {
+		return nil, err
+	}
+	ApplySubscriptionProfile(&ss, profile)
+	prefix := ""
+	if profile != nil {
+		prefix = profile.Settings.RemarkPrefix
+	}
 	subs, _ := s.Store.ActiveSubscriptions(ctx, u.ID)
 	usable := usableSubs(subs, time.Now())
 	vars := s.remarkVars(ctx, u, usable, account(usable), time.Now())
 	out := make([]EntryLink, 0, len(rows))
 	for _, r := range rows {
 		l := subscription.Line{
-			Name: vars.Expand(subscription.WithFlag(r.Entry.Name, r.Entry.DisplayHost, r.Entry.Region, ss.AutoFlags)), Host: r.Entry.DisplayHost, Port: r.Entry.DisplayPort,
+			Name: vars.Expand(prefix + subscription.WithFlag(r.Entry.Name, r.Entry.DisplayHost, r.Entry.Region, ss.AutoFlags)), Host: r.Entry.DisplayHost, Port: r.Entry.DisplayPort,
 			Inbound: r.Inbound.Spec(), UUID: u.UUID, UserID: u.AgentID, Password: u.UUID, Tags: r.Entry.Tags,
 		}
 		out = append(out, EntryLink{EntryID: r.Entry.ID, Name: l.Name, Protocol: string(r.Inbound.Protocol), Host: l.Host, Port: l.Port, URI: subscription.ShareURI(l), Blocked: hidden[r.Entry.ID]})
@@ -190,4 +214,46 @@ func (s *Subscription) HWIDLimit(ctx context.Context, u *domain.User, fallback i
 		}
 	}
 	return fallback
+}
+
+// ApplySubscriptionProfile overlays only presentation/device settings. It never
+// grants an entry, plan, balance or proxy credential.
+func ApplySubscriptionProfile(ss *SubscriptionSettings, p *store.SubscriptionProfile) {
+	if p == nil {
+		return
+	}
+	v := p.Settings
+	if v.AutoFlags != nil {
+		ss.AutoFlags = *v.AutoFlags
+	}
+	if v.InfoLines != nil {
+		ss.InfoLines = *v.InfoLines
+	}
+	if v.HWID != nil {
+		h := v.HWID
+		if h.Enabled != nil {
+			ss.HWID.Enabled = *h.Enabled
+			if !*h.Enabled {
+				ss.HWID.Require = false
+			}
+		}
+		if h.Require != nil {
+			ss.HWID.Require = *h.Require
+			if *h.Require {
+				ss.HWID.Enabled = true
+			}
+		}
+		if h.Announce != nil {
+			ss.HWID.Announce = *h.Announce
+		}
+	}
+}
+func (s *Subscription) HWIDLimitWithProfile(ctx context.Context, u *domain.User, fallback int, p *store.SubscriptionProfile) int {
+	if u.HwidLimit != nil {
+		return *u.HwidLimit
+	}
+	if p != nil && p.Settings.HWID != nil && p.Settings.HWID.DeviceLimit != nil {
+		return *p.Settings.HWID.DeviceLimit
+	}
+	return s.HWIDLimit(ctx, u, fallback)
 }

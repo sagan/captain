@@ -16,6 +16,7 @@ import { RegistrationCard } from '../components/RegistrationCard'
 import { ClientsCard, TelegramCard, TrialCard } from '../components/OpsCards'
 import { WebhooksCard } from '../components/WebhooksCard'
 import { ProbeCard } from '../components/ProbeCard'
+import { PasskeysCard } from '../components/PasskeysCard'
 import { TokensCard } from '../components/TokensCard'
 import { TwoFactorCard } from '../components/TwoFactorCard'
 import { SecurityCard } from '../components/SecurityCard'
@@ -142,6 +143,7 @@ export default function SettingsPage() {
         <DynLimitCard />
         <TokensCard />
         <TwoFactorCard />
+        <PasskeysCard />
         <SecurityCard />
         <AdminLogCard />
         <BackupCard />

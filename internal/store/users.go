@@ -215,12 +215,14 @@ type UserRow struct {
 // ListUsers returns users matching q (email substring) with their active
 // subscription summary, newest first.
 func (s *Store) ListUsers(ctx context.Context, q string, limit, offset int, at time.Time) ([]UserRow, int, error) {
-	where := `WHERE u.role = 'user'`
-	args := []any{}
-	if q != "" {
-		where += ` AND u.email LIKE ?`
-		args = append(args, "%"+q+"%")
+	return s.ListUsersFiltered(ctx, UserFilter{Query: q, Desc: true}, limit, offset, at)
+}
+
+func (s *Store) ListUsersFiltered(ctx context.Context, f UserFilter, limit, offset int, at time.Time) ([]UserRow, int, error) {
+	if err := f.Validate(); err != nil {
+		return nil, 0, err
 	}
+	where, args, order := f.query(at)
 	var total int
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users u `+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
@@ -230,7 +232,7 @@ func (s *Store) ListUsers(ctx context.Context, q string, limit, offset int, at t
 		LEFT JOIN subscriptions sub ON sub.id = (SELECT id FROM subscriptions x WHERE x.user_id = u.id AND x.status = 'active'
 			ORDER BY ((x.expires_at IS NULL OR x.expires_at > ?) AND (x.quota_bytes = 0 OR x.used_up_bytes + x.used_down_bytes < x.quota_bytes)) DESC, x.expires_at IS NULL DESC, x.expires_at DESC, x.id DESC LIMIT 1)
 		LEFT JOIN plans p ON p.id = sub.plan_id
-		`+where+` ORDER BY u.id DESC LIMIT ? OFFSET ?`, append(append([]any{at.Unix()}, args...), limit, offset)...)
+		`+where+` ORDER BY `+order+` LIMIT ? OFFSET ?`, append(append([]any{at.Unix()}, args...), limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -306,6 +308,13 @@ func (s *Store) DeleteUser(ctx context.Context, id int64) error {
 		return err
 	}
 	defer tx.Rollback()
+	if err := deleteUserTx(ctx, tx, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func deleteUserTx(ctx context.Context, tx *sql.Tx, id int64) error {
 	var exists int
 	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM users WHERE id = ? AND role = 'user'`, id).Scan(&exists); err != nil {
 		return wrapNotFound(err)
@@ -341,7 +350,7 @@ func (s *Store) DeleteUser(ctx context.Context, id int64) error {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 // ListGroups returns all user groups.

@@ -1,15 +1,14 @@
-import { ActionIcon, Badge, Button, Card, Code, Drawer, Group, Modal, NumberInput, Pagination, PasswordInput, Progress, Select, Stack, Table, Text, TextInput, Title, Divider } from '@mantine/core'
+import { ActionIcon, Badge, Button, Code, Drawer, Group, Modal, NumberInput, PasswordInput, Select, Stack, Text, TextInput, Title, Divider } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { useDebouncedValue } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
+import { IconPlus, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AccountIDEditor } from '../components/AccountIDEditor'
 import { useAuth } from '../lib/auth'
-import { api, ApiError, type Group as UGroup, type HwidDevice, type OnlineDevice, type Page, type Plan, type SubRequest, type UserRow } from '../lib/api'
-import { bytes, money, when } from '../lib/format'
+import { api, ApiError, type Group as UGroup, type HwidDevice, type OnlineDevice, type Plan, type SubRequest, type UserRow } from '../lib/api'
+import { money, when } from '../lib/format'
 import { toast } from '../lib/notify'
 import { PageHeader } from '../components/PageHeader'
 import { Copy } from '../components/Copy'
@@ -21,6 +20,9 @@ import { HwidDevices } from '../components/HwidDevices'
 import { UserConnections } from '../components/UserConnections'
 import { UserAudit } from '../components/UserAudit'
 import { UserGroupsPanel } from '../components/UserGroupsPanel'
+import { UserDirectory } from '../components/UserDirectory'
+import { UserSubscriptionProfile } from '../components/UserSubscriptionProfile'
+import { MetadataEditor } from '../components/MetadataEditor'
 import { SegmentedControl } from '@mantine/core'
 
 export default function UsersPage() {
@@ -28,10 +30,6 @@ export default function UsersPage() {
   const { me } = useAuth()
   const qc = useQueryClient()
   const canManageGroups = me?.role === 'admin' || me?.role === 'operator'
-  const [search, setSearch] = useState('')
-  const [debounced] = useDebouncedValue(search, 300)
-  const [page, setPage] = useState(1)
-  const q = useQuery({ queryKey: ['users', debounced, page], queryFn: () => api.get<Page<UserRow>>(`/api/admin/users?q=${encodeURIComponent(debounced)}&page=${page}`) })
   const plans = useQuery({ queryKey: ['plans'], queryFn: () => api.get<Plan[]>('/api/admin/plans') })
   const groups = useQuery({ queryKey: ['groups'], queryFn: () => api.get<UGroup[]>('/api/admin/groups'), enabled: canManageGroups })
   const [sel, setSel] = useState<UserRow | null>(null)
@@ -57,33 +55,11 @@ export default function UsersPage() {
 
   const open = (u: UserRow) => { setSel(u); editForm.setValues({ Status: u.status, GroupID: u.group_id ? String(u.group_id) : '', Password: '' }); setGrantPlan(null); setDelta(0) }
   const subURL = sel ? (sel.sub_url || `${window.location.origin}/sub/${sel.sub_token}`) : ''
-  const pages = q.data ? Math.max(1, Math.ceil(q.data.total / q.data.per_page)) : 1
 
   return (
     <>
-      <PageHeader title={t('users.title')} subtitle={t('users.subtitle')} actions={<><SegmentedControl size="xs" value={view} onChange={setView} data={[{ value: 'list', label: t('users.viewList') }, ...(canManageGroups ? [{ value: 'groups', label: t('users.groups') }] : []), { value: 'renewals', label: t('users.viewRenewals') }]} />{view !== 'groups' && <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>{t('users.create')}</Button>}</>} />
-      {view === 'groups' && canManageGroups ? <UserGroupsPanel /> : view === 'renewals' ? <RenewalsPanel /> : <Card p={0}>
-        <Group p="md" pb="xs"><TextInput placeholder={t('users.filterPlaceholder')} leftSection={<IconSearch size={14} />} value={search} onChange={(e) => { setSearch(e.currentTarget.value); setPage(1) }} w={300} /><Text size="sm" c="dimmed">{t('common.total', { count: q.data?.total ?? 0 })}</Text></Group>
-        <Table.ScrollContainer minWidth={760}>
-          <Table>
-            <Table.Thead><Table.Tr><Table.Th>{t('users.email')}</Table.Th><Table.Th>{t('users.plan')}</Table.Th><Table.Th>{t('users.usage')}</Table.Th><Table.Th>{t('users.expires')}</Table.Th><Table.Th>{t('users.balance')}</Table.Th><Table.Th>{t('users.status')}</Table.Th></Table.Tr></Table.Thead>
-            <Table.Tbody>
-              {(q.data?.items ?? []).map((u) => (
-                <Table.Tr key={u.id} onClick={() => open(u)} style={{ cursor: 'pointer' }}>
-                  <Table.Td><Text fw={600}>{u.email}</Text><Text size="xs" c="dimmed">#{u.id}</Text></Table.Td>
-                  <Table.Td>{u.plan_name ? <Group gap={4}><Badge color={u.sub_usable ? 'teal' : 'orange'}>{u.plan_name}</Badge>{u.sub_count > 1 && <Badge variant="light" color="gray">+{u.sub_count - 1}</Badge>}</Group> : <Text size="sm" c="dimmed">{t('users.noPlan')}</Text>}</Table.Td>
-                  <Table.Td w={180}>{u.plan_name ? <><Text size="xs">{bytes(u.used_bytes)}{u.quota_bytes ? ` / ${bytes(u.quota_bytes)}` : ''}</Text>{u.quota_bytes ? <Progress value={Math.min(100, (u.used_bytes / u.quota_bytes) * 100)} size="xs" mt={4} /> : null}</> : '—'}</Table.Td>
-                  <Table.Td>{u.plan_name ? (u.expires_at ? when(u.expires_at) : '∞') : '—'}</Table.Td>
-                  <Table.Td>{money(u.balance_cents)}</Table.Td>
-                  <Table.Td>{u.status === 'active' ? <Badge color="teal">{t('users.active')}</Badge> : <Badge color="red">{t('users.banned')}</Badge>}</Table.Td>
-                </Table.Tr>
-              ))}
-              {q.data?.items.length === 0 && <Table.Tr><Table.Td colSpan={6}><Text c="dimmed" ta="center" py="lg">{t('common.empty')}</Text></Table.Td></Table.Tr>}
-            </Table.Tbody>
-          </Table>
-        </Table.ScrollContainer>
-        {pages > 1 && <Group justify="center" p="md"><Pagination total={pages} value={page} onChange={setPage} /></Group>}
-      </Card>}
+      <PageHeader title={t('users.title')} subtitle={t('users.subtitle')} actions={<><SegmentedControl size="xs" value={view} onChange={setView} data={[{ value: 'list', label: t('users.viewList') }, ...(canManageGroups ? [{ value: 'groups', label: t('users.groups') }] : []), { value: 'renewals', label: t('users.viewRenewals') }]} />{view !== 'groups' && canManageGroups && <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>{t('users.create')}</Button>}</>} />
+      {view === 'groups' && canManageGroups ? <UserGroupsPanel /> : view === 'renewals' ? <RenewalsPanel /> : <UserDirectory onOpen={open} canManage={canManageGroups} plans={plans.data ?? []} groups={groups.data ?? []} />}
 
       <Modal opened={creating} onClose={() => setCreating(false)} title={t('users.create')}>
         <form onSubmit={createForm.onSubmit((v) => create.mutate(v))}><Stack>
@@ -141,6 +117,8 @@ export default function UsersPage() {
               <Group align="flex-end"><Select flex={1} data={(plans.data ?? []).map((p) => ({ value: String(p.ID), label: `${p.Name} · ${money(p.PriceCents)}` }))} value={grantPlan} onChange={setGrantPlan} placeholder={t('users.plan')} /><Select w={190} data={[{ value: '', label: t('users.grantDefault') }, { value: 'queue', label: t('users.grantQueue') }, { value: 'replace', label: t('users.grantReplace') }]} value={grantHow} onChange={(v) => setGrantHow(v ?? '')} allowDeselect={false} /><Button size="xs" disabled={!grantPlan} loading={grant.isPending} onClick={() => grant.mutate()}>{t('users.grant')}</Button></Group>
             </Stack>
             <UserSubs userID={sel.id} subs={detail.data?.subscriptions ?? []} onDone={() => setSel(null)} />
+            <UserSubscriptionProfile userID={sel.id} subURL={subURL} />
+            <MetadataEditor endpoint={`/api/admin/users/${sel.id}/metadata`} />
             <UserEntries userID={sel.id} />
             <TempLinks userID={sel.id} />
             <HwidDevices key={sel.id} userID={sel.id} devices={detail.data?.hwid_devices ?? []} limit={detail.data?.hwid_limit ?? null} requests={detail.data?.sub_requests ?? []} />

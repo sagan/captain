@@ -43,8 +43,12 @@ func (h *handlers) listUsers(w http.ResponseWriter, r *http.Request) {
 	if page < 1 {
 		page = 1
 	}
-	const per = 50
-	rows, total, err := h.Store.ListUsers(r.Context(), q.Get("q"), per, (page-1)*per, time.Now())
+	filter, per, valid := userFilter(r)
+	if !valid || page > 100000000 {
+		fail(w, 400, "invalid user filter")
+		return
+	}
+	rows, total, err := h.Store.ListUsersFiltered(r.Context(), filter, per, (page-1)*per, time.Now())
 	if err != nil {
 		serverErr(w, err)
 		return
@@ -53,7 +57,7 @@ func (h *handlers) listUsers(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		u := row.User
 		view := userView{ID: u.ID, Email: u.Email, UUID: u.UUID, SubToken: u.SubToken, SubURL: h.subURL(r.Context(), u.SubToken), GroupID: u.GroupID, BalanceCents: u.BalanceCents, Status: u.Status, CreatedAt: u.CreatedAt,
-			PlanName: row.PlanName, ExpiresAt: row.ExpiresAt, QuotaBytes: row.QuotaBytes, UsedBytes: row.UsedBytes, SubUsable: row.SubUsable}
+			PlanName: row.PlanName, ExpiresAt: row.ExpiresAt, QuotaBytes: row.QuotaBytes, UsedBytes: row.UsedBytes, SubUsable: row.SubUsable, SubCount: row.SubCount}
 		if hidesTokens(r) {
 			view.SubToken, view.SubURL = "", ""
 		}

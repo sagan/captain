@@ -584,3 +584,7 @@ with explicit authorization and audit rules.
 
 Each phase ships a usable UI, additive protocol fields and regression checks;
 features present in another monitor are not evidence that they already exist here.
+
+## Additions in 1.8.0
+
+Captain 1.8.0 with bosun 0.57.0 adds the Exit diagnostic: structured IPv4/IPv6, ASN/location, reputation and optional service checks. It describes host egress, not every proxy path. Failed/missing observations remain explicit; JSON export preserves the provider results. The optional MIT GeoCheck tool is rebuilt with the pinned Go toolchain and installed from a fixed, checksummed bosun release.

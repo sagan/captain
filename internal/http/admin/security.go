@@ -198,12 +198,17 @@ func (h *handlers) listTokens(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlers) createToken(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Name  string
-		Scope string
-		Days  int // 0 = no expiry
+		Name   string
+		Scope  string
+		Scopes []string
+		Days   int // 0 = no expiry
 	}
 	if !decode(r, &in) || strings.TrimSpace(in.Name) == "" {
 		fail(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if err := store.ValidateTokenScopes(in.Scopes); err != nil {
+		fail(w, 400, err.Error())
 		return
 	}
 	var expires *time.Time
@@ -211,12 +216,12 @@ func (h *handlers) createToken(w http.ResponseWriter, r *http.Request) {
 		t := time.Now().AddDate(0, 0, in.Days)
 		expires = &t
 	}
-	plain, tok, err := h.Store.CreateAPIToken(r.Context(), userFrom(r).ID, strings.TrimSpace(in.Name), in.Scope, expires)
+	plain, tok, err := h.Store.CreateAPIToken(r.Context(), userFrom(r).ID, strings.TrimSpace(in.Name), in.Scope, expires, in.Scopes)
 	if err != nil {
 		serverErr(w, err)
 		return
 	}
-	ok(w, map[string]any{"token": plain, "id": tok.ID, "name": tok.Name, "scope": tok.Scope, "expires_at": tok.ExpiresAt})
+	ok(w, map[string]any{"token": plain, "id": tok.ID, "name": tok.Name, "scope": tok.Scope, "scopes": tok.Scopes, "expires_at": tok.ExpiresAt})
 }
 
 func (h *handlers) deleteToken(w http.ResponseWriter, r *http.Request) {

@@ -60,7 +60,8 @@ type Runner struct {
 	SiteName   string
 	PortalURL  string
 
-	lastReminders time.Time
+	lastReminders      time.Time
+	lastInfraReminders time.Time
 }
 
 // Run blocks until ctx ends.
@@ -89,6 +90,7 @@ func (r *Runner) Run(ctx context.Context) {
 
 // Tick runs every job once.
 func (r *Runner) Tick(ctx context.Context) {
+	r.infraReminders(ctx, time.Now())
 	r.Store.Accounts.RLock()
 	defer r.Store.Accounts.RUnlock()
 	now := time.Now()

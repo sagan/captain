@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { api, runNodeJob } from '../lib/api'
 import { toast } from '../lib/notify'
 import { bytes } from '../lib/format'
+import { ConfigPresets } from './ConfigPresets'
 import { WarpCard, warpTemplate, type WarpAccount } from './WarpCard'
 
 interface Remote { host: string; port: number; uuid?: string; password?: string; username?: string; settings: { protocol: string } }
@@ -47,6 +48,8 @@ export function RoutingCard({ nodeID, inboundTags, embedded }: { nodeID: number;
       {!embedded && <Title order={5} mb={4}>{t('routing.title')}</Title>}
       <Text size="xs" c="dimmed" mb="sm">{t('routing.hint')}</Text>
       <Stack gap="xs">
+        <ConfigPresets kind="outbounds" current={() => nr} onLoad={v => setNr(v as Routing)} affected={inboundTags} />
+        <ConfigPresets kind="routes" current={() => nr} onLoad={v => setNr(v as Routing)} affected={inboundTags} />
         {nr.outbounds.map((o, i) => (
           <Group key={i} justify="space-between" wrap="nowrap">
             <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}><Code>{o.tag}</Code><Text size="sm" truncate>{describe(o)}</Text>{q.data?.traffic?.[o.tag] && <Text size="xs" c="dimmed">{bytes(q.data.traffic[o.tag].today)} / {bytes(q.data.traffic[o.tag].total)}</Text>}{o.proxy_tag && <Badge size="xs" variant="light">{t('routing.via', { tag: o.proxy_tag })}</Badge>}{nr.default_outbound === o.tag && <Badge size="xs" color="teal">{t('routing.isDefault')}</Badge>}</Group>

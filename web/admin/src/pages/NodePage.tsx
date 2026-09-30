@@ -8,6 +8,7 @@ import { IconInfoCircle, IconPencil, IconPlus, IconTrash } from '@tabler/icons-r
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useAuth } from '../lib/auth'
 import { api, type DoctorReport, type Ingress, type CertStatus, type Group as UGroup, type Inbound, type Node } from '../lib/api'
 import { ago, bytes, when } from '../lib/format'
 import { dnsToast, toast, type DNSResult } from '../lib/notify'
@@ -20,12 +21,14 @@ import { RoutingCard } from '../components/RoutingCard'
 import { ForwardsCard } from '../components/ForwardsCard'
 import { IngressesCard, ingressPayload } from '../components/IngressesCard'
 import { OverridesCard } from '../components/OverridesCard'
+import { MetadataEditor } from '../components/MetadataEditor'
 import { DeleteNodeModal } from '../components/DeleteNodeModal'
 
 interface Detail { traffic?: Record<string, { today: number; total: number }>; node: Node; inbounds: Inbound[]; ingresses?: Ingress[]; status: { host: ResourceHost | null; cores: Record<string, { running: boolean; inbounds?: string[] }> | null; certs: CertStatus[] | null; doctor?: DoctorReport | null } | null }
 
 export default function NodePage() {
   const { id } = useParams()
+  const { me } = useAuth()
   const { t } = useTranslation()
   const qc = useQueryClient()
   const nav = useNavigate()
@@ -59,6 +62,7 @@ export default function NodePage() {
       <DeleteNodeModal node={n} opened={deletingNode} onClose={() => setDeletingNode(false)} onDeleted={() => { qc.invalidateQueries({ queryKey: ['nodes'] }); nav('/nodes') }} />
       <PageHeader title={n.name} subtitle={`${n.hostname || ''} ${n.platform || ''} ${n.version || ''}`.trim()} actions={<>
         <NodeStatus n={n} />
+        {me?.role === 'admin' && <Button variant="light" size="xs" onClick={() => nav(`/infrastructure?node=${n.id}`)}>{t('infra.title')}</Button>}
         <Button variant="default" size="xs" leftSection={<IconPencil size={14} />} onClick={() => { nodeForm.setValues({ Name: n.name, PublicAddr: n.public_addr, InternalAddr: n.internal_addr, V6Addr: n.v6_addr, Domain: n.domain ?? '', MonitorURL: n.monitor_url, DStatusSID: n.dstatus_sid ?? '', DecoyEnabled: !!n.decoy_enabled, DecoyUpstream: n.decoy_upstream ?? '', UserSpeedLimitMbps: n.user_speed_limit_mbps ?? 0, MitaQuotas: !!n.mita_quotas, EgressByIngress: !!n.egress_by_ingress }); setEditNode(true) }}>{t('common.edit')}</Button>
         <Button variant="default" size="xs" onClick={() => modals.openConfirmModal({ title: t('nodes.repair'), children: <Text size="sm">{t('nodes.repairHint')}</Text>, labels: { confirm: t('common.confirm'), cancel: t('common.cancel') }, onConfirm: () => repair.mutate() })}>{t('nodes.repair')}</Button>
         <Button color="red" variant="light" size="xs" leftSection={<IconTrash size={14} />} onClick={() => setDeletingNode(true)}>{t('common.delete')}</Button>
@@ -66,6 +70,7 @@ export default function NodePage() {
 
       {!n.paired && n.pair_code && <Card mb="lg"><Title order={5} mb="sm">{t('nodes.pairTitle')}</Title><PairCodeBox code={n.pair_code} /></Card>}
       {n.paired && <NodeProbeCard key={n.id} nodeID={n.id} reportedHost={host} />}
+      <Card mb="lg"><MetadataEditor endpoint={`/api/admin/nodes/${n.id}/metadata`} /></Card>
       {d.status?.doctor && <DoctorCard report={d.status.doctor} />}
       {d.status?.certs && d.status.certs.length > 0 && (
         <Card mb="lg">

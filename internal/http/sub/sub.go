@@ -79,7 +79,13 @@ func Register(mux *http.ServeMux, d Deps) {
 	// rules, HWID) and a document is about to be written; it spends a
 	// temporary link's use. nil for the permanent token route.
 	serve := func(w http.ResponseWriter, r *http.Request, u *domain.User, charge func() error) {
-		lines, acct, err := d.Service.Lines(r.Context(), u, time.Now())
+		profile, err := d.Store.SubscriptionProfileForUser(r.Context(), u.ID)
+		if err != nil {
+			d.Log.Error("subscription profile", "err", err)
+			http.Error(w, "internal error", 500)
+			return
+		}
+		lines, acct, err := d.Service.LinesWithProfile(r.Context(), u, time.Now(), profile)
 		if errors.Is(err, service.ErrDisabled) {
 			// Like Xboard: a banned account gets nothing, not even its usage.
 			http.Error(w, "account disabled", http.StatusForbidden)
@@ -145,6 +151,7 @@ func Register(mux *http.ServeMux, d Deps) {
 		// with the reason in headers (x-hwid-*, announce), the Happ way.
 		var subs service.SubscriptionSettings
 		_ = d.Store.GetSetting(r.Context(), service.SettingSubscription, &subs)
+		service.ApplySubscriptionProfile(&subs, profile)
 		if subs.HWID.Enabled {
 			hwid := strings.TrimSpace(r.Header.Get("x-hwid"))
 			switch {
@@ -160,7 +167,7 @@ func Register(mux *http.ServeMux, d Deps) {
 				return
 			case hwid != "":
 				req.Hwid = hwid
-				limit := d.Service.HWIDLimit(r.Context(), u, subs.HWID.FallbackLimit)
+				limit := d.Service.HWIDLimitWithProfile(r.Context(), u, subs.HWID.FallbackLimit, profile)
 				allowed, n, err := d.Store.ClaimHwidDevice(r.Context(), u.ID, store.HwidDevice{Hwid: hwid, Platform: clip(r.Header.Get("x-device-os"), 64), OSVersion: clip(r.Header.Get("x-ver-os"), 64), DeviceModel: clip(r.Header.Get("x-device-model"), 128), UserAgent: clip(r.UserAgent(), 512), RequestIP: req.RequestIP}, limit, time.Now())
 				if err != nil {
 					d.Log.Error("hwid", "user", u.ID, "err", err)
@@ -179,10 +186,27 @@ func Register(mux *http.ServeMux, d Deps) {
 			}
 		}
 		defer func() { _ = d.Store.RecordSubRequest(context.WithoutCancel(r.Context()), u.ID, req) }()
+		if template == "" && profile != nil {
+			if templateID := profile.Templates[rd.Name()]; templateID > 0 {
+				named, e := d.Store.NamedSubTemplate(r.Context(), templateID)
+				if e != nil {
+					http.Error(w, "internal error", 500)
+					return
+				}
+				template = named.Body
+			}
+		}
 		if template == "" {
 			template = tpls.get(r.Context(), rd.Name())
 		}
-		body, err := rd.RenderWith(lines, acct, template)
+		pageMode := format == "page" && profile != nil && profile.Settings.Page != nil && profile.Settings.Page.Enabled
+		var body []byte
+		if pageMode {
+			req.Response = "page"
+			body, err = renderProfilePage(r, profile.Settings.Page, acct)
+		} else {
+			body, err = rd.RenderWith(lines, acct, template)
+		}
 		if err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
@@ -204,6 +228,9 @@ func Register(mux *http.ServeMux, d Deps) {
 		if err := d.Store.GetSetting(r.Context(), site.SettingSite, &ss); err == nil && strings.TrimSpace(ss.Name) != "" {
 			name = strings.TrimSpace(ss.Name)
 		}
+		if profile != nil && profile.Settings.Title != "" {
+			name = profile.Settings.Title
+		}
 		if name == "" {
 			name = "captain"
 		}
@@ -213,6 +240,17 @@ func Register(mux *http.ServeMux, d Deps) {
 		w.Header().Set("Subscription-Userinfo", fmt.Sprintf("upload=%d; download=%d; total=%d; expire=%d", acct.Upload, acct.Download, acct.Total, acct.Expire))
 		w.Header().Set("Profile-Update-Interval", "12")
 		w.Header().Set("Cache-Control", "no-store")
+		if profile != nil {
+			for k, v := range profile.Settings.Headers {
+				w.Header().Set(k, v)
+			}
+		}
+		if pageMode {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Del("Content-Disposition")
+			w.Header().Set("Referrer-Policy", "no-referrer")
+			w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+		}
 		// A rule's own headers come last: an operator who sets
 		// profile-update-interval or profile-title means it.
 		for k, v := range ruleHeaders {

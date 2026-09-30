@@ -80,6 +80,7 @@ features it has never heard of, which the node page shows as an orange
 
 | Captain | needs bosun | for |
 |---|---|---|
+| 1.8.0 | >= 0.57.0 | exit diagnostics and immutable durable traffic batches; epoch receipts are additive, legacy reports remain supported. Presets and administration features do not require a node upgrade. |
 | 1.7.0 | ≥ 0.56.0 | resource detail, optional GPU, NIC selection, missing-data flags, network-quality attempt batches/timings and on-demand diagnostics; legacy summaries remain supported |
 | 1.6.0 | ≥ 0.55.0 | remote node removal: preserve as standalone or uninstall; record-only DELETE remains compatible |
 | 1.6.0 | ≥ 0.55.0 | core availability, automatic-selection preview and confirmed running assignments; older nodes retain protocol filtering with unknown availability |
@@ -232,3 +233,18 @@ Device identities and detailed metrics stay private to management APIs.
 Probe settings and public snapshots gain an optional `appearance` object for
 bundled presets and color scheme. Omitted settings preserve existing values;
 this page-only feature has no bosun version requirement.
+
+## Administration additions in 1.8
+
+Migrations 58–64 add traffic receipts, API scopes, bulk result storage and
+metadata, staff Passkeys, named subscription profiles/templates, typed preset
+libraries and the independent infrastructure-cost ledger. Existing URLs,
+response fields and account/traffic identities remain valid. Scopes omitted
+from token creation retain the legacy behavior; an explicit empty array denies
+all access. Profiles inherit global behavior when no assignment/default exists.
+
+Passkey handles survive staff ID changes; bulk operations use immutable
+customer identities to reject reused IDs. Infrastructure history follows staff
+renumbering and survives node removal. Site reset clears every new table.
+See [administration workflows](ADMIN_WORKFLOWS.md) before rolling back or
+changing the configured Passkey origin.

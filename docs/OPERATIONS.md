@@ -357,3 +357,7 @@ forward again with "upgrade".
 - [COMPATIBILITY.md](COMPATIBILITY.md): what a release promises, the
   Captain ↔ bosun version matrix, and the measured database ceiling
   (why SQLite, and no Postgres, MySQL or Redis).
+
+## Additions in 1.8.0
+
+Before upgrading to 1.8.0, back up the database and preserve bosun data directories including `traffic/`. The new infrastructure ledger is cleared by site reset; site reset also removes staff Passkeys. Passkey origin changes and traffic crash-window limits are documented in [administration workflows](ADMIN_WORKFLOWS.md).

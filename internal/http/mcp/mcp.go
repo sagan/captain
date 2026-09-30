@@ -190,8 +190,11 @@ func (h *handlers) toolList(u *domain.User, scope string) []map[string]any {
 // users/orders/plans/dashboard; operator = everything but no extra; admin =
 // all. A read-only token narrows any of them to the read tools.
 func allowedTool(u *domain.User, scope string, t tool) bool {
-	if t.Write && scope == store.ScopeRead {
-		return false
+	for _, route := range toolRoutes(t.Name) {
+		method, path, _ := strings.Cut(route, " ")
+		if !store.TokenAllowsRequest(scope, method, path, route) {
+			return false
+		}
 	}
 	switch u.Role {
 	case domain.RoleAdmin, domain.RoleOperator:
@@ -460,4 +463,48 @@ func (h *handlers) call(ctx context.Context, u *domain.User, scope, name string,
 		return map[string]any{"ticket_id": tk.ID, "status": store.TicketReplied}, nil
 	}
 	return nil, fmt.Errorf("tool %q has no implementation", name)
+}
+
+// Composite tools require every resource they return or mutate.
+func toolRoutes(name string) []string {
+	switch name {
+	case "dashboard":
+		return []string{"GET /api/admin/dashboard"}
+	case "node_list":
+		return []string{"GET /api/admin/nodes"}
+	case "node_detail":
+		return []string{"GET /api/admin/nodes/{id}", "GET /api/admin/nodes/{id}/probe"}
+	case "plan_list":
+		return []string{"GET /api/admin/plans"}
+	case "user_list":
+		return []string{"GET /api/admin/users"}
+	case "user_detail":
+		return []string{"GET /api/admin/users/{id}"}
+	case "order_list":
+		return []string{"GET /api/admin/orders"}
+	case "ticket_list":
+		return []string{"GET /api/admin/tickets"}
+	case "ticket_detail":
+		return []string{"GET /api/admin/tickets/{id}"}
+	case "probe_snapshot":
+		return []string{"GET /api/admin/monitoring"}
+	case "tcping":
+		return []string{"GET /api/admin/speedtest"}
+	case "external_node_list":
+		return []string{"GET /api/admin/external/nodes"}
+	case "user_create":
+		return []string{"POST /api/admin/users"}
+	case "user_grant_plan":
+		return []string{"POST /api/admin/users/{id}/grant"}
+	case "user_adjust":
+		return []string{"POST /api/admin/users/{id}/subscription"}
+	case "user_balance":
+		return []string{"POST /api/admin/users/{id}/balance"}
+	case "user_set_status":
+		return []string{"PATCH /api/admin/users/{id}"}
+	case "ticket_reply":
+		return []string{"POST /api/admin/tickets/{id}/reply"}
+	default:
+		return []string{"DENY /"}
+	}
 }

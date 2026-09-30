@@ -39,6 +39,9 @@ in lockstep with the panel.
 
 ## Features
 
+- Fleet administration: scoped automation tokens, staff Passkeys, subscription-aware user filters and previewed bulk operations, private metadata, named subscription profiles/templates, typed configuration presets, and a supplier/asset renewal ledger. [Workflows and boundaries](docs/ADMIN_WORKFLOWS.md).
+- Reliable traffic delivery pairs atomic receipts/accounting with bosun's durable frozen batches; node exit diagnostics add structured IPv4/IPv6, ASN/region and optional service observations (bosun >= 0.57.0).
+
 Node deletion can retain bosun in standalone mode, uninstall it with optional
 data retention, or only remove the panel record. Remote actions need bosun
 ≥ v0.55.0; see [node removal](docs/NODES.md#removing-a-node).

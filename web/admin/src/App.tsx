@@ -10,6 +10,8 @@ import EntriesPage from './pages/EntriesPage'
 import UsersPage from './pages/UsersPage'
 import PlansPage from './pages/PlansPage'
 import OrdersPage from './pages/OrdersPage'
+import InfrastructurePage from './pages/InfrastructurePage'
+import AccountPage from './pages/AccountPage'
 import SettingsPage from './pages/SettingsPage'
 import SitePage from './pages/SitePage'
 import SubTemplatesPage from './pages/SubTemplatesPage'
@@ -53,6 +55,8 @@ export default function App() {
           <Route path="/articles" element={<ArticlesPage />} />
           <Route path="/withdrawals" element={<WithdrawalsPage />} />
           <Route path="/admins" element={<AdminsPage />} />
+          <Route path="/infrastructure" element={<InfrastructurePage />} />
+          <Route path="/account" element={<AccountPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/site" element={<SitePage />} />
           <Route path="/sub-templates" element={<SubTemplatesPage />} />

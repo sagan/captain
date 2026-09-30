@@ -56,8 +56,12 @@ func (h *handlers) createNodeJob(w http.ResponseWriter, r *http.Request) {
 			fail(w, 409, "node must be paired and online")
 			return
 		}
-		if n.Version != "v0.56.0" && !selfupdate.Newer(n.Version, "v0.56.0") {
-			fail(w, 409, "network diagnostics require bosun v0.56.0 or newer")
+		minimum := "v0.56.0"
+		if p.Type == "exit" {
+			minimum = "v0.57.0"
+		}
+		if n.Version != minimum && !selfupdate.Newer(n.Version, minimum) {
+			fail(w, 409, "this diagnostic requires bosun "+minimum+" or newer")
 			return
 		}
 		if err := h.Store.QueueNetworkDiagnostic(r.Context(), jobID, id, p); err != nil {

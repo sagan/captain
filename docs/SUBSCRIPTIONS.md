@@ -159,3 +159,7 @@ are covered by the panel's own certificates; see
 A node option, *mita native quotas*, also writes each user's allowance into
 mieru's own quota system (the window is the plan's reset cycle), so the
 core keeps enforcing the limit while the panel is unreachable.
+
+## Additions in 1.8.0
+
+Named template libraries, explicit/default user presentation profiles, response-rule precedence, HWID limits and optional subscription pages are described in [administration workflows](ADMIN_WORKFLOWS.md#named-subscription-templates-and-profiles).

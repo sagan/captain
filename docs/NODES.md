@@ -285,3 +285,7 @@ address), or a line ingress with an *entry domain* is saved (entry domain →
 the provider's entry address). Records are never deleted and never proxied,
 and the outcome is shown in a toast. The token needs DNS edit permission on
 the zone, which the DNS-01 token already has.
+
+## Additions in 1.8.0
+
+Inbound and routing editors support typed named presets with a draft diff and impact preview. Node detail also links to administrator-only supplier/asset costs. See [administration workflows](ADMIN_WORKFLOWS.md).

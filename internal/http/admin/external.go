@@ -191,6 +191,10 @@ func (h *handlers) putNodeRouting(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &nr) {
 		return
 	}
+	if err := spec.ValidateRoutingReferences(nr.Outbounds, nr.Routes, nr.DefaultOutbound); err != nil {
+		fail(w, 400, err.Error())
+		return
+	}
 	for _, rule := range nr.Routes {
 		// Refuse here what the nodes would drop: a rule the cores cannot
 		// render leaves them running an old config for ever.

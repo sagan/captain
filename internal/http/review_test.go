@@ -32,10 +32,12 @@ type rig struct {
 	nodeID int64
 }
 
-func newRig(t *testing.T) *rig {
+func newRig(t *testing.T) *rig { return newRigAt(t, "http://test") }
+
+func newRigAt(t *testing.T, baseURL string) *rig {
 	t.Helper()
 	cfg := config.Default()
-	cfg.BaseURL = "http://test"
+	cfg.BaseURL = baseURL
 	conn, err := db.Open("sqlite", filepath.Join(t.TempDir(), "c.db"))
 	if err != nil {
 		t.Fatal(err)

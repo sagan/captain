@@ -38,6 +38,10 @@ mita（mieru）、Hysteria、snell-server 和 realm 作为子进程拉起来。
 
 ## 功能特性
 
+- 运维管理新增细粒度 API 令牌、员工 Passkey、用户筛选与批量预览操作、内部元数据、命名订阅模板和展示方案、结构化配置预设，以及供应商和节点续费台账。[使用说明与边界](docs/ADMIN_WORKFLOWS.md)。
+- 流量接收和入账在同一事务内完成，配合 bosun 持久化重试批次；新增 IPv4/IPv6、ASN/地区和可选服务检测的结构化出口诊断（bosun >= 0.57.0）。
+
+
 删除节点时，可保留 bosun 并转为独立模式、卸载 bosun（可选保留数据），
 或仅删除面板记录。远程操作需要 bosun ≥ v0.55.0，详见
 [节点删除说明](docs/NODES.md#removing-a-node)。

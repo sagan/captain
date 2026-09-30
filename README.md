@@ -39,12 +39,17 @@ in lockstep with the panel.
 
 ## Features
 
+Node deletion can retain bosun in standalone mode, uninstall it with optional
+data retention, or only remove the panel record. Remote actions need bosun
+≥ v0.55.0; see [node removal](docs/NODES.md#removing-a-node).
+
 **Protocols and cores** ([docs](docs/NODES.md#inbounds)) — VLESS (+ REALITY, with a decoy site and a target
 scanner), VMess, Trojan, Shadowsocks (incl. 2022 ciphers and ShadowTLS v3),
 Hysteria2, TUIC, AnyTLS, mieru, Snell, SOCKS, HTTP, NaiveProxy and
 WireGuard. Each inbound
 picks its core; bosun installs and supervises the binaries, so there is no
 fork of anything to maintain.
+Inbound core choices follow protocol and feature compatibility, with automatic previews, node availability and a separate running-core indicator.
 
 **Subscriptions that fit the client** ([docs](docs/SUBSCRIPTIONS.md)) — mihomo/Clash, Stash, sing-box,
 Egern, Surge, Surfboard, Loon, Quantumult X, base64 share links (v2rayN,

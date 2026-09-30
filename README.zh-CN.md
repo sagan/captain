@@ -38,11 +38,16 @@ mita（mieru）、Hysteria、snell-server 和 realm 作为子进程拉起来。
 
 ## 功能特性
 
+删除节点时，可保留 bosun 并转为独立模式、卸载 bosun（可选保留数据），
+或仅删除面板记录。远程操作需要 bosun ≥ v0.55.0，详见
+[节点删除说明](docs/NODES.md#removing-a-node)。
+
 **协议与内核**（[文档](docs/NODES.md#inbounds)）—— VLESS（含 REALITY，带伪装站点和 dest
 扫描器）、VMess、Trojan、Shadowsocks（含 2022 加密与 ShadowTLS v3）、Hysteria2、TUIC、
 AnyTLS、mieru、Snell、SOCKS、HTTP、NaiveProxy 和 WireGuard。每个入站
 各自选择内核；二进制由 bosun 安装并托管，因此没有任何魔改分支需要
 维护。
+入站内核选项按协议和功能筛选，支持自动选择预览、节点可用性提示，并分别展示指定内核和运行内核。
 
 **贴合客户端的订阅**（[文档](docs/SUBSCRIPTIONS.md)）—— mihomo/Clash、Stash、sing-box、
 Egern、Surge、Surfboard、Loon、Quantumult X、base64 分享链接（v2rayN、

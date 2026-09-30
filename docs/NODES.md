@@ -33,7 +33,70 @@ the doctor's verdicts and which inbounds were not applied and why.
 previous build, scan REALITY targets, run a speed test. Each is recorded
 with its result.
 
+## Removing a node
+
+Node → Delete asks for the node name and offers three actions:
+
+- **Keep bosun in standalone mode** imports the currently provisioned inbounds,
+  users, per-inbound access and limits, routes, certificates and forwards, then
+  restarts bosun with the local driver. UUIDs/passwords and immutable traffic
+  identities remain. Captain's plans, balances, history, expiry schedule and
+  subscription URLs stay in Captain; standalone subscription URLs are new.
+  Existing local administrator credentials remain. A headless node gets a panel
+  on `127.0.0.1:2053`: use SSH to set its password with
+  `bosun admin set -user admin -password 'NEW_PASSWORD'`, restart bosun, then use an
+  SSH tunnel or configure a reverse proxy. Imported per-inbound limits remain
+  until that user is edited locally; configure ongoing quotas/expiry locally.
+- **Uninstall bosun** stops the agent and its cores, removes its service, binary
+  and `/etc/bosun`, and cleans up its own firewall/forwarding/shaping rules.
+  `/var/lib/bosun` is removed unless **Keep local data** is selected. This does
+  not uninstall OS packages or change SSH, interfaces or unrelated firewall rules.
+- **Only remove the Captain record** retains the legacy behavior, including for
+  offline nodes: delete the node and its inbounds without contacting bosun.
+  The node may continue serving the cached configuration in managed mode.
+
+Remote actions require a full administrator, an online paired node running
+**bosun ≥ v0.55.0**, and the standard Linux systemd/OpenRC installation paths.
+Docker containers and custom installation paths must be managed on the host.
+The worker runs outside bosun's service so it can report after stopping it.
+Captain deletes its record only after a successful result. Failures/timeouts
+retain the record; reopen the dialog to see or resume the same task. An unclaimed
+request expires after five minutes, so a returning offline node cannot execute
+an old uninstall. A standalone startup failure restores the managed files and
+attempts to restart the original service.
+
+API: `POST /api/admin/nodes/{id}/removal` accepts
+`{"mode":"standalone"}` or `{"mode":"uninstall","keep_data":true}` and returns
+`{"id":"JOB_ID"}`. `GET` on that path returns the latest job or `null`.
+After `done_at` is set, `error` is empty and `result.phase` is `complete`, use
+`DELETE /api/admin/nodes/{id}?removal_job=JOB_ID`. The original DELETE without
+that query still removes only the record. Workers authenticate their claim and
+completion at `POST /api/agent/removal` with the existing node credential.
+
+If result delivery fails, the node retains a root-only plan/result under
+`/var/tmp/bosun-removal-JOB_ID/`. After inspecting the worker service/log and
+confirming it is no longer running, rerun its staged worker with
+`/var/tmp/bosun-removal-JOB_ID/worker internal-node-removal /var/tmp/bosun-removal-JOB_ID/plan.json` to deliver
+an existing `result.json` without repeating the operation. Keep this directory
+private: it contains the node credential. Do not remove a `running.lock` while
+its worker is alive.
+
 ## Inbounds
+
+The **Core** selector filters choices by protocol, transport and features such
+as Shadowsocks 2022, ShadowTLS, PROXY protocol, fallbacks and Snell mode.
+**Automatic (recommended)** follows the node's configured core priority;
+REALITY prefers Xray. A manual choice is retained when settings change; an
+incompatible choice must be corrected before saving.
+
+With bosun ≥ 0.55.0, the form previews automatic selection and greys out
+compatible cores that the node has not enabled. Enable those in the node's
+`config.yaml` first; selecting a core does not install or enable it. Idle
+cores are available even while stopped. Older, offline or unreported nodes
+show unknown availability and validate when applying the configuration.
+The list separates the configured choice from the last reported running core.
+A failed apply has no confirmed running assignment. Existing `Core` values
+and the default selection order are preserved; no database migration is needed.
 
 An inbound is one listening service on one node: protocol, port, listen
 address, transport and its settings. Quick-setup recipes fill in a working

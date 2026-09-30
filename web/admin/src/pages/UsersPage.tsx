@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AccountIDEditor } from '../components/AccountIDEditor'
 import { useAuth } from '../lib/auth'
-import { api, type Group as UGroup, type HwidDevice, type OnlineDevice, type Page, type Plan, type SubRequest, type UserRow } from '../lib/api'
+import { api, ApiError, type Group as UGroup, type HwidDevice, type OnlineDevice, type Page, type Plan, type SubRequest, type UserRow } from '../lib/api'
 import { bytes, money, when } from '../lib/format'
 import { toast } from '../lib/notify'
 import { PageHeader } from '../components/PageHeader'
@@ -20,18 +20,20 @@ import { UserEntries } from '../components/UserEntries'
 import { HwidDevices } from '../components/HwidDevices'
 import { UserConnections } from '../components/UserConnections'
 import { UserAudit } from '../components/UserAudit'
+import { UserGroupsPanel } from '../components/UserGroupsPanel'
 import { SegmentedControl } from '@mantine/core'
 
 export default function UsersPage() {
   const { t } = useTranslation()
   const { me } = useAuth()
   const qc = useQueryClient()
+  const canManageGroups = me?.role === 'admin' || me?.role === 'operator'
   const [search, setSearch] = useState('')
   const [debounced] = useDebouncedValue(search, 300)
   const [page, setPage] = useState(1)
   const q = useQuery({ queryKey: ['users', debounced, page], queryFn: () => api.get<Page<UserRow>>(`/api/admin/users?q=${encodeURIComponent(debounced)}&page=${page}`) })
   const plans = useQuery({ queryKey: ['plans'], queryFn: () => api.get<Plan[]>('/api/admin/plans') })
-  const groups = useQuery({ queryKey: ['groups'], queryFn: () => api.get<UGroup[]>('/api/admin/groups') })
+  const groups = useQuery({ queryKey: ['groups'], queryFn: () => api.get<UGroup[]>('/api/admin/groups'), enabled: canManageGroups })
   const [sel, setSel] = useState<UserRow | null>(null)
   const [creating, setCreating] = useState(false)
   const [view, setView] = useState('list')
@@ -51,7 +53,7 @@ export default function UsersPage() {
   const [manualMin, setManualMin] = useState<number | string>(30)
   const topUp = useMutation({ mutationFn: () => api.post(`/api/admin/users/${sel!.id}/balance`, { DeltaCents: Number(delta) }), onSuccess: () => { toast.ok(t('common.saved')); invalidate(); setSel(null) }, onError: toast.err })
   const rotate = useMutation({ mutationFn: () => api.post<{ sub_token: string; sub_url: string }>(`/api/admin/users/${sel!.id}/rotate-token`), onSuccess: (r) => { toast.ok(t('common.saved')); setSel({ ...sel!, sub_token: r.sub_token, sub_url: r.sub_url }); invalidate() }, onError: toast.err })
-  const del = useMutation({ mutationFn: () => api.del(`/api/admin/users/${sel!.id}`), onSuccess: () => { toast.ok(t('common.deleted')); setSel(null); invalidate() }, onError: toast.err })
+  const del = useMutation({ mutationFn: () => api.del(`/api/admin/users/${sel!.id}`), onSuccess: () => { toast.ok(t('common.deleted')); setSel(null); invalidate() }, onError: (e) => toast.err(e instanceof ApiError && e.status === 409 ? t('users.deleteBlocked') : e) })
 
   const open = (u: UserRow) => { setSel(u); editForm.setValues({ Status: u.status, GroupID: u.group_id ? String(u.group_id) : '', Password: '' }); setGrantPlan(null); setDelta(0) }
   const subURL = sel ? (sel.sub_url || `${window.location.origin}/sub/${sel.sub_token}`) : ''
@@ -59,8 +61,8 @@ export default function UsersPage() {
 
   return (
     <>
-      <PageHeader title={t('users.title')} subtitle={t('users.subtitle')} actions={<><SegmentedControl size="xs" value={view} onChange={setView} data={[{ value: 'list', label: t('users.viewList') }, { value: 'renewals', label: t('users.viewRenewals') }]} /><Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>{t('users.create')}</Button></>} />
-      {view === 'renewals' ? <RenewalsPanel /> : <Card p={0}>
+      <PageHeader title={t('users.title')} subtitle={t('users.subtitle')} actions={<><SegmentedControl size="xs" value={view} onChange={setView} data={[{ value: 'list', label: t('users.viewList') }, ...(canManageGroups ? [{ value: 'groups', label: t('users.groups') }] : []), { value: 'renewals', label: t('users.viewRenewals') }]} />{view !== 'groups' && <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>{t('users.create')}</Button>}</>} />
+      {view === 'groups' && canManageGroups ? <UserGroupsPanel /> : view === 'renewals' ? <RenewalsPanel /> : <Card p={0}>
         <Group p="md" pb="xs"><TextInput placeholder={t('users.filterPlaceholder')} leftSection={<IconSearch size={14} />} value={search} onChange={(e) => { setSearch(e.currentTarget.value); setPage(1) }} w={300} /><Text size="sm" c="dimmed">{t('common.total', { count: q.data?.total ?? 0 })}</Text></Group>
         <Table.ScrollContainer minWidth={760}>
           <Table>

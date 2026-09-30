@@ -92,7 +92,6 @@
     "pairHint": "Run either command as root on the node: it installs bosun and pairs it. The code is valid for 24h, single use.",
     "repair": "Re-pair",
     "repairHint": "Revokes the current token and issues a new code; the node must pair again.",
-    "deleteHint": "Inbounds on this node are deleted too.",
     "host": "Host",
     "cores": "Cores",
     "cpu": "CPU",
@@ -257,7 +256,32 @@
     "shadowTLSHandshake": "Handshake site",
     "shadowTLSHandshakeHint": "A real HTTPS site with TLS 1.3, unrelated to this node; its certificate is what a prober sees",
     "shadowTLSStrict": "Strict mode",
-    "shadowTLSStrictHint": "Refuse a ClientHello the site itself would not accept"
+    "shadowTLSStrictHint": "Refuse a ClientHello the site itself would not accept",
+    "coreSelection": {
+      "auto": "Automatic (recommended)",
+      "preview": "Expected core: {{core}}. Automatic follows the node’s priority; REALITY prefers Xray.",
+      "enabledHint": "Only compatible cores are listed. Enable unavailable cores in the node configuration first.",
+      "unknown": "Core availability is unknown (older, offline or unreported node). The node will validate on apply.",
+      "notEnabled": "Not enabled",
+      "unavailable": "This core is not enabled on the node. Enable it there or choose another core.",
+      "noAvailable": "No enabled core supports this configuration. Enable a compatible core on the node first.",
+      "loading": "Checking compatible cores…",
+      "loadFailed": "Could not check cores. Retrying automatically; check the connection.",
+      "invalidJSON": "Fix the settings JSON to check compatible cores.",
+      "running": "Running: {{core}}",
+      "notReported": "Running core not confirmed",
+      "reasons": {
+        "protocol": "This core does not support the protocol. Choose another core.",
+        "transport": "This core does not support the transport. Choose another core.",
+        "ss2022": "Multi-user Shadowsocks 2022 requires sing-box.",
+        "shadowTLS": "ShadowTLS requires sing-box.",
+        "fallbacks": "Fallbacks require Xray.",
+        "proxyProtocol": "PROXY protocol requires Xray.",
+        "snellMultiUser": "Multi-user Snell requires sing-box.",
+        "snellTLS": "Snell TLS obfuscation requires snell-server.",
+        "unknown": "This core is not recognized. Choose a compatible core."
+      }
+    }
   },
   "entries": {
     "title": "Entries",
@@ -314,7 +338,11 @@
     "grantReplace": "Replace current",
     "viaRelay": "via relay",
     "firstConnected": "First connected",
-    "neverConnected": "never"
+    "neverConnected": "never",
+    "deleteBlocked": "This user has orders, commission records or invited users and cannot be deleted. To disable the account while preserving its history, set its status to Banned.",
+    "groups": "User groups",
+    "createGroup": "Add group",
+    "groupName": "Group name"
   },
   "plans": {
     "title": "Plans",
@@ -358,10 +386,7 @@
   },
   "settings": {
     "title": "Settings",
-    "subtitle": "User groups and system info.",
-    "groups": "User groups",
-    "createGroup": "Add group",
-    "groupName": "Group name",
+    "subtitle": "System settings and integrations.",
     "version": "Version",
     "acme": "Automatic certificates (ACME)",
     "acmeHint": "Nodes whose inbounds have “auto_cert” use this account with Let's Encrypt. HTTP needs port 80 reachable on the node; DNS goes through Cloudflare. Pushed to every node on save.",
@@ -1378,5 +1403,25 @@
       "orders": "Orders",
       "subscriptions": "Subscriptions"
     }
+  },
+  "nodeRemoval": {
+    "title": "Remove {{name}}",
+    "action": "Node action",
+    "standalone": "Keep bosun and switch to standalone",
+    "uninstall": "Uninstall bosun on the node",
+    "record": "Remove only the Captain record",
+    "requires": "Remote actions require an online node with bosun v0.55.0+, installed by the standard Linux systemd/OpenRC script. Containers must be managed on the host.",
+    "standaloneHint": "Keeps the currently provisioned inbounds, users, access restrictions and forwards. Captain plans, billing records and subscription URLs are not transferred.",
+    "loginHint": "Existing local administrator credentials are kept. A previously headless node listens on 127.0.0.1:2053; set its login password over SSH and restart bosun, then use an SSH tunnel or configure a reverse proxy.",
+    "uninstallHint": "Stops bosun and its proxy cores, removes the service, executable and configuration, and deletes local data unless you choose to keep it.",
+    "keepData": "Keep local data, cores and certificates",
+    "recordHint": "Only the panel record and its inbounds are deleted. This does not switch bosun to standalone or uninstall it; running proxies may continue with old configuration.",
+    "waiting": "Waiting for the node to finish. The Captain record is kept until the worker reports success.",
+    "finished": "The node operation succeeded. Finish removing its Captain record.",
+    "confirm": "Type {{name}} to confirm",
+    "resume": "Check result and finish",
+    "incomplete": "The node has not confirmed successful completion. Its record was kept.",
+    "timeout": "Timed out waiting for the node. Its record was kept; reopen this dialog to check the task.",
+    "intro": "The node and its inbound records will be removed from Captain. Choose what happens to bosun on the server."
   }
 }

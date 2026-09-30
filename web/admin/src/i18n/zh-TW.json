@@ -92,7 +92,6 @@
     "pairHint": "在節點上以 root 執行下面任一指令，它會安裝 bosun 並自動配對。配對碼 24 小時內有效，只能用一次。",
     "repair": "重新配對",
     "repairHint": "會撤銷目前權杖並產生新配對碼，節點需要重新配對。",
-    "deleteHint": "節點下的入站會一併刪除。",
     "host": "主機",
     "cores": "核心",
     "cpu": "CPU",
@@ -257,7 +256,32 @@
     "shadowTLSHandshake": "交握站點",
     "shadowTLSHandshakeHint": "一個支援 TLS 1.3、與本節點無關的真實 HTTPS 站點；探測者看到的是它的憑證",
     "shadowTLSStrict": "嚴格模式",
-    "shadowTLSStrictHint": "拒絕該站點本身不會接受的 ClientHello"
+    "shadowTLSStrictHint": "拒絕該站點本身不會接受的 ClientHello",
+    "coreSelection": {
+      "auto": "自動選擇（建議）",
+      "preview": "預計使用 {{core}}。自動選擇遵循節點優先順序；REALITY 優先 Xray。",
+      "enabledHint": "僅列出相容核心；未啟用的核心需先在節點設定中啟用。",
+      "unknown": "核心可用性未知（節點版本較舊、離線或尚未回報），將在節點套用時驗證。",
+      "notEnabled": "未啟用",
+      "unavailable": "節點未啟用此核心，請先啟用或選擇其他核心。",
+      "noAvailable": "節點尚未啟用支援目前設定的核心，請先在節點中啟用相容核心。",
+      "loading": "正在檢查相容核心…",
+      "loadFailed": "無法檢查核心，正在自動重試，請檢查連線。",
+      "invalidJSON": "請先修正設定 JSON，再檢查相容核心。",
+      "running": "執行核心：{{core}}",
+      "notReported": "尚未確認執行核心",
+      "reasons": {
+        "protocol": "目前核心不支援此協定，請重新選擇。",
+        "transport": "目前核心不支援此傳輸方式，請重新選擇。",
+        "ss2022": "多使用者 Shadowsocks 2022 需要 sing-box。",
+        "shadowTLS": "ShadowTLS 需要 sing-box。",
+        "fallbacks": "回落設定需要 Xray。",
+        "proxyProtocol": "PROXY protocol 需要 Xray。",
+        "snellMultiUser": "Snell 多使用者模式需要 sing-box。",
+        "snellTLS": "Snell TLS 混淆需要 snell-server。",
+        "unknown": "無法識別此核心，請選擇相容核心。"
+      }
+    }
   },
   "entries": {
     "title": "入口",
@@ -314,7 +338,11 @@
     "viewRenewals": "續費檢視",
     "viaRelay": "經轉發",
     "firstConnected": "首次連線",
-    "neverConnected": "從未連線"
+    "neverConnected": "從未連線",
+    "deleteBlocked": "此使用者有訂單、返佣紀錄或邀請的其他使用者，無法刪除。如需停用，請將狀態設為停權，以保留歷史紀錄。",
+    "groups": "使用者群組",
+    "createGroup": "新增使用者群組",
+    "groupName": "群組名稱"
   },
   "plans": {
     "title": "方案",
@@ -358,10 +386,7 @@
   },
   "settings": {
     "title": "設定",
-    "subtitle": "使用者群組與系統資訊。",
-    "groups": "使用者群組",
-    "createGroup": "新增使用者群組",
-    "groupName": "群組名稱",
+    "subtitle": "系統設定與外部服務。",
     "version": "版本",
     "acme": "自動憑證（ACME）",
     "acmeHint": "入站裡開了「自動憑證」的節點用這個帳號向 Let's Encrypt 申請。HTTP 驗證只需節點 80 連接埠可達；DNS 驗證走 Cloudflare。儲存後下發到所有節點。",
@@ -1378,5 +1403,25 @@
       "orders": "訂單",
       "subscriptions": "訂閱"
     }
+  },
+  "nodeRemoval": {
+    "title": "刪除 {{name}}",
+    "action": "節點處理方式",
+    "standalone": "保留 bosun，切換至獨立模式",
+    "uninstall": "解除安裝節點上的 bosun",
+    "record": "僅刪除 Captain 紀錄",
+    "requires": "遠端操作需要在線節點、bosun v0.55.0 以上，且透過標準 Linux systemd/OpenRC 腳本安裝。容器須在主機處理。",
+    "standaloneHint": "保留目前下發的入站、使用者、存取權限與轉發設定。Captain 的方案、帳單和訂閱網址不會移轉。",
+    "loginHint": "現有的本機管理員憑證保持不變。原本沒有本機面板的節點會監聽 127.0.0.1:2053；請透過 SSH 設定登入密碼並重新啟動 bosun，再使用 SSH 通道或設定反向代理。",
+    "uninstallHint": "停止 bosun 與代理核心，刪除服務、程式和設定；除非勾選保留，否則一併刪除本地資料。",
+    "keepData": "保留本地資料、核心與憑證",
+    "recordHint": "只刪除面板中的節點與入站，不會切換 bosun 模式或解除安裝；現有代理可能繼續使用舊設定。",
+    "waiting": "正在等待節點完成操作。節點回報成功前，Captain 會保留紀錄。",
+    "finished": "節點操作已成功，可完成刪除 Captain 紀錄。",
+    "confirm": "輸入 {{name}} 確認",
+    "resume": "檢查結果並完成刪除",
+    "incomplete": "節點尚未確認成功，已保留紀錄。",
+    "timeout": "等待節點逾時，已保留紀錄。重新開啟此視窗可查看任務結果。",
+    "intro": "節點及其入站記錄將從 Captain 中移除。請選擇如何處理伺服器上的 bosun。"
   }
 }

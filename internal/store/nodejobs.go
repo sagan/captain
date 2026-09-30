@@ -26,7 +26,7 @@ func (s *Store) CreateNodeJob(ctx context.Context, id string, nodeID int64, kind
 	if len(params) == 0 {
 		params = json.RawMessage("{}")
 	}
-	_, _ = s.db.ExecContext(ctx, `DELETE FROM node_jobs WHERE node_id = ? AND ((done_at IS NOT NULL AND done_at < ?) OR created_at < ?)`, nodeID, time.Now().Add(-time.Hour).Unix(), time.Now().Add(-6*time.Hour).Unix())
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM node_jobs WHERE node_id = ? AND kind <> 'node_remove' AND ((done_at IS NOT NULL AND done_at < ?) OR created_at < ?)`, nodeID, time.Now().Add(-time.Hour).Unix(), time.Now().Add(-6*time.Hour).Unix())
 	_, err := s.db.ExecContext(ctx, `INSERT INTO node_jobs (id, node_id, kind, params_json, created_at) VALUES (?, ?, ?, ?, ?)`, id, nodeID, kind, string(params), time.Now().Unix())
 	return err
 }
@@ -65,6 +65,13 @@ func (s *Store) NodeJob(ctx context.Context, nodeID int64, id string) (*NodeJob,
 // CompleteNodeJob stores a node's answer.
 func (s *Store) CompleteNodeJob(ctx context.Context, nodeID int64, id string, result json.RawMessage, errText string) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE node_jobs SET result_json = ?, error = ?, done_at = ? WHERE node_id = ? AND id = ? AND done_at IS NULL`, string(result), errText, time.Now().Unix(), nodeID, id)
+	return err
+}
+
+// CompleteReportedNodeJob accepts removal launch failures only before a worker
+// claims the request. A late agent report cannot overwrite the worker outcome.
+func (s *Store) CompleteReportedNodeJob(ctx context.Context, nodeID int64, id string, result json.RawMessage, errText string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE node_jobs SET result_json = ?, error = ?, done_at = ? WHERE node_id = ? AND id = ? AND done_at IS NULL AND (kind <> 'node_remove' OR (? <> '' AND result_json = ''))`, string(result), errText, time.Now().Unix(), nodeID, id, errText)
 	return err
 }
 

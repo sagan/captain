@@ -170,6 +170,20 @@ func (h *handlers) deleteNode(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "bad id")
 		return
 	}
+	if jobID := r.URL.Query().Get("removal_job"); jobID != "" {
+		if !userFrom(r).IsAdmin() {
+			fail(w, 403, "admin only")
+			return
+		}
+		j, err := h.Store.NodeJob(r.Context(), id, jobID)
+		var result struct {
+			Phase string `json:"phase"`
+		}
+		if err != nil || j.Kind != store.NodeRemovalKind || j.DoneAt == nil || j.Error != "" || json.Unmarshal(j.Result, &result) != nil || result.Phase != "complete" {
+			fail(w, 409, "remote operation has not completed successfully")
+			return
+		}
+	}
 	if err := h.Store.DeleteNode(r.Context(), id); err != nil {
 		serverErr(w, err)
 		return
@@ -221,6 +235,10 @@ func (h *handlers) createInbound(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, msg)
 		return
 	}
+	if msg := h.checkInboundCore(r.Context(), &ib); msg != "" {
+		fail(w, http.StatusBadRequest, msg)
+		return
+	}
 	if msg := h.checkIngress(r, &ib); msg != "" {
 		fail(w, http.StatusBadRequest, msg)
 		return
@@ -251,6 +269,10 @@ func (h *handlers) updateInbound(w http.ResponseWriter, r *http.Request) {
 	ib.ID, ib.NodeID = cur.ID, cur.NodeID
 	fillInboundSecrets(&ib)
 	if msg := checkInboundFields(&ib); msg != "" {
+		fail(w, http.StatusBadRequest, msg)
+		return
+	}
+	if msg := h.checkInboundCore(r.Context(), &ib); msg != "" {
 		fail(w, http.StatusBadRequest, msg)
 		return
 	}

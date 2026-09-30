@@ -1,3 +1,4 @@
+import { coreName } from '../lib/coreSelection'
 import { NumberInput, Switch, Accordion, ActionIcon, Badge, Button, Card, Code, Group, Modal, Progress, SimpleGrid, Stack, Table, Text, TextInput, Title, Autocomplete, Alert } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { modals } from '@mantine/modals'
@@ -18,8 +19,9 @@ import { RoutingCard } from '../components/RoutingCard'
 import { ForwardsCard } from '../components/ForwardsCard'
 import { IngressesCard, ingressPayload } from '../components/IngressesCard'
 import { OverridesCard } from '../components/OverridesCard'
+import { DeleteNodeModal } from '../components/DeleteNodeModal'
 
-interface Detail { traffic?: Record<string, { today: number; total: number }>; node: Node; inbounds: Inbound[]; ingresses?: Ingress[]; status: { host: Record<string, number> | null; cores: Record<string, { running: boolean }> | null; certs: CertStatus[] | null; doctor?: DoctorReport | null } | null }
+interface Detail { traffic?: Record<string, { today: number; total: number }>; node: Node; inbounds: Inbound[]; ingresses?: Ingress[]; status: { host: Record<string, number> | null; cores: Record<string, { running: boolean; inbounds?: string[] }> | null; certs: CertStatus[] | null; doctor?: DoctorReport | null } | null }
 
 export default function NodePage() {
   const { id } = useParams()
@@ -42,7 +44,7 @@ export default function NodePage() {
   })
   const del = useMutation({ mutationFn: (ibID: number) => api.del(`/api/admin/inbounds/${ibID}`), onSuccess: () => { toast.ok(t('common.deleted')); invalidate() }, onError: toast.err })
   const repair = useMutation({ mutationFn: () => api.post<{ pair_code: string }>(`/api/admin/nodes/${id}/repair`), onSuccess: (r) => { setPair(r.pair_code); invalidate() }, onError: toast.err })
-  const delNode = useMutation({ mutationFn: () => api.del(`/api/admin/nodes/${id}`), onSuccess: () => { toast.ok(t('common.deleted')); qc.invalidateQueries({ queryKey: ['nodes'] }); nav('/nodes') }, onError: toast.err })
+  const [deletingNode, setDeletingNode] = useState(false)
   const nodeForm = useForm({ initialValues: { Name: '', PublicAddr: '', InternalAddr: '', V6Addr: '', Domain: '', MonitorURL: '', DStatusSID: '', DecoyEnabled: false, DecoyUpstream: '', UserSpeedLimitMbps: 0, MitaQuotas: false, EgressByIngress: false } })
   const domainList = useQuery({ queryKey: ['domains'], queryFn: () => api.get<{ domains: { name: string }[] }>('/api/admin/domains') })
   const saveNode = useMutation({ mutationFn: (v: typeof nodeForm.values) => api.patch<{ ok: boolean; dns?: DNSResult[] }>(`/api/admin/nodes/${id}`, v), onSuccess: (r) => { toast.ok(t('common.saved')); setEditNode(false); invalidate(); dnsToast(r.dns) }, onError: toast.err })
@@ -54,11 +56,12 @@ export default function NodePage() {
   const pct = (used?: number, total?: number) => (used && total ? Math.round((used / total) * 100) : 0)
   return (
     <>
+      <DeleteNodeModal node={n} opened={deletingNode} onClose={() => setDeletingNode(false)} onDeleted={() => { qc.invalidateQueries({ queryKey: ['nodes'] }); nav('/nodes') }} />
       <PageHeader title={n.name} subtitle={`${n.hostname || ''} ${n.platform || ''} ${n.version || ''}`.trim()} actions={<>
         <NodeStatus n={n} />
         <Button variant="default" size="xs" leftSection={<IconPencil size={14} />} onClick={() => { nodeForm.setValues({ Name: n.name, PublicAddr: n.public_addr, InternalAddr: n.internal_addr, V6Addr: n.v6_addr, Domain: n.domain ?? '', MonitorURL: n.monitor_url, DStatusSID: n.dstatus_sid ?? '', DecoyEnabled: !!n.decoy_enabled, DecoyUpstream: n.decoy_upstream ?? '', UserSpeedLimitMbps: n.user_speed_limit_mbps ?? 0, MitaQuotas: !!n.mita_quotas, EgressByIngress: !!n.egress_by_ingress }); setEditNode(true) }}>{t('common.edit')}</Button>
         <Button variant="default" size="xs" onClick={() => modals.openConfirmModal({ title: t('nodes.repair'), children: <Text size="sm">{t('nodes.repairHint')}</Text>, labels: { confirm: t('common.confirm'), cancel: t('common.cancel') }, onConfirm: () => repair.mutate() })}>{t('nodes.repair')}</Button>
-        <Button color="red" variant="light" size="xs" leftSection={<IconTrash size={14} />} onClick={() => modals.openConfirmModal({ title: t('common.delete'), children: <Text size="sm">{t('nodes.deleteHint')}</Text>, labels: { confirm: t('common.delete'), cancel: t('common.cancel') }, confirmProps: { color: 'red' }, onConfirm: () => delNode.mutate() })}>{t('common.delete')}</Button>
+        <Button color="red" variant="light" size="xs" leftSection={<IconTrash size={14} />} onClick={() => setDeletingNode(true)}>{t('common.delete')}</Button>
       </>} />
 
       {!n.paired && n.pair_code && <Card mb="lg"><Title order={5} mb="sm">{t('nodes.pairTitle')}</Title><PairCodeBox code={n.pair_code} /></Card>}
@@ -123,7 +126,7 @@ export default function NodePage() {
                 <Table.Td><Text fw={600}>{ib.Tag}</Text></Table.Td>
                 <Table.Td><Badge>{ib.Protocol}</Badge></Table.Td>
                 <Table.Td><Code>{ib.Listen || '::'}:{ib.Port}</Code></Table.Td>
-                <Table.Td>{ib.Core || t('inbounds.coreAuto')}</Table.Td>
+                <Table.Td><Text size="sm">{ib.Core ? coreName(ib.Core) : t('inbounds.coreAuto')}</Text><Text size="xs" c="dimmed">{(() => { const actual = Object.entries(d.node.online ? d.status?.cores ?? {} : {}).find(([, c]) => c.running && c.inbounds?.includes(ib.Tag))?.[0]; return actual ? t('inbounds.coreSelection.running', { core: coreName(actual) }) : t('inbounds.coreSelection.notReported') })()}</Text></Table.Td>
                 <Table.Td>{d.traffic?.[String(ib.ID)] ? <Text size="xs">{bytes(d.traffic[String(ib.ID)].today)} <Text span c="dimmed">/ {bytes(d.traffic[String(ib.ID)].total)}</Text></Text> : <Text size="xs" c="dimmed">—</Text>}</Table.Td>
                 <Table.Td>{ib.GroupID ? (groups.data?.find((g) => g.ID === ib.GroupID)?.Name ?? ib.GroupID) : t('inbounds.groupAll')}</Table.Td>
                 <Table.Td>{ib.Enabled ? <Badge color="teal">{t('common.enabled')}</Badge> : <Badge color="gray">{t('common.disabled')}</Badge>}</Table.Td>

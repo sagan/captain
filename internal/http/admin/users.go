@@ -246,6 +246,10 @@ func (h *handlers) deleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Store.DeleteUser(r.Context(), id); err != nil {
+		if errors.Is(err, store.ErrUserHasHistory) {
+			fail(w, http.StatusConflict, err.Error())
+			return
+		}
 		serverErr(w, err)
 		return
 	}

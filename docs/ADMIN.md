@@ -2,6 +2,13 @@
 
 Who can do what, how the panel is reached, and everything it can talk to.
 
+## User groups
+
+Users → User groups lists and creates groups beside the user list and renewals
+views. Assign a group in the user detail drawer or through a plan; inbound group
+restrictions use the same groups. Admin and operator accounts can manage them;
+support accounts cannot. The APIs remain `GET` and `POST /api/admin/groups`.
+
 ## Staff roles
 
 Admin → Staff creates console accounts with a role:
@@ -31,6 +38,13 @@ customer password. Staff without customer history is removed from `users` entire
 are not renumbered; restore the pre-upgrade snapshot to roll back this schema.
 
 The last admin cannot be demoted, disabled or deleted.
+
+**Delete a customer** — accounts referenced by orders, commissions or other
+users' `invited_by` links cannot be deleted, to preserve that history. Keep
+them banned instead. This also applies to disabled customer records retained
+when staff accounts were separated. The delete API returns 409 with an
+explanation; the console shows it in the selected language. Deleting an
+eligible customer does not affect a staff account with the same ID or email.
 
 **Change an account ID** — the customer detail drawer and the staff edit
 dialog each have a separate Change ID control. Only the `admin` role can

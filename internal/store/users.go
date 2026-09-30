@@ -291,7 +291,11 @@ func (s *Store) RotateSubToken(ctx context.Context, id int64, token string) erro
 	return nil
 }
 
+// ErrUserHasHistory protects orders, commissions and other users' invitations.
+var ErrUserHasHistory = errors.New("user has orders, commissions or invited users; keep the account banned to preserve history")
+
 // DeleteUser removes a user and, via cascades, sessions and subscriptions.
+// Financial history and invitations from other users prevent deletion.
 // The tables the nodes fill have no foreign key (they are written on a hot
 // path), so they are cleared here: SQLite reuses row ids, and the next
 // registrant must not inherit somebody's connection log, audit hits or
@@ -302,6 +306,22 @@ func (s *Store) DeleteUser(ctx context.Context, id int64) error {
 		return err
 	}
 	defer tx.Rollback()
+	var exists int
+	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM users WHERE id = ? AND role = 'user'`, id).Scan(&exists); err != nil {
+		return wrapNotFound(err)
+	}
+	// Check the restrictive references before deleting, in the same transaction,
+	// so callers can distinguish preserved history from a storage failure.
+	var hasHistory bool
+	if err := tx.QueryRowContext(ctx, `SELECT
+		EXISTS(SELECT 1 FROM orders WHERE user_id = ?)
+		OR EXISTS(SELECT 1 FROM commissions WHERE inviter_id = ? OR invitee_id = ?)
+		OR EXISTS(SELECT 1 FROM users WHERE invited_by = ?)`, id, id, id, id).Scan(&hasHistory); err != nil {
+		return err
+	}
+	if hasHistory {
+		return ErrUserHasHistory
+	}
 	res, err := tx.ExecContext(ctx, `DELETE FROM users WHERE id = ? AND role = 'user'`, id)
 	if err != nil {
 		return err

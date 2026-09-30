@@ -92,7 +92,6 @@
     "pairHint": "在节点上以 root 执行下面任意一条命令，它会安装 bosun 并自动配对。配对码 24 小时内有效，只能用一次。",
     "repair": "重新配对",
     "repairHint": "会吊销当前令牌并生成新配对码，节点需要重新配对。",
-    "deleteHint": "节点下的入站会一并删除。",
     "host": "主机",
     "cores": "内核",
     "cpu": "CPU",
@@ -257,7 +256,32 @@
     "shadowTLSHandshake": "握手站点",
     "shadowTLSHandshakeHint": "一个支持 TLS 1.3、与本节点无关的真实 HTTPS 站点；探测者看到的是它的证书",
     "shadowTLSStrict": "严格模式",
-    "shadowTLSStrictHint": "拒绝该站点本身不会接受的 ClientHello"
+    "shadowTLSStrictHint": "拒绝该站点本身不会接受的 ClientHello",
+    "coreSelection": {
+      "auto": "自动选择（推荐）",
+      "preview": "预计使用 {{core}}。自动选择遵循节点优先级；REALITY 优先 Xray。",
+      "enabledHint": "仅列出兼容内核；未启用的内核需先在节点配置中启用。",
+      "unknown": "内核可用性未知（节点版本较旧、离线或尚未上报），将在节点应用时校验。",
+      "notEnabled": "未启用",
+      "unavailable": "节点未启用此内核，请先启用或选择其他内核。",
+      "noAvailable": "节点尚未启用支持当前配置的内核，请先在节点中启用兼容内核。",
+      "loading": "正在检查兼容内核…",
+      "loadFailed": "无法检查内核，正在自动重试，请检查连接。",
+      "invalidJSON": "请先修正配置 JSON，再检查兼容内核。",
+      "running": "运行内核：{{core}}",
+      "notReported": "尚未确认运行内核",
+      "reasons": {
+        "protocol": "当前内核不支持此协议，请重新选择。",
+        "transport": "当前内核不支持此传输方式，请重新选择。",
+        "ss2022": "多用户 Shadowsocks 2022 需要 sing-box。",
+        "shadowTLS": "ShadowTLS 需要 sing-box。",
+        "fallbacks": "回落配置需要 Xray。",
+        "proxyProtocol": "PROXY protocol 需要 Xray。",
+        "snellMultiUser": "Snell 多用户模式需要 sing-box。",
+        "snellTLS": "Snell TLS 混淆需要 snell-server。",
+        "unknown": "无法识别此内核，请选择兼容内核。"
+      }
+    }
   },
   "entries": {
     "title": "入口",
@@ -314,7 +338,11 @@
     "grantReplace": "替换当前套餐",
     "viaRelay": "经转发",
     "firstConnected": "首次连接",
-    "neverConnected": "从未连接"
+    "neverConnected": "从未连接",
+    "deleteBlocked": "该用户有订单、返佣记录或邀请的其他用户，无法删除。如需停用，请将状态设为“封禁”，以保留历史记录。",
+    "groups": "用户组",
+    "createGroup": "添加用户组",
+    "groupName": "组名"
   },
   "plans": {
     "title": "套餐",
@@ -358,10 +386,7 @@
   },
   "settings": {
     "title": "设置",
-    "subtitle": "用户组与系统信息。",
-    "groups": "用户组",
-    "createGroup": "添加用户组",
-    "groupName": "组名",
+    "subtitle": "系统配置与外部服务。",
     "version": "版本",
     "acme": "自动证书（ACME）",
     "acmeHint": "入站里开了“自动证书”的节点用这个账号向 Let's Encrypt 申请。HTTP 验证只需节点 80 端口可达；DNS 验证走 Cloudflare。保存后下发到所有节点。",
@@ -1378,5 +1403,25 @@
       "orders": "订单",
       "subscriptions": "订阅"
     }
+  },
+  "nodeRemoval": {
+    "title": "删除 {{name}}",
+    "action": "节点处理方式",
+    "standalone": "保留 bosun，切换到独立模式",
+    "uninstall": "卸载节点上的 bosun",
+    "record": "仅删除 Captain 记录",
+    "requires": "远程操作需要在线节点、bosun v0.55.0 及以上，并通过标准 Linux systemd/OpenRC 脚本安装。容器需在宿主机处理。",
+    "standaloneHint": "保留当前下发的入站、用户、访问权限及转发配置。Captain 的套餐、账单和订阅网址不会迁移。",
+    "loginHint": "已有的本地管理员凭据保持不变。原来没有本地面板的节点会监听 127.0.0.1:2053；请通过 SSH 设置登录密码并重启 bosun，再使用 SSH 隧道或配置反向代理。",
+    "uninstallHint": "停止 bosun 及代理内核，删除服务、程序和配置；除非勾选保留，否则一并删除本地数据。",
+    "keepData": "保留本地数据、内核和证书",
+    "recordHint": "只删除面板中的节点及入站，不会切换 bosun 模式或卸载程序；现有代理可能继续使用旧配置运行。",
+    "waiting": "正在等待节点完成操作。节点进程回报成功前，Captain 会保留记录。",
+    "finished": "节点操作已成功，可完成删除 Captain 记录。",
+    "confirm": "输入 {{name}} 确认",
+    "resume": "检查结果并完成删除",
+    "incomplete": "节点尚未确认操作成功，已保留记录。",
+    "timeout": "等待节点超时，已保留记录。重新打开此窗口可查看任务结果。",
+    "intro": "节点及其入站记录将从 Captain 中移除。请选择如何处理服务器上的 bosun。"
   }
 }

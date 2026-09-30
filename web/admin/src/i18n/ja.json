@@ -92,7 +92,6 @@
     "pairHint": "ノード上で root として以下のいずれかのコマンドを実行すると、bosun がインストールされ自動でペアリングされます。コードは 24 時間有効で 1 回のみ使えます。",
     "repair": "再ペアリング",
     "repairHint": "現在のトークンを失効させて新しいペアリングコードを発行します。ノードは再ペアリングが必要です。",
-    "deleteHint": "このノードのインバウンドも一緒に削除されます。",
     "host": "ホスト",
     "cores": "コア",
     "cpu": "CPU",
@@ -257,7 +256,32 @@
     "shadowTLSHandshake": "ハンドシェイク先",
     "shadowTLSHandshakeHint": "TLS 1.3 に対応し、このノードとは無関係な実在の HTTPS サイト。調査者が見るのはその証明書です",
     "shadowTLSStrict": "厳格モード",
-    "shadowTLSStrictHint": "そのサイト自身が受け付けない ClientHello を拒否します"
+    "shadowTLSStrictHint": "そのサイト自身が受け付けない ClientHello を拒否します",
+    "coreSelection": {
+      "auto": "自動選択（推奨）",
+      "preview": "使用予定：{{core}}。ノードの優先順位に従います。REALITY は Xray を優先します。",
+      "enabledHint": "対応するコアのみ表示します。未有効のコアはノードの設定で有効にしてください。",
+      "unknown": "コアの利用可否は不明です（旧版、オフライン、未報告）。ノードで適用時に検証します。",
+      "notEnabled": "未有効",
+      "unavailable": "このコアはノードで有効になっていません。有効にするか、別のコアを選択してください。",
+      "noAvailable": "現在の設定に対応するコアが有効になっていません。ノードで対応するコアを有効にしてください。",
+      "loading": "対応するコアを確認中…",
+      "loadFailed": "コアを確認できません。自動で再試行しています。接続を確認してください。",
+      "invalidJSON": "設定 JSON を修正してから対応するコアを確認してください。",
+      "running": "稼働コア：{{core}}",
+      "notReported": "稼働コアは未確認",
+      "reasons": {
+        "protocol": "このコアはプロトコルに対応していません。選び直してください。",
+        "transport": "このコアはトランスポートに対応していません。選び直してください。",
+        "ss2022": "複数ユーザーの Shadowsocks 2022 には sing-box が必要です。",
+        "shadowTLS": "ShadowTLS には sing-box が必要です。",
+        "fallbacks": "フォールバックには Xray が必要です。",
+        "proxyProtocol": "PROXY protocol には Xray が必要です。",
+        "snellMultiUser": "Snell の複数ユーザーモードには sing-box が必要です。",
+        "snellTLS": "Snell の TLS 難読化には snell-server が必要です。",
+        "unknown": "不明なコアです。対応するコアを選択してください。"
+      }
+    }
   },
   "entries": {
     "title": "エントリ",
@@ -314,7 +338,11 @@
     "viewRenewals": "更新状況",
     "viaRelay": "中継経由",
     "firstConnected": "初回接続",
-    "neverConnected": "未接続"
+    "neverConnected": "未接続",
+    "deleteBlocked": "このユーザーには注文、紹介報酬の記録、または招待したユーザーがあるため削除できません。履歴を保持してアカウントを無効にするには、利用停止にしてください。",
+    "groups": "ユーザーグループ",
+    "createGroup": "ユーザーグループを追加",
+    "groupName": "グループ名"
   },
   "plans": {
     "title": "プラン",
@@ -358,10 +386,7 @@
   },
   "settings": {
     "title": "設定",
-    "subtitle": "ユーザーグループとシステム情報。",
-    "groups": "ユーザーグループ",
-    "createGroup": "ユーザーグループを追加",
-    "groupName": "グループ名",
+    "subtitle": "システム設定と外部サービス。",
     "version": "バージョン",
     "acme": "自動証明書（ACME）",
     "acmeHint": "インバウンドで「自動証明書」を有効にしたノードは、このアカウントで Let's Encrypt に申請します。HTTP 検証はノードのポート 80 が到達可能であれば十分、DNS 検証は Cloudflare を使います。保存すると全ノードに配布されます。",
@@ -1378,5 +1403,25 @@
       "orders": "注文",
       "subscriptions": "サブスクリプション"
     }
+  },
+  "nodeRemoval": {
+    "title": "{{name}} を削除",
+    "action": "ノードの処理",
+    "standalone": "bosun を残して独立モードに切り替える",
+    "uninstall": "ノードの bosun をアンインストール",
+    "record": "Captain の記録のみ削除",
+    "requires": "遠隔操作にはオンラインの bosun v0.55.0 以降と、標準 Linux systemd/OpenRC スクリプトによるインストールが必要です。コンテナはホスト側で管理してください。",
+    "standaloneHint": "現在配信されているインバウンド、ユーザー、アクセス権限、転送設定を保持します。Captain のプラン、請求履歴、サブスクリプション URL は移行しません。",
+    "loginHint": "既存のローカル管理者の認証情報は保持されます。ローカルパネルのなかったノードは 127.0.0.1:2053 で待ち受けます。SSH でパスワードを設定して bosun を再起動し、SSH トンネルまたはリバースプロキシを利用してください。",
+    "uninstallHint": "bosun とプロキシコアを停止し、サービス、実行ファイル、設定を削除します。保持を選ばなければローカルデータも削除します。",
+    "keepData": "ローカルデータ、コア、証明書を保持",
+    "recordHint": "パネルのノード記録とインバウンドのみ削除します。bosun のモード変更やアンインストールは行わず、古い設定でプロキシが動き続ける場合があります。",
+    "waiting": "ノードの処理完了を待っています。成功の報告を受けるまで Captain の記録を保持します。",
+    "finished": "ノードの処理が成功しました。Captain の記録の削除を完了できます。",
+    "confirm": "確認のため {{name}} を入力",
+    "resume": "結果を確認して削除を完了",
+    "incomplete": "ノードから成功の確認がないため、記録を保持しました。",
+    "timeout": "ノードの応答待ちがタイムアウトしました。記録は保持されています。この画面を再度開いて結果を確認してください。",
+    "intro": "ノードとそのインバウンドの記録を Captain から削除します。サーバー上の bosun の処理を選択してください。"
   }
 }

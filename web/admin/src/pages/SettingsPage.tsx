@@ -1,8 +1,8 @@
-import { Button, Card, Divider, Group, Stack, Table, Text, TextInput, Title } from '@mantine/core'
+import { Button, Card, Divider, Group, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api, type ACMESettings, type Group as UGroup, type InviteSettings, type NoticeSettings, type OIDCSettings, type SubscriptionSettings } from '../lib/api'
+import { api, type ACMESettings, type InviteSettings, type NoticeSettings, type OIDCSettings, type SubscriptionSettings } from '../lib/api'
 import { JsonInput, NumberInput, Select, Switch } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { useEffect } from 'react'
@@ -33,9 +33,6 @@ export default function SettingsPage() {
   const { t } = useTranslation()
   const { me } = useAuth()
   const qc = useQueryClient()
-  const groups = useQuery({ queryKey: ['groups'], queryFn: () => api.get<UGroup[]>('/api/admin/groups') })
-  const [name, setName] = useState('')
-  const create = useMutation({ mutationFn: () => api.post('/api/admin/groups', { Name: name }), onSuccess: () => { toast.ok(t('common.saved')); setName(''); qc.invalidateQueries({ queryKey: ['groups'] }) }, onError: toast.err })
   const subs = useQuery({ queryKey: ['subscription-settings'], queryFn: () => api.get<SubscriptionSettings>('/api/admin/settings/subscription') })
   const [subText, setSubText] = useState<string | null>(null)
   const [shortLinks, setShortLinks] = useState<boolean | null>(null)
@@ -67,11 +64,6 @@ export default function SettingsPage() {
     <>
       <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
       <Stack>
-        <Card>
-          <Title order={5} mb="sm">{t('settings.groups')}</Title>
-          <Table mb="md"><Table.Tbody>{(groups.data ?? []).map((g) => <Table.Tr key={g.ID}><Table.Td w={60}><Text c="dimmed">#{g.ID}</Text></Table.Td><Table.Td>{g.Name}</Table.Td></Table.Tr>)}</Table.Tbody></Table>
-          <Group align="flex-end"><TextInput label={t('settings.groupName')} value={name} onChange={(e) => setName(e.currentTarget.value)} /><Button disabled={!name} loading={create.isPending} onClick={() => create.mutate()}>{t('settings.createGroup')}</Button></Group>
-        </Card>
         <Card>
           <Title order={5} mb="xs">{t('settings.subUrls')}</Title>
           <Text size="xs" c="dimmed" mb="sm">{t('settings.subUrlsHint')}</Text>

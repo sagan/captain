@@ -58,6 +58,7 @@ func Register(mux *http.ServeMux, d Deps) {
 	mux.HandleFunc("GET /api/agent/install.sh", h.installScript)
 	mux.HandleFunc("GET /api/agent/state", h.requireNode(h.state))
 	mux.HandleFunc("POST /api/agent/report", h.requireNode(h.report))
+	mux.HandleFunc("POST /api/agent/removal", h.requireNode(h.nodeRemoval))
 	mux.HandleFunc("POST /api/agent/beat", h.requireNode(h.beat))
 }
 
@@ -200,7 +201,7 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 		_ = h.Store.SetNodeDoctor(ctx, n.ID, rep.Doctor)
 	}
 	for _, jr := range rep.Jobs {
-		if err := h.Store.CompleteNodeJob(ctx, n.ID, jr.ID, jr.Result, jr.Error); err != nil {
+		if err := h.Store.CompleteReportedNodeJob(ctx, n.ID, jr.ID, jr.Result, jr.Error); err != nil {
 			h.Log.Error("complete node job", "job", jr.ID, "err", err)
 		}
 		if jr.Kind == "warp_register" && len(jr.Result) > 0 {

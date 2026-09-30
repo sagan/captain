@@ -93,6 +93,9 @@ func TestStaffMigration(t *testing.T) {
 				if err != nil || u.Status != "banned" || u.PasswordHash != "" || u.Role != "user" {
 					t.Fatalf("legacy history login active: %+v %v", u, err)
 				}
+				if err := st.DeleteUser(ctx, 1); !errors.Is(err, store.ErrUserHasHistory) {
+					t.Fatalf("legacy customer deletion should explain preserved history: %v", err)
+				}
 				var count int
 				if err := conn.QueryRow(`SELECT COUNT(*) FROM orders WHERE user_id=1`).Scan(&count); err != nil || count != 1 {
 					t.Fatal("lost order", err)

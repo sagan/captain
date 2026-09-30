@@ -6,6 +6,7 @@ import type { Group as UGroup, Inbound, Ingress } from '../lib/api'
 import { IngressFields, emptyIngress, type IngressValues } from './IngressesCard'
 import { RealityScan, type RealityResult } from './RealityScan'
 import { api, type NodeJob } from '../lib/api'
+import { useCoreSelection } from '../lib/coreSelection'
 
 // REALITY helpers over the settings JSON.
 type TLSSettings = { mode?: number; server_name?: string; reality?: { handshake_server?: string; handshake_port?: number; fallback_limit?: { off?: boolean; after_bytes?: number; bytes_per_sec?: number } } }
@@ -35,7 +36,6 @@ async function scanViaNode(nodeID: number, hosts: string[]): Promise<RealityResu
 }
 
 const protocols = ['vless', 'vmess', 'trojan', 'shadowsocks', 'hysteria2', 'tuic', 'anytls', 'mieru', 'snell', 'socks', 'http', 'naive', 'wireguard']
-const cores = ['', 'singbox', 'xray', 'mita', 'hysteria', 'snell']
 
 // Snell's PSK: 32 random bytes, base64 (any string works, this is the convention).
 function randomPSK(): string { const b = new Uint8Array(32); crypto.getRandomValues(b); return btoa(String.fromCharCode(...b)) }
@@ -113,6 +113,9 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
     initialValues: initial,
     validate: { Tag: (v) => (v ? null : 'required'), Port: (v) => (v > 0 && v < 65536 ? null : 'port'), Settings: (v) => { try { JSON.parse(v || '{}'); return null } catch { return 'invalid JSON' } } },
   })
+  let coreInbound: Record<string, unknown> | undefined
+  try { const settings = JSON.parse(form.values.Settings || '{}'); if (settings && typeof settings === 'object' && !Array.isArray(settings)) coreInbound = { ...settings, protocol: form.values.Protocol } } catch { /* JSON validation explains the error */ }
+  const coreSelection = useCoreSelection(nodeID ? `/api/admin/nodes/${nodeID}/core-options` : '', coreInbound, form.values.Core)
   const [recipe, setRecipe] = useState<string | null>(null) // highlighted quick-setup card
   // Recipes name node.example.com; a node with a registered host name gets it instead.
   const firstFree = (g?: { port_from: number; port_to: number; reserved_ports?: number[] }) => { if (!g || !g.port_from) return 0; for (let p = g.port_from; p <= g.port_to; p++) if (!usedPorts.includes(p) && !(g.reserved_ports ?? []).includes(p)) return p; return 0 }
@@ -133,7 +136,7 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
     const g = ingresses.find((x) => String(x.id) === v)
     form.setValues({ IngressID: v ?? '', NewIngress: undefined, Port: g && !g.port_from ? form.values.Port : (g ? (firstFree(g) || form.values.Port) : form.values.Port) })
   }
-  const submit = (v: InboundValues) => onSubmit(v.NewIngress ? { ...v, NewIngress: ingressForm.values } : v)
+  const submit = (v: InboundValues) => { if (!coreSelection.blocked) onSubmit(v.NewIngress ? { ...v, NewIngress: ingressForm.values } : v) }
   return (
     <form onSubmit={form.onSubmit(submit)}>
       <Stack>
@@ -163,8 +166,8 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
         <Group grow align="flex-start">
           <TextInput label={t('inbounds.listen')} placeholder={selectedIngress?.bind_ip || '::'} {...form.getInputProps('Listen')} />
           <NumberInput label={t('inbounds.port')} min={1} max={65535} required {...form.getInputProps('Port')} />
-          <Select label={t('inbounds.core')} data={cores.map((c) => ({ value: c, label: c || t('inbounds.coreAuto') }))} allowDeselect={false} {...form.getInputProps('Core')} />
         </Group>
+        <Select label={t('inbounds.core')} allowDeselect={false} {...form.getInputProps('Core')} {...coreSelection.selectProps} />
         <Group grow align="flex-end">
           <Select label={t('inbounds.group')} data={[{ value: '', label: t('inbounds.groupAll') }, ...groups.map((g) => ({ value: String(g.ID), label: g.Name }))]} allowDeselect={false} {...form.getInputProps('GroupID')} />
           {form.values.Protocol === 'mieru' && (
@@ -248,7 +251,7 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
           )
         })()}
         <JsonInput label={t('inbounds.settings')} description={t('inbounds.settingsHint')} autosize minRows={4} maxRows={16} formatOnBlur {...form.getInputProps('Settings')} />
-        <Group justify="flex-end"><Button variant="default" onClick={onCancel}>{t('common.cancel')}</Button><Button type="submit" loading={busy}>{t('common.save')}</Button></Group>
+        <Group justify="flex-end"><Button variant="default" onClick={onCancel}>{t('common.cancel')}</Button><Button type="submit" loading={busy} disabled={coreSelection.blocked}>{t('common.save')}</Button></Group>
       </Stack>
     </form>
   )

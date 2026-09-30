@@ -1,0 +1,113 @@
+package admin
+
+import (
+	"net/http"
+	"strings"
+	"time"
+	"unicode"
+
+	"github.com/zeptop-dev/bosun/pkg/spec"
+	"github.com/zeptop-dev/captain/internal/store"
+)
+
+func (h *handlers) monitoring(w http.ResponseWriter, r *http.Request) {
+	grace := 180 * time.Second
+	fresh := 90 * time.Second
+	if h.Probe != nil {
+		settings := h.Probe.Settings(r.Context())
+		grace = time.Duration(settings.Alerts.OfflineSeconds) * time.Second
+		if settings.Enabled {
+			fresh = max(fresh, time.Duration(settings.BeatSeconds)*2*time.Second)
+		}
+	}
+	nodes, err := h.Store.MonitorNodes(r.Context(), time.Now(), grace)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	for i := range nodes {
+		nodes[i].Stale = nodes[i].SampledAt == 0 || time.Since(time.Unix(nodes[i].SampledAt, 0)) > fresh
+		if nodes[i].Host != nil {
+			nodes[i].Host.Resources = nil
+		}
+	}
+	ok(w, nodes)
+}
+
+func (h *handlers) resourceHistory(w http.ResponseWriter, r *http.Request) {
+	if _, err := h.Store.NodeByID(r.Context(), idOf(r)); err != nil {
+		fail(w, 404, "node not found")
+		return
+	}
+	q := r.URL.Query()
+	if _, _, _, valid := store.ResourceRange(q.Get("range")); !valid || len(q.Get("series")) > 1024 {
+		fail(w, 400, "invalid history query")
+		return
+	}
+	result, err := h.Store.ResourceHistory(r.Context(), idOf(r), q.Get("range"), q.Get("series"), time.Now())
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	ok(w, result)
+}
+
+func (h *handlers) setMonitorGroup(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Group string `json:"group"`
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	in.Group = strings.TrimSpace(in.Group)
+	if len(in.Group) > 128 || strings.IndexFunc(in.Group, unicode.IsControl) >= 0 {
+		fail(w, 400, "invalid monitoring group")
+		return
+	}
+	if _, err := h.Store.NodeByID(r.Context(), idOf(r)); err != nil {
+		fail(w, 404, "node not found")
+		return
+	}
+	if err := h.Store.SetMonitorGroup(r.Context(), idOf(r), in.Group); err != nil {
+		serverErr(w, err)
+		return
+	}
+	if h.Probe != nil {
+		h.Probe.Invalidate()
+	}
+	ok(w, map[string]string{"group": in.Group})
+}
+
+// Network history is separate from the public-page gate, so private collection
+// remains useful with public visibility disabled.
+func (h *handlers) networkQuality(w http.ResponseWriter, r *http.Request) {
+	span := r.URL.Query().Get("range")
+	res, step, window, valid := store.ResourceRange(span)
+	if !valid {
+		fail(w, 400, "invalid history range")
+		return
+	}
+	now := time.Now()
+	nodes, err := h.Store.MonitorNodes(r.Context(), now, 180*time.Second, idOf(r))
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	if len(nodes) == 0 {
+		fail(w, 404, "node not found")
+		return
+	}
+	points, err := h.Store.NodePingStats(r.Context(), idOf(r), res, now.Add(-window), now)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	current := []spec.PingResult{}
+	if nodes[0].Host != nil {
+		current = nodes[0].Host.Pings
+	}
+	if current == nil {
+		current = []spec.PingResult{}
+	}
+	ok(w, map[string]any{"current": current, "points": points, "from": now.Add(-window).Unix(), "to": now.Unix(), "step": int64(step / time.Second)})
+}

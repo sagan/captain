@@ -2,7 +2,7 @@
 // per node, redrawn when the data changes.
 import { useEffect, useRef } from 'react'
 
-export function Spark({ values, color = '#22d3ee', height = 32, max }: { values: number[]; color?: string; height?: number; max?: number }) {
+export function Spark({ values, color = '#22d3ee', height = 32, max }: { values: (number | null)[]; color?: string; height?: number; max?: number }) {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const c = ref.current
@@ -14,13 +14,18 @@ export function Spark({ values, color = '#22d3ee', height = 32, max }: { values:
     ctx.scale(dpr, dpr)
     ctx.clearRect(0, 0, w, height)
     if (values.length < 2) return
-    const m = max ?? Math.max(1, ...values)
+    const m = max ?? Math.max(1, ...values.filter((v): v is number => v != null))
     const step = w / (values.length - 1)
     ctx.beginPath()
-    values.forEach((v, i) => { const y = height - (Math.min(v, m) / m) * (height - 2) - 1; if (i === 0) ctx.moveTo(0, y); else ctx.lineTo(i * step, y) })
+    let gap = true
+    values.forEach((v, i) => {
+      if (v == null) { gap = true; return }
+      const y = height - (Math.min(v, m) / m) * (height - 2) - 1
+      if (gap) ctx.moveTo(i * step, y); else ctx.lineTo(i * step, y)
+      gap = false
+    })
     ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke()
-    ctx.lineTo(w, height); ctx.lineTo(0, height); ctx.closePath()
-    ctx.fillStyle = color + '22'; ctx.fill()
+
   }, [values, color, height, max])
   return <canvas ref={ref} style={{ width: '100%', height }} />
 }

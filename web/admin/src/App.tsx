@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './lib/auth'
 import { AppLayout } from './components/AppLayout'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
+import MonitoringPage from './pages/MonitoringPage'
 import NodesPage from './pages/NodesPage'
 import NodePage from './pages/NodePage'
 import EntriesPage from './pages/EntriesPage'
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route element={<Protected><AppLayout /></Protected>}>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/monitoring" element={<MonitoringPage />} />
           <Route path="/nodes" element={<NodesPage />} />
           <Route path="/nodes/:id" element={<NodePage />} />
           <Route path="/entries" element={<EntriesPage />} />

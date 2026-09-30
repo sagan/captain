@@ -90,6 +90,9 @@ rules on `/sub`, daily `VACUUM INTO` backups uploaded to WebDAV/S3 encrypted
 with age and carrying the config file, a panel self-check on the dashboard, self-update for the panel and every node, Telegram bot and event webhooks,
 and an MCP server so an agent can answer "which node is down" for you.
 
+Resource monitoring adds per-NIC selection, filesystem/inode and disk I/O detail, logical CPUs and managed-process usage in node details, with a separate public-page switch (bosun ≥ 0.56). Network quality adds failure reasons, P50/P95, jitter and DNS/connect/TLS/response timing, with history counted by actual attempts. The monitoring workspace adds grouping, filtering, four-node comparison and per-device average/peak history; the six-language public page has configurable sections and compact layout. Persistent incidents, acknowledgement/recovery, maintenance/silence windows and contact availability with coverage complete the alert workspace. Node details also provide on-demand DNS, service, download and MTR/traceroute diagnostics with bounded execution and recent results. Optional NVIDIA/AMD GPU readings have private, deduplicated history; the public page offers Aurora/Paper/Terminal presets and light/dark/system modes. See [monitoring](docs/MONITORING.md#resource-detail-captain-17--bosun-056).
+
+
 **Six languages** in both interfaces — 简体中文, 繁體中文, English, 日本語,
 Русский, 한국어 — and the mail users receive has its own language picker in
 Settings → Mail.

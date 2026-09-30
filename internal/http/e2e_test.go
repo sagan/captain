@@ -1677,7 +1677,16 @@ func TestProbePageAndBeats(t *testing.T) {
 	}
 	ac.do("POST", "/api/admin/nodes/"+nodeID+"/inbounds", map[string]any{"Tag": "m", "Protocol": "mieru", "Port": 17710, "IngressID": gid, "Settings": map[string]any{"mieru_transport": "TCP"}}, nil)
 	_, b, _ = nc.do("GET", "/api/agent/state", nil, nil)
-	if !strings.Contains(string(b), `{"id":-`+itoa(gid)+`,"name":"IPLC","type":"tcp","target":"198.51.100.20:17710","interval_seconds":30,"source_ip":"10.10.0.2"}`) {
+	lineState := mustJSON[agentproto.State](t, b)
+	var lineTask spec.PingTask
+	if lineState.Probe != nil {
+		for _, task := range lineState.Probe.Tasks {
+			if task.ID == -gid {
+				lineTask = task
+			}
+		}
+	}
+	if lineTask.Name != "IPLC" || lineTask.Type != "tcp" || lineTask.Target != "198.51.100.20:17710" || lineTask.IntervalSeconds != 30 || lineTask.SourceIP != "10.10.0.2" || !lineTask.TCPReachability {
 		t.Fatalf("line task missing from state: %s", b)
 	}
 
@@ -1793,9 +1802,16 @@ func TestProbePageAndBeats(t *testing.T) {
 	if !strings.Contains(string(b), `"probe_url":"/status/"`) {
 		t.Fatalf("site probe_url: %s", b)
 	}
-	// Threshold alert fired once (cpu 80% over 1 minute) into the admin channel via the store record.
-	if fire, _ := st.AlertOnce(context.Background(), int64(node["id"].(float64)), "cpu", time.Hour, time.Now()); fire {
-		t.Fatal("cpu alert should already have fired during the beats")
+	// The CPU condition is one durable incident, even across repeated beats.
+	incidents, err := st.MonitorIncidents(context.Background(), int64(node["id"].(float64)), 0, "")
+	count := 0
+	for _, incident := range incidents {
+		if incident.Kind == "cpu" && incident.NotifiedAt > 0 {
+			count++
+		}
+	}
+	if err != nil || count != 1 {
+		t.Fatalf("CPU incident count %d: %v", count, err)
 	}
 }
 

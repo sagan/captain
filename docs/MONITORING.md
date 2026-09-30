@@ -26,7 +26,7 @@ page:
 - **Per node** — region flag, provider, price, expiry, and a monthly NIC
   traffic allowance (limit, reset day, counting mode) with reset-aware
   counters shown as a bar.
-- **Alerts** — through Telegram, mail or webhooks: node offline (after a
+- **Alerts** — through the admin Telegram chat or webhooks: node offline (after a
   grace period), sustained CPU / memory / disk over a threshold, monthly
   traffic at 80 % and 100 %.
 
@@ -98,8 +98,8 @@ reason.
 
 Two figures will not match DStatus': it counts whole-interface traffic,
 Captain counts the per-user proxy traffic it bills, so the interface number
-runs higher. Per-core CPU and per-interface counters come back empty
-because bosun does not measure them; everything DStatus renders from
+runs higher. The DStatus adapter still leaves its per-core CPU and per-interface fields
+empty; Captain’s native resource detail is separate from that export mapping; everything DStatus renders from
 `cpu.multi`, `mem`, `disk` and `net` is real.
 
 ## Metrics
@@ -200,3 +200,387 @@ Self-update refuses to download when the binary's filesystem lacks twice
 the asset size plus headroom, and the backup job refuses a snapshot when
 the backup directory lacks twice the newest backup plus headroom — instead
 of filling the disk halfway.
+
+
+## Resource detail (Captain 1.7 / bosun 0.56)
+
+The node detail page shows per-interface byte counters and rates, local
+filesystem space and inode usage, per-device disk throughput and IOPS,
+logical CPU usage, and RSS/CPU for bosun and its supervised core/realm
+processes. Process CPU uses 100% per logical CPU and can exceed 100%; RSS
+is resident memory, not a sum of private allocations. Network filesystems
+(NFS, CIFS, SMB, FUSE and automounts) are excluded to avoid blocking a
+heartbeat on an unavailable mount. Disk devices/partitions can overlap;
+the UI deliberately does not sum disk I/O or filesystem capacity.
+
+Node → Monitoring → Include/exclude interfaces selects exact interface
+names for host totals, rates and monthly monitoring traffic. An empty
+include list excludes loopback, Docker, veth and bridge interfaces by
+default. Explicit includes override defaults; explicit exclusions win.
+All discovered interfaces remain visible with their inclusion status.
+This setting never changes proxy-user billing. A newly included/recreated
+NIC, reboot or agent restart establishes a new monthly counter baseline;
+traffic before that baseline is not estimated or backfilled.
+
+New samples carry validity flags. A missing reading or a rate without a
+baseline is displayed as **—**, while measured zero remains zero. Invalid
+readings do not dilute history averages or threshold alerts. Migration 54
+adds per-metric sample counts; existing history remains as recorded because
+older nodes did not distinguish missing readings. Replayed sample sequence
+numbers within the same agent run do not enter history or monthly counters.
+
+The resource sampler serializes consumers and caches results for one second.
+Beats, minute reports, the standalone panel and external exporters share its
+baselines. High-frequency beats/history and latency tasks follow the probe
+collection switch; minute host reports still operate. The separate **Enable
+status page** switch controls the page and public probe API while collection
+and alerts can continue. New process, device and mount details are available
+only through authenticated management APIs, never the public status payload.
+
+Older bosun nodes continue to send their original summaries. Detailed
+resource fields and interface selection require bosun 0.56 or later. The monitoring workspace below stores detailed history for these nodes; older
+nodes still contribute their host summaries.
+
+## Monitoring workspace (Captain 1.7)
+
+Open **Monitoring** in the management sidebar. Filter by name, region,
+provider, monitoring group and connection status; sort resource usage and
+compare up to four nodes using the same metric and time range. Monitoring
+labels are separate from user/access groups. Click a group in the table to
+edit it; blank removes the label. Group names also appear on the status page.
+Administrators and operators can use the workspace; support accounts cannot.
+
+Each node's resource history selector includes host summaries, individual
+interfaces, filesystem/inode usage, disk throughput/IOPS, logical CPUs and
+managed processes. Interfaces excluded from aggregate accounting remain
+available individually. A process series follows the supervisor name across
+restarts, while its rate baseline still resets with process identity.
+
+Migration 55 stores compressed buckets with per-metric valid sample count,
+sum and maximum. Averages include measured zero and exclude missing values;
+peaks are the largest sampled value, not an inferred sub-interval maximum.
+Whole missing intervals return null points so charts break across gaps.
+Buckets use Captain's receipt time in UTC, not the node's potentially skewed
+clock. Sequence replay detection covers history and monthly traffic in one
+transaction. History starts when this version is installed; old summaries
+cannot reconstruct per-device history or peaks.
+
+Detailed retention is independent from the existing aggregate history:
+
+| Resolution | Retention | Workspace ranges |
+| --- | --- | --- |
+| Minute | 24 hours | 1h, 24h |
+| Hour | 14 days | 7d, 14d |
+| Day | 90 days | 30d, 90d |
+
+Hourly cleanup prunes expired buckets. One compressed row holds a node's
+bucket, with at most 512 metric series; a query catalog has at most 1,024.
+A warning identifies truncation instead of silently promising all devices
+on very large hosts. Historical device names stay selectable within the
+requested window. Node deletion and site reset remove these records.
+
+Latest snapshots persist independently of liveness. A task/status request
+cannot refresh old resource readings. If high-frequency collection is off,
+minute reports still populate the workspace, but do not create resource
+history. The fleet history/comparison workspace lives in Captain; bosun
+standalone retains its local resource detail and interface controls.
+
+Management APIs:
+
+- `GET /api/admin/monitoring`: fleet summaries, group, last seen, sampled time
+  and stale flag. Detailed device/process lists are not duplicated here.
+- `PUT /api/admin/nodes/{id}/monitor-group`: `{ "group": "Edge" }`.
+- `GET /api/admin/nodes/{id}/resource-history?range=24h&series=host::cpu`:
+  timestamp grid with average, peak and valid sample count; a bounded series
+  catalog supplies opaque keys for device selection. URL-encode the full key.
+
+**Settings → Probe** also controls public sections and card/compact layout.
+CPU, memory, disk, network, system facts, server details, traffic, latency and
+history can be shown independently. The server masks hidden sections in both
+snapshot and history APIs; disabling history or latency also closes the
+corresponding history endpoint. Device names, mount paths and process details
+are always private. Existing clients that omit `public_sections` or `layout`
+preserve saved choices. The status page offers node/group/status filters,
+responsive layouts and the same six languages as the management UI.
+
+## Network quality (Captain 1.7 / bosun 0.56)
+
+Node → Monitoring shows a **Network quality** card with the latest attempt,
+classified outcome, HTTP status, completion time and stale indication. Bosun's
+standalone Probe page shows the same detail. Public node detail follows the
+latency/history visibility settings; private detail remains available when the
+public page is disabled.
+
+| Check | Successful attempt | Latency |
+| --- | --- | --- |
+| ICMP | One echo reply | Echo round-trip time |
+| TCP | Connection established | TCP connection time; DNS is separate |
+| Carrier/line reachability | Connection established or explicitly labelled refusal | Connection/refusal response time |
+| HTTP | Status 200–399, redirects not followed | Request start through response headers |
+| Download | Status 2xx with bytes received | Response headers; throughput covers the bounded body transfer |
+
+Timeouts, connection refusal, DNS/TLS errors, permission errors, unreachable
+hosts, HTTP errors, I/O errors and empty downloads have separate reason labels.
+No raw error, URL or response body is included in those labels. Task targets are
+administrator-configured and may deliberately address private line endpoints.
+`source_ip` binds all four task types. The old external Komari on-demand task
+policy is unchanged; the new periodic checks never select the best of retries.
+
+The latest result includes an exact window of up to 30 attempts: failure count,
+min/max, nearest-rank P50/P95, and mean absolute difference of consecutive
+successful latencies (jitter). A failure breaks adjacency. A successful refused
+carrier/line result is labelled **TCP reachability**, not mistaken for service
+availability. The failure percentage is an attempt ratio; only ICMP uses echo
+loss, and TCP/HTTP cannot infer packet loss from these measurements.
+
+DNS, TCP connect, TLS handshake and HTTP response-wait durations are separate.
+Response wait runs from writing the request to the first response byte. Only
+completed phases have a value: literal-IP DNS, plain-HTTP TLS and interrupted
+phases remain unknown rather than zero. Total attempt duration also includes
+failed waits and, for downloads, the body transfer. The phases need not sum to
+latency because of scheduling and request/header overhead.
+
+History offers 1h/24h/7d/14d/30d/90d ranges, failure ratio, average latency,
+P50/P95, jitter and phase averages. It shares the existing latency history
+retention (minute 48h, hour 60d, day 2y); the UI selects minute/hour/day resolution
+for those ranges. Empty buckets break lines. Phase averages use only completed
+measurements; old agents continue to supply averages/failures without fabricated
+phase data. Historical percentiles use a bounded logarithmic histogram with an
+upper-bin error of at most 5% or 0.1 ms; min/max are exact. Aggregation combines
+histogram counts, never averages of smaller-window percentiles.
+
+Each node holds at most 60 pending attempts per target until a successful beat.
+Failed storage returns HTTP 500 so the node keeps its pending batch.
+Migration 56 persists a cursor per node/task/name/run epoch, so cached reads,
+beat retries and Captain restarts do not recount attempts. Gaps caused by queue
+overflow appear as **unknown deliveries**, not target failures. Samples from an
+older configuration are dropped on reconfiguration. History buckets use panel
+receipt time adjusted by sample age against the same node's resource clock;
+age outside 0–24h falls back to receipt time. This preserves delayed samples
+without trusting the node's absolute clock. The completion time of a cached
+result is never refreshed just because another host beat arrived.
+
+`GET /api/admin/nodes/{id}/network-quality?range=24h` returns current results,
+history points and a UTC bucket grid (`from`, `to`, `step`); admin/operator access
+matches resource history. Public snapshots strip transport queues, hiding history
+also masks rolling statistics, and hiding latency removes network results.
+Bosun standalone has rolling results only; persistent history belongs to Captain.
+Historical quality begins with this upgrade and cannot be reconstructed from old
+aggregate latency rows.
+
+## Alert lifecycle and availability (Captain 1.7)
+
+**Monitoring → Alert events** lists ongoing, acknowledged and ended incidents
+across the fleet, filterable by node. CPU, memory, disk, monthly traffic (80% and
+100%) and offline conditions use the existing settings. A continuing condition
+updates one incident, instead of sending another alert every cooldown period.
+An operator can acknowledge it; this records the handler and time without
+resolving the condition or changing notification policy. Only a valid healthy
+measurement resolves a resource incident; missing measurements do not. Disabling
+collection or a rule ends the incident as **disabled**, without claiming recovery.
+Resource thresholds still evaluate the configured rolling average, not a promise
+that every instant in the entire window exceeded the limit.
+
+Migration 57 persists lifecycle records across restarts. An offline incident can
+recover on the first new beat even when Captain's in-memory state was lost.
+After a restart, new offline detection still waits one configured grace period.
+New monitoring history begins with this upgrade: older cooldown timestamps cannot
+reconstruct when a historical failure started or recovered.
+
+Each incident requests one opening notification and one recovery notification
+through the existing operator Telegram/webhook channels. Delivery remains best
+effort, not a durable guaranteed-delivery queue; `notified_at` records an attempted
+notification. Telegram batching remains 30 seconds and rechecks suppression before
+sending. Disabling collection drops pending batches. Existing `node.alert` webhook
+fields remain, with additive `incident_id`, `alert_kind` and `recovered` fields.
+The existing offline recovery kind remains `recovered`; resource and traffic
+recoveries use `cpu_recovered`, `mem_recovered`, `disk_recovered`,
+`traffic80_recovered` or `traffic100_recovered`.
+
+Full administrators can create a global or per-node **maintenance** or **silence**
+window, immediately or at a future time. The form uses the browser's local time
+zone; APIs store Unix seconds. A window lasts at most 30 days, can start up to a
+year ahead, and cannot be backdated to erase already recorded downtime. At most
+200 active/scheduled windows are allowed. Notes are private operational metadata.
+The management list includes the past seven days plus future windows, displaying
+up to 200 with active/scheduled windows first. Cancellation preserves the elapsed
+portion of maintenance instead of physically deleting its history.
+
+| Mode | Record incidents | Send notifications | Count time in availability |
+| --- | --- | --- | --- |
+| Normal | Yes | Opening and recovery | Observed time |
+| Silence | Yes | Suppressed | Observed time |
+| Maintenance | Yes | Suppressed | Excluded |
+
+An incident first detected under suppression stays unnotified. If still failing
+when the window ends, the next evaluation sends its opening notification. A
+failure and recovery entirely within a window remain in history without a delayed
+recovery notice. Overlapping windows form a union; their time is not deducted twice.
+Acknowledgement is separate from both window types. Only full administrators can
+create/cancel windows; operators can read them and acknowledge incidents, while
+support roles cannot access monitoring management. These writes use the normal
+admin operation log.
+
+**Availability** appears in node monitoring detail and when selecting a node in
+the alert workspace. It measures contact with Captain according to the configured
+offline grace, not whether a proxy core or an end-to-end service worked. The metric
+is online seconds divided by observed seconds outside maintenance. **Coverage**
+shows the observed fraction of non-maintenance time; unknown time is reported
+separately, not converted into uptime or downtime. The time bars distinguish
+online, offline, maintenance and unknown periods.
+
+Availability observations use Captain's receipt clock. Contiguous intervals are
+stored and adjacent equal states merged. A new panel-process epoch, disabled
+collection, or a gap of more than two minutes between observations breaks coverage.
+The interval after the latest observation is also unknown until the next one.
+A new node and pre-upgrade history therefore begin unknown. The public availability
+endpoint requires the page, history and availability sections to be enabled and
+honors node visibility. It never returns incident notes or staff identities.
+
+Availability queries are bounded to 90 days; expired intervals are pruned hourly.
+Ended incidents and canceled/finished window records are retained for 180 days;
+ongoing incidents are retained until they end. Node deletion cascades its records;
+site reset clears lifecycle data and observation cursors. This phase runs in Captain
+and accepts existing agent beats without a new bosun protocol requirement.
+
+New management APIs:
+
+- `GET /api/admin/monitoring/incidents?state=open&node_id=1&before=100`:
+  at most 50 events plus `next` cursor; omit filters as needed. `state` can also
+  be `acknowledged` or `resolved`.
+- `POST /api/admin/monitoring/incidents/{id}/ack`: acknowledge an open event.
+- `GET /api/admin/monitoring/windows`: internal window list and truncation flag.
+- `POST /api/admin/settings/monitor-windows`: `kind`, nullable `node_id`,
+  `starts_at` (0 means now), `ends_at`, optional `note`.
+- `DELETE /api/admin/settings/monitor-windows/{id}`: cancel without deleting history.
+- `GET /api/admin/nodes/{id}/availability?range=24h`: summary and UTC time buckets;
+  ranges are 1h/24h/7d/14d/30d/90d. Public equivalent:
+  `GET /api/probe/nodes/{id}/availability?range=24h`.
+
+## On-demand network diagnostics (Captain 1.7 / bosun 0.56)
+
+Node monitoring details now include **Network diagnostics** for full administrators.
+The check originates on the selected node, including an optional source IP for
+dedicated-line tests. These checks work independently of periodic collection.
+
+| Check | Result / limit |
+|---|---|
+| DNS | A/AAAA address resolution, system resolver or an explicit resolver IP/port; 5 seconds, up to 64 addresses |
+| TCP | A successful connection is required; refusal is a failure, with DNS/connect timings |
+| HTTP | GET response status and completed DNS/connect/TLS/response phases; 200–399 is reachable; no redirects followed |
+| Download | HTTP(S) GET, nonempty 2xx body; up to 8 seconds of body transfer or 64 MiB read, plus bounded setup time |
+| MTR | Numeric report from the installed `mtr`, five rounds at one-second intervals, at most 20 hops |
+| Traceroute | Numeric report from the installed Linux `traceroute`, one probe per hop, at most 20 hops |
+
+Each node permits one diagnostic at a time, with an overall 35-second deadline.
+The download result describes this transfer, not the node's total link capacity;
+it consumes ordinary node traffic but is not attributed to a proxy customer.
+HTTP credentials, custom headers/bodies, arbitrary commands and user-supplied
+flags are not accepted. Explicit administrator targets may include loopback and
+private networks; proxy-core egress restrictions are unchanged. TLS certificates
+are verified and response bodies are discarded, never returned to the panel.
+
+Route checks require optional system tools. Missing tools are reported rather
+than installed automatically; containers/minimal systems may also lack the
+required networking capabilities. Commands use argument arrays with a previously
+resolved literal destination IP, never a shell. Text output is capped at 32 KiB,
+control characters are stripped and the UI renders it as escaped text. A completed
+route report means the tool exited successfully, not that every hop answered;
+intermediate silence alone does not establish destination packet loss. Options
+follow the [MTR manual](https://github.com/traviscross/mtr/blob/master/man/mtr.8.in)
+and [Linux traceroute manual](https://man7.org/linux/man-pages/man8/traceroute.8.html).
+
+Captain requires an online, paired bosun >= v0.56.0. The existing job envelope
+carries `kind: "network_diagnostic"` and parameters `type`, `target`, optional
+`source_ip` and optional DNS-only `resolver`. The panel supplies a two-minute
+expiry that the node also checks; offline work is not replayed after expiry.
+Results use the existing report retry queue. Database errors return a retryable
+failure instead of acknowledging lost results; completed results cannot be
+overwritten by a replay. Job execution deduplication on the node is in memory:
+a node restart before delivery may repeat an unexpired check, within its usual
+limits. This is not an exactly-once execution guarantee.
+
+- `POST /api/admin/nodes/{id}/jobs`: queue the typed diagnostic.
+- `GET /api/admin/nodes/{id}/jobs/{job}`: poll the existing job shape.
+- `GET /api/admin/nodes/{id}/network-diagnostics`: at most 20 checks created
+  within the last 24 hours. The hourly cleanup removes older diagnostics.
+
+Creating and reading these jobs requires a full administrator; operator/support
+and public-page access are denied. Requests use existing admin audit logging.
+No public status API includes targets, command output or diagnostic history.
+These records never share cleanup rules with node-removal worker results.
+
+The standalone bosun **Probe** page provides the same checks through
+`POST /api/diagnostics/network`. It returns the bounded result directly and
+keeps the current result in the page, without persistent history. Authentication
+and cross-origin checks apply; managed nodes run diagnostics through Captain.
+
+## Optional GPU monitoring (Captain 1.7 / bosun 0.56)
+
+GPU collection is off by default. Enable it per node in Captain's resource
+settings, or in standalone bosun's Probe settings (`probe.resources.gpu: true`).
+Both management panels show utilization, used/total VRAM, temperature and power,
+with a separate GPU sample time. Unsupported fields remain **—**; no device or
+missing drivers produce an explicit unavailable state. This does not install
+drivers or tools and does not enumerate GPU processes.
+
+Linux collectors use the fixed, read-only query interface of
+[NVIDIA nvidia-smi](https://docs.nvidia.com/deploy/nvidia-smi/index.html) and
+[AMD amdgpu sysfs/hwmon](https://docs.kernel.org/gpu/amdgpu/thermal.html).
+Individual fields depend on the device and driver; other operating systems and
+Intel/Apple GPU telemetry are not implemented. An AMD device without a product
+name uses its device ID as the display name. Device UUIDs/PCI addresses are
+private management data and are excluded from every public status response.
+
+Collection runs asynchronously at most once every 15 seconds, with one worker,
+a two-second command deadline, 64 KiB NVIDIA output and 32 devices maximum.
+Even a kernel sysfs read that ignores cancellation cannot stall host beats or
+start accumulating workers. A previous reading remains visibly stale; a failed
+completed reading has no numeric values. Disabling GPU collection clears the
+visible sample and cancels pending work.
+
+Captain's resource history includes GPU utilization, used VRAM and percentage,
+temperature and power. GPU epoch/sequence cursors persist with the existing
+host counters in the same transaction as history: repeated heartbeat copies of
+one GPU sample count only once, including after a panel restart. Missing samples
+leave gaps. Display times use receipt time minus sample age on the node's own
+clock, so node clock skew and fresh host beats do not refresh old GPU data.
+Standalone bosun provides current readings without persistent GPU history.
+
+## Status-page appearance (Captain 1.7)
+
+Settings → Probe provides bundled **Aurora**, **Paper** and **Terminal** presets,
+with a preview, plus **Inherit site theme** for the existing primary color,
+radius and font. Choose light, dark or system mode independently, or inherit
+the site's scheme. The page background, cards, controls and text now follow
+that scheme; system mode follows the visitor's OS preference. Presets work with
+both card and compact layouts and the six existing page languages.
+
+The optional `appearance` object on probe settings and `/api/probe` contains
+`preset` (`inherit`, `aurora`, `paper`, `terminal`) and `scheme` (`inherit`,
+`auto`, `light`, `dark`). Older settings clients that omit it preserve the
+current appearance. Only bundled options are accepted; themes do not execute
+remote code or custom CSS. Existing public-page visibility and section controls
+remain authoritative. GPU details are never exposed by a theme choice.
+
+## Monitoring development sequence
+
+1. Resource collection, missing-data semantics, interface accounting and basic
+   management detail (the phase above).
+2. Monitoring workspace: grouping/filtering, node comparison, resource history,
+   peaks and gaps, configurable public page and mobile layouts.
+3. Network quality: ICMP/TCP/HTTP semantics, failure reasons, jitter, percentiles
+   and distinct DNS/connect/TLS/response timings where supported.
+4. Alert lifecycle: incidents, recovery, availability, maintenance and silence.
+5. On-demand diagnostics: MTR/traceroute, DNS, throughput and service reachability.
+6. Optional GPU collection and bundled status-page themes.
+
+All six phases above ship in Captain 1.7 / bosun 0.56. Test deployment covers
+resource history, network diagnostics and quality, visibility, themes and mobile
+layouts, plus subscription, billing, isolation and shaping regressions. Physical
+GPU validation remains pending because the test hosts have no GPU. Terminal,
+files and arbitrary remote execution remain separately scoped capabilities
+with explicit authorization and audit rules.
+
+Each phase ships a usable UI, additive protocol fields and regression checks;
+features present in another monitor are not evidence that they already exist here.

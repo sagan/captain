@@ -190,7 +190,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger, opts ...Options)
 	s.mux.Handle("GET /assets/", siteHandler)
 	site.Register(s.mux, site.Deps{Store: st, SiteName: cfg.SiteName, Registration: cfg.Portal.Registration, ProbeURL: func(r *http.Request) string {
 		ps := s.probeSvc.Settings(r.Context())
-		if !ps.Enabled || ps.Visibility == "admins" {
+		if !ps.PageOn() || ps.Visibility == "admins" {
 			return ""
 		}
 		if len(ps.Hosts) > 0 {

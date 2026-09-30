@@ -22,7 +22,7 @@ func TestResetDiscardsOldAccountAndNodeState(t *testing.T) {
 	if len(limit.recent[1]) != 0 {
 		t.Fatal("new customer 1 inherited the old traffic window")
 	}
-	probe := &Probe{live: map[int64]*Live{1: {At: at}}, pending: []string{"old node alert"}, started: at}
+	probe := &Probe{live: map[int64]*Live{1: {At: at}}, pending: []probeNotice{{Text: "old node alert", NodeID: 1}}, started: at}
 	gen := probe.Gen()
 	probe.Reset()
 	if len(probe.live) != 0 || len(probe.pending) != 0 || probe.Gen() == gen {

@@ -5,10 +5,12 @@ import { IconPlus, IconTrash } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type Node } from '../lib/api'
+import { ProbeAppearanceFields } from './ProbeAppearanceFields'
 import { toast } from '../lib/notify'
 
 interface ProbeSettings {
-  enabled: boolean; beat_seconds: number; carrier_ping: boolean; carriers?: { name: string; addr: string }[]; path: string; hosts: string[]; visibility: string; title: string; logo: string; show_globe: boolean; show_ip: boolean
+  appearance?: { preset: string; scheme: string }
+  enabled: boolean; page_enabled?: boolean; public_sections?: string[]; layout?: string; beat_seconds: number; carrier_ping: boolean; carriers?: { name: string; addr: string }[]; path: string; hosts: string[]; visibility: string; title: string; logo: string; show_globe: boolean; show_ip: boolean
   alerts: { offline_seconds: number; cpu_pct: number; mem_pct: number; disk_pct: number; window_minutes: number; traffic: boolean }
 }
 interface PingTask { id: number; name: string; type: string; target: string; interval_seconds: number; node_ids: number[] | null; enabled: boolean }
@@ -19,8 +21,8 @@ export function ProbeCard() {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['probe-settings'], queryFn: () => api.get<ProbeSettings>('/api/admin/settings/probe') })
-  const form = useForm<ProbeSettings & { hostsText: string; carriersText: string }>({ initialValues: { enabled: false, beat_seconds: 10, carrier_ping: true, carriersText: '', path: '/status', hosts: [], hostsText: '', visibility: 'public', title: '', logo: '', show_globe: false, show_ip: false, alerts: { offline_seconds: 180, cpu_pct: 0, mem_pct: 0, disk_pct: 0, window_minutes: 5, traffic: true } } })
-  useEffect(() => { if (q.data) form.setValues({ ...q.data, hostsText: (q.data.hosts ?? []).join(', '), carriersText: (q.data.carriers ?? []).map((c) => `${c.name} ${c.addr}`).join('\n') }) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
+  const form = useForm<ProbeSettings & { hostsText: string; carriersText: string }>({ initialValues: { appearance: { preset: 'inherit', scheme: 'inherit' }, enabled: false, page_enabled: true, public_sections: ['cpu', 'memory', 'disk', 'network', 'system', 'info', 'traffic', 'latency', 'history', 'availability'], layout: 'grid', beat_seconds: 10, carrier_ping: true, carriersText: '', path: '/status', hosts: [], hostsText: '', visibility: 'public', title: '', logo: '', show_globe: false, show_ip: false, alerts: { offline_seconds: 180, cpu_pct: 0, mem_pct: 0, disk_pct: 0, window_minutes: 5, traffic: true } } })
+  useEffect(() => { if (q.data) form.setValues({ ...q.data, appearance: q.data.appearance ?? { preset: 'inherit', scheme: 'inherit' }, public_sections: q.data.public_sections ?? ['cpu', 'memory', 'disk', 'network', 'system', 'info', 'traffic', 'latency', 'history', 'availability'], layout: q.data.layout || 'grid', page_enabled: q.data.page_enabled ?? true, hostsText: (q.data.hosts ?? []).join(', '), carriersText: (q.data.carriers ?? []).map((c) => `${c.name} ${c.addr}`).join('\n') }) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
   const parseCarriers = (text: string) => text.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const [name, ...rest] = l.split(/[\s,=]+/); return { name, addr: rest.join('') } })
   const save = useMutation({ mutationFn: (v: ProbeSettings & { hostsText: string; carriersText: string }) => api.put('/api/admin/settings/probe', { ...v, hosts: v.hostsText.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean), carriers: parseCarriers(v.carriersText) }), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['probe-settings'] }) }, onError: toast.err })
   const v = form.values
@@ -31,16 +33,17 @@ export function ProbeCard() {
       <Text size="xs" c="dimmed" mb="sm">{t('probe.hint')}</Text>
       <form onSubmit={form.onSubmit((vals) => save.mutate(vals))}><Stack gap="sm">
         <Group grow align="flex-end">
-          <Switch label={t('probe.enabled')} {...form.getInputProps('enabled', { type: 'checkbox' })} />
+          <Switch label={t('probe.collection')} {...form.getInputProps('enabled', { type: 'checkbox' })} />
           <NumberInput label={t('probe.beat')} min={3} max={300} {...form.getInputProps('beat_seconds')} />
           <Switch label={t('probe.carrier')} {...form.getInputProps('carrier_ping', { type: 'checkbox' })} />
         </Group>
+        <Switch label={t('probe.pageEnabled')} description={t('probe.pageEnabledHint')} {...form.getInputProps('page_enabled', { type: 'checkbox' })} />
         {v.carrier_ping && <Textarea label={t('probe.carriers')} description={t('probe.carriersHint')} autosize minRows={2} placeholder={'CT ct.tz.cloudcpp.com:80\nCU cu.tz.cloudcpp.com:80\nCM cm.tz.cloudcpp.com:80'} styles={{ input: { fontFamily: 'monospace', fontSize: 12 } }} {...form.getInputProps('carriersText')} />}
         <Group grow align="flex-end">
           <TextInput label={t('probe.path')} description={t('probe.pathHint')} placeholder="/status" {...form.getInputProps('path')} />
           <TextInput label={t('probe.hosts')} description={t('probe.hostsHint')} placeholder="status.example.com, probes.example.com" {...form.getInputProps('hostsText')} />
         </Group>
-        {v.enabled && <Text size="xs" c="dimmed">{t('probe.urls')}: {v.path && <Code>{origin}{v.path.replace(/\/+$/, '')}/</Code>} {v.hostsText.split(/[,\s]+/).filter(Boolean).map((h) => <Code key={h} ml={4}>https://{h}/</Code>)}</Text>}
+        {v.enabled && v.page_enabled && <Text size="xs" c="dimmed">{t('probe.urls')}: {v.path && <Code>{origin}{v.path.replace(/\/+$/, '')}/</Code>} {v.hostsText.split(/[,\s]+/).filter(Boolean).map((h) => <Code key={h} ml={4}>https://{h}/</Code>)}</Text>}
         <Group grow align="flex-end">
           <Select label={t('probe.visibility')} data={[{ value: 'public', label: t('probe.vis.public') }, { value: 'users', label: t('probe.vis.users') }, { value: 'admins', label: t('probe.vis.admins') }]} allowDeselect={false} {...form.getInputProps('visibility')} />
           <Switch label={t('probe.showIP')} {...form.getInputProps('show_ip', { type: 'checkbox' })} />
@@ -50,6 +53,9 @@ export function ProbeCard() {
           <TextInput label={t('probe.pageTitle')} placeholder={t('probe.pageTitleHint')} {...form.getInputProps('title')} />
           <TextInput label={t('probe.logo')} placeholder="https://…/logo.png" {...form.getInputProps('logo')} />
         </Group>
+        <MultiSelect label={t('monitoring.publicSections')} description={t('monitoring.publicHint')} data={['cpu', 'memory', 'disk', 'network', 'system', 'info', 'traffic', 'latency', 'history', 'availability'].map((value) => ({ value, label: t(`monitoring.sections.${value}`) }))} {...form.getInputProps('public_sections')} />
+        <Select label={t('monitoring.layout')} data={['grid', 'compact'].map((value) => ({ value, label: t(`monitoring.layouts.${value}`) }))} allowDeselect={false} {...form.getInputProps('layout')} />
+        <ProbeAppearanceFields value={v.appearance} onChange={(a) => form.setFieldValue('appearance', a)} />
         <Text size="sm" fw={600} mt="xs">{t('probe.alerts')}</Text>
         <Group grow align="flex-end">
           <NumberInput label={t('probe.offline')} min={30} {...form.getInputProps('alerts.offline_seconds')} />
@@ -79,7 +85,7 @@ function PingTasks() {
   return (
     <Stack gap="xs" mt="lg">
       <Group justify="space-between"><Text size="sm" fw={600}>{t('probe.tasks')}</Text><Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={() => setAdding((a) => !a)}>{t('probe.addTask')}</Button></Group>
-      <Text size="xs" c="dimmed">{t('probe.tasksHint')}</Text>
+      <Text size="xs" c="dimmed">{t('probe.tasksHint')}</Text><Text size="xs" c="dimmed">{t('networkQuality.semantics')}</Text>
       {adding && (
         <form onSubmit={form.onSubmit((v) => save.mutate(v))}><Group align="flex-end" wrap="wrap">
           <TextInput label={t('probe.taskName')} required style={{ flex: 1, minWidth: 120 }} {...form.getInputProps('Name')} />

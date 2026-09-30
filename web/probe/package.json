@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mantine/charts": "^9.6.1",
+    "@mantine/charts": "^8.3.18",
     "@mantine/core": "8",
     "@mantine/form": "8",
     "@mantine/hooks": "8",
@@ -18,8 +18,11 @@
     "@tabler/icons-react": "^3.46.0",
     "@tanstack/react-query": "^5.102.8",
     "globe.gl": "^2.44.0",
+    "i18next": "^26.4.2",
+    "i18next-browser-languagedetector": "^8.2.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-i18next": "^17.0.14",
     "recharts": "^3.10.1",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2"

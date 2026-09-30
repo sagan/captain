@@ -15,6 +15,12 @@ import (
 )
 
 func (h *handlers) registerOps(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/admin/monitoring/incidents", h.requireAdmin(h.monitorIncidents))
+	mux.HandleFunc("POST /api/admin/monitoring/incidents/{id}/ack", h.requireAdmin(h.acknowledgeIncident))
+	mux.HandleFunc("GET /api/admin/monitoring/windows", h.requireAdmin(h.monitorWindows))
+	mux.HandleFunc("POST /api/admin/settings/monitor-windows", h.requireAdmin(h.createMonitorWindow))
+	mux.HandleFunc("DELETE /api/admin/settings/monitor-windows/{id}", h.requireAdmin(h.cancelMonitorWindow))
+	mux.HandleFunc("GET /api/admin/nodes/{id}/availability", h.requireAdmin(h.availability))
 	mux.HandleFunc("GET /api/admin/tickets", h.requireAdmin(h.listTickets))
 	mux.HandleFunc("GET /api/admin/tickets/{id}", h.requireAdmin(h.getTicket))
 	mux.HandleFunc("POST /api/admin/tickets/{id}/reply", h.requireAdmin(h.replyTicket))
@@ -187,6 +193,10 @@ func (h *handlers) registerOps(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/admin/settings/komari", h.requireAdmin(h.putKomari))
 	mux.HandleFunc("GET /api/admin/settings/dstatus", h.requireAdmin(h.getDStatus))
 	mux.HandleFunc("PUT /api/admin/settings/dstatus", h.requireAdmin(h.putDStatus))
+	mux.HandleFunc("GET /api/admin/nodes/{id}/network-quality", h.requireAdmin(h.networkQuality))
+	mux.HandleFunc("GET /api/admin/monitoring", h.requireAdmin(h.monitoring))
+	mux.HandleFunc("GET /api/admin/nodes/{id}/resource-history", h.requireAdmin(h.resourceHistory))
+	mux.HandleFunc("PUT /api/admin/nodes/{id}/monitor-group", h.requireAdmin(h.setMonitorGroup))
 	mux.HandleFunc("GET /api/admin/settings/probe", h.requireAdmin(h.getProbe))
 	mux.HandleFunc("PUT /api/admin/settings/probe", h.requireAdmin(h.putProbe))
 	mux.HandleFunc("GET /api/admin/ping-tasks", h.requireAdmin(h.listPingTasks))

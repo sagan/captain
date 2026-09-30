@@ -1,26 +1,31 @@
-import { Badge, Box, Card, Container, Group, Progress, SimpleGrid, Stack, Text, Title, Tooltip } from '@mantine/core'
-import { useQuery } from '@tanstack/react-query'
+import { Badge, Box, Card, Container, Group, Progress, SimpleGrid, Stack, Text, Title, Tooltip, Select, TextInput } from '@mantine/core'
+import type { UseQueryResult } from '@tanstack/react-query'
 import { IconServer, IconArrowUp, IconArrowDown } from '@tabler/icons-react'
-import { useState } from 'react'
-import { bytes, flag, getJSON, pct, rate, uptime, type Node, type Snapshot } from './lib/api'
+import { useTranslation } from 'react-i18next'
+import { useEffect, useState } from 'react'
+import { publicShows, bytes, flag, pct, rate, uptime, type Node, type Snapshot } from './lib/api'
 import { Spark } from './components/Spark'
 import { NodeDetail } from './components/NodeDetail'
 
 // The public status page: one card per node, live values, sparklines and
 // the monthly traffic bar. Polls the snapshot at the beat interval.
-export default function App() {
-  const snap = useQuery({ queryKey: ['probe'], queryFn: () => getJSON<Snapshot>('/api/probe'), refetchInterval: (q) => Math.max(3, q.state.data?.beat_seconds ?? 10) * 1000, retry: false })
-  const [open, setOpen] = useState<Node | null>(null)
+export default function App({ snap }: { snap: UseQueryResult<Snapshot, Error> }) {
+  const { t, i18n } = useTranslation()
+  const [search, setSearch] = useState(''), [group, setGroup] = useState<string | null>(null), [status, setStatus] = useState<string | null>(null)
+  const [open, setOpen] = useState<number | null>(null)
+  useEffect(() => { if (snap.data?.title) document.title = snap.data.title }, [snap.data?.title])
   if (snap.isError) {
     const code = (snap.error as Error).message
-    return <Container size="sm" py={80}><Card className="glass" bg="transparent" withBorder={false}><Title order={3}>{code === '401' ? 'Sign in to view the status page' : code === '403' ? 'Staff only' : 'Status page is off'}</Title>{code === '401' && <Text mt="sm"><a href="/portal/login">Sign in</a></Text>}</Card></Container>
+    return <Container size="sm" py={80}><Card className="glass" bg="transparent" withBorder={false}><Title order={3}>{t(code === '401' ? 'page.signInRequired' : code === '403' ? 'page.staffOnly' : code === '404' ? 'page.off' : 'page.error')}</Title>{code === '401' && <Text mt="sm"><a href="/portal/login">{t('page.signIn')}</a></Text>}</Card></Container>
   }
   const s = snap.data
   if (!s) return null
+  const show = (section: string) => publicShows(s, section)
+  const filtered = s.nodes.filter((n) => n.name.toLowerCase().includes(search.toLowerCase()) && (!group || n.group === group) && (!status || n.online === (status === 'online')))
   const online = s.nodes.filter((n) => n.online).length
-  const totalUp = s.nodes.reduce((a, n) => a + (n.host?.net_up ?? 0), 0)
-  const totalDown = s.nodes.reduce((a, n) => a + (n.host?.net_down ?? 0), 0)
-  document.title = s.title
+  const validNetworkNodes = s.nodes.filter((n) => n.online && n.host && n.host.valid?.network !== false)
+  const totalUp = validNetworkNodes.reduce((a, n) => a + (n.host?.net_up ?? 0), 0)
+  const totalDown = validNetworkNodes.reduce((a, n) => a + (n.host?.net_down ?? 0), 0)
   return (
     <Box pos="relative" style={{ zIndex: 1 }}>
       <div className="site-bg" />
@@ -28,73 +33,77 @@ export default function App() {
         <Group justify="space-between">
           <Group gap="xs">{s.logo && <img src={s.logo} alt="" style={{ height: 28 }} />}<Text fw={800} fz="xl" className="gradient-text">{s.title}</Text></Group>
           <Group gap="md">
-            <Badge variant="light" color="teal" size="lg" leftSection={<span className="live-dot" />}>{online} / {s.nodes.length} online</Badge>
-            <Text size="sm" c="dimmed"><IconArrowUp size={14} /> {rate(totalUp)} <IconArrowDown size={14} /> {rate(totalDown)}</Text>
+            <Badge variant="light" color="teal" size="lg" leftSection={<span className="live-dot" />}>{online} / {s.nodes.length} {t('page.online')}</Badge>
+            {show('network') && <Text size="sm" c="dimmed"><IconArrowUp size={14} /> {validNetworkNodes.length ? rate(totalUp) : '—'} <IconArrowDown size={14} /> {validNetworkNodes.length ? rate(totalDown) : '—'}</Text>}
+            <Select aria-label={t('page.language')} w={140} size="xs" value={i18n.resolvedLanguage} onChange={(v) => v && i18n.changeLanguage(v)} allowDeselect={false} data={[{ value: 'en', label: 'English' }, { value: 'zh-CN', label: '简体中文' }, { value: 'zh-TW', label: '繁體中文' }, { value: 'ja', label: '日本語' }, { value: 'ko', label: '한국어' }, { value: 'ru', label: 'Русский' }]} />
           </Group>
         </Group>
       </Container>
       <Container size="lg" pb={60}>
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-          {s.nodes.map((n) => <NodeCard key={n.id} n={n} onOpen={() => setOpen(n)} />)}
+        <SimpleGrid cols={{ base: 1, sm: 3 }} mb="md"><TextInput aria-label={t('page.search')} placeholder={t('page.search')} value={search} onChange={(e) => setSearch(e.currentTarget.value)} /><Select aria-label={t('page.group')} placeholder={t('page.group')} clearable data={[...new Set(s.nodes.map((n) => n.group).filter((g): g is string => !!g))].sort()} value={group} onChange={setGroup} /><Select aria-label={t('page.status')} placeholder={t('page.status')} clearable value={status} onChange={setStatus} data={['online', 'offline'].map((value) => ({ value, label: t(`page.${value}`) }))} /></SimpleGrid>
+        <SimpleGrid cols={s.layout === 'compact' ? 1 : { base: 1, sm: 2, lg: 3 }} spacing="md">
+          {filtered.map((n) => <NodeCard key={n.id} n={n} snapshot={s} onOpen={() => setOpen(n.id)} />)}
         </SimpleGrid>
-        {s.nodes.length === 0 && <Text c="dimmed" ta="center" py={60}>No servers to show yet.</Text>}
+        {filtered.length === 0 && <Text c="dimmed" ta="center" py={60}>{t('page.noNodes')}</Text>}
       </Container>
-      <NodeDetail node={open} onClose={() => setOpen(null)} />
+      <NodeDetail snapshot={s} node={s.nodes.find((n) => n.id === open) ?? null} onClose={() => setOpen(null)} />
     </Box>
   )
 }
 
-function NodeCard({ n, onOpen }: { n: Node; onOpen: () => void }) {
+function NodeCard({ n, snapshot, onOpen }: { n: Node; snapshot: Snapshot; onOpen: () => void }) {
+  const { t } = useTranslation()
+  const show = (section: string) => publicShows(snapshot, section)
   const h = n.host
-  const cpu = h?.cpu_percent ?? 0
-  const mem = pct(h?.mem_used, h?.mem_total)
-  const disk = pct(h?.disk_used, h?.disk_total)
+  const cpu = !h || h.valid?.cpu === false ? null : h.cpu_percent ?? 0
+  const mem = !h || h.valid?.memory === false ? null : pct(h.mem_used, h.mem_total)
+  const disk = !h || h.valid?.disk === false ? null : pct(h.disk_used, h.disk_total)
   const tr = n.traffic
   const trafficPct = tr.limit > 0 ? Math.min(100, Math.round((tr.used / tr.limit) * 100)) : 0
   const carriers = (h?.pings ?? []).filter((p) => p.task_id === 0)
   return (
-    <Card className="glass" bg="transparent" withBorder={false} style={{ cursor: 'pointer', opacity: n.online ? 1 : 0.6 }} onClick={onOpen}>
+    <Card className={`glass monitor-node ${snapshot.layout === 'compact' ? 'monitor-compact' : ''}`} withBorder={false} style={{ cursor: 'pointer', opacity: n.online ? 1 : 0.6 }} onClick={onOpen} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}>
       <Group justify="space-between" wrap="nowrap">
-        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
           <Text fz="lg">{flag(n.info.region) || <IconServer size={18} />}</Text>
           <div style={{ minWidth: 0 }}>
             <Text fw={700} truncate>{n.name}</Text>
-            <Text size="xs" c="dimmed" truncate>{[n.info.provider, h?.info?.os, h?.uptime ? uptime(h.uptime) : ''].filter(Boolean).join(' · ')}</Text>
+            <Text size="xs" c="dimmed" truncate>{[n.group, n.info.provider, h?.info?.os, h?.uptime ? uptime(h.uptime) : ''].filter(Boolean).join(' · ')}</Text>
           </div>
         </Group>
-        <Badge size="sm" color={n.online ? 'teal' : 'red'} variant={n.online ? 'light' : 'filled'}>{n.online ? 'UP' : 'DOWN'}</Badge>
+        <Badge size="sm" style={{ flexShrink: 0 }} color={n.online ? 'teal' : 'red'} variant={n.online ? 'light' : 'filled'}>{t(n.online ? 'page.online' : 'page.offline')}</Badge>
       </Group>
-      <SimpleGrid cols={3} spacing="xs" mt="sm">
-        <Meter label="CPU" value={cpu} />
-        <Meter label="MEM" value={mem} sub={bytes(h?.mem_total ?? 0)} />
-        <Meter label="DISK" value={disk} sub={bytes(h?.disk_total ?? 0)} />
-      </SimpleGrid>
-      <Group justify="space-between" mt="sm" gap="xs">
-        <Text size="xs" c="dimmed"><IconArrowUp size={12} /> {rate(h?.net_up ?? 0)} <IconArrowDown size={12} /> {rate(h?.net_down ?? 0)}</Text>
-        <Text size="xs" c="dimmed">load {h?.load1?.toFixed(2) ?? '—'}</Text>
-      </Group>
-      <Spark values={n.recent.map((r) => r.down)} color="#f59e0b" height={28} />
+      {['cpu', 'memory', 'disk'].some(show) && <SimpleGrid cols={['cpu', 'memory', 'disk'].filter(show).length} spacing="xs" mt="sm">
+        {show('cpu') && <Meter label="CPU" value={cpu} />}
+        {show('memory') && <Meter label={t('page.memory')} value={mem} sub={mem == null ? undefined : bytes(h?.mem_total ?? 0)} />}
+        {show('disk') && <Meter label={t('page.disk')} value={disk} sub={disk == null ? undefined : bytes(h?.disk_total ?? 0)} />}
+      </SimpleGrid>}
+      {(show('network') || show('system')) && <Group justify="space-between" mt="sm" gap="xs">
+        {show('network') && <Text size="xs" c="dimmed"><IconArrowUp size={12} /> {!h || h.valid?.network === false ? '—' : rate(h.net_up ?? 0)} <IconArrowDown size={12} /> {!h || h.valid?.network === false ? '—' : rate(h.net_down ?? 0)}</Text>}
+        <Text size="xs" c="dimmed">{show('system') && <>{t('page.load')} {!h || h.valid?.load === false ? '—' : (h.load1 ?? 0).toFixed(2)}</>}</Text>
+      </Group>}
+      {show('history') && show('network') && snapshot.layout !== 'compact' && <Spark values={n.recent.flatMap((r, i) => [...(i > 0 && r.t - n.recent[i - 1].t > snapshot.beat_seconds * 2 ? [null] : []), r.valid?.network === false ? null : r.down])} color="#f59e0b" height={28} />}
       {carriers.length > 0 && (
         <Group gap="sm" mt="xs">
-          {carriers.map((p) => <Tooltip key={p.name} label={`${p.name} loss ${p.loss?.toFixed(0) ?? 0}%`}><Text size="xs" c={p.latency_ms < 0 ? 'red' : p.latency_ms > 200 ? 'orange' : 'dimmed'}>{p.name} {p.latency_ms < 0 ? '×' : `${Math.round(p.latency_ms)}ms`}</Text></Tooltip>)}
+          {carriers.map((p) => <Tooltip key={p.name} label={`${p.name} ${t('page.loss')} ${p.loss?.toFixed(0) ?? 0}%`}><Text size="xs" c={p.latency_ms < 0 ? 'red' : p.latency_ms > 200 ? 'orange' : 'dimmed'}>{p.name} {p.latency_ms < 0 ? '×' : `${Math.round(p.latency_ms)}ms`}</Text></Tooltip>)}
         </Group>
       )}
-      {tr.limit > 0 ? (
+      {show('traffic') && (tr.limit > 0 ? (
         <Stack gap={2} mt="xs">
-          <Group justify="space-between"><Text size="xs" c="dimmed">Traffic</Text><Text size="xs" c="dimmed">{bytes(tr.used)} / {bytes(tr.limit)}</Text></Group>
+          <Group justify="space-between"><Text size="xs" c="dimmed">{t('page.traffic')}</Text><Text size="xs" c="dimmed">{bytes(tr.used)} / {bytes(tr.limit)}</Text></Group>
           <Progress value={trafficPct} size="sm" color={trafficPct > 90 ? 'red' : trafficPct > 70 ? 'orange' : 'teal'} />
         </Stack>
-      ) : <Text size="xs" c="dimmed" mt="xs">Traffic this period {bytes(tr.used)}</Text>}
-      {n.info.expires_at && <Text size="xs" c="dimmed" mt={4}>Expires {n.info.expires_at}{n.info.price ? ` · ${n.info.price}` : ''}</Text>}
+      ) : <Text size="xs" c="dimmed" mt="xs">{t('page.traffic')} {bytes(tr.used)}</Text>)}
+      {n.info.expires_at && <Text size="xs" c="dimmed" mt={4}>{t('page.expires')} {n.info.expires_at}{n.info.price ? ` · ${n.info.price}` : ''}</Text>}
     </Card>
   )
 }
 
-function Meter({ label, value, sub }: { label: string; value: number; sub?: string }) {
+function Meter({ label, value, sub }: { label: string; value: number | null; sub?: string }) {
   return (
     <div>
-      <Group justify="space-between" gap={4}><Text size="xs" c="dimmed">{label}</Text><Text size="xs" fw={600}>{Math.round(value)}%</Text></Group>
-      <Progress value={value} size="xs" color={value > 90 ? 'red' : value > 70 ? 'orange' : 'cyan'} />
+      <Group justify="space-between" gap={4}><Text size="xs" c="dimmed">{label}</Text><Text size="xs" fw={600}>{value == null ? '—' : `${Math.round(value)}%`}</Text></Group>
+      {value != null && <Progress value={value} size="xs" color={value > 90 ? 'red' : value > 70 ? 'orange' : undefined} />}
       {sub && <Text size="xs" c="dimmed" mt={2}>{sub}</Text>}
     </div>
   )

@@ -13,7 +13,7 @@ jobs:
         with: { version: 9 }
       - uses: actions/setup-node@v7
         with: { node-version: 24, cache: pnpm, cache-dependency-path: "web/*/pnpm-lock.yaml" }
-      - run: python3 scripts/i18n-check.py web/admin/src/i18n web/portal/src/i18n
+      - run: python3 scripts/i18n-check.py web/admin/src/i18n web/portal/src/i18n web/probe/src/i18n
       - run: cd web/admin && pnpm install --frozen-lockfile && pnpm exec oxlint src && pnpm build
       - run: cd web/portal && pnpm install --frozen-lockfile && pnpm exec oxlint src && pnpm build
       - run: cd web/site && pnpm install --frozen-lockfile && pnpm build

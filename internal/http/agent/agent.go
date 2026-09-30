@@ -203,6 +203,8 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 	for _, jr := range rep.Jobs {
 		if err := h.Store.CompleteReportedNodeJob(ctx, n.ID, jr.ID, jr.Result, jr.Error); err != nil {
 			h.Log.Error("complete node job", "job", jr.ID, "err", err)
+			fail(w, http.StatusInternalServerError, "internal error")
+			return
 		}
 		if jr.Kind == "warp_register" && len(jr.Result) > 0 {
 			_ = h.Store.SetNodeWARP(ctx, n.ID, jr.Result)
@@ -386,6 +388,10 @@ func (h *handlers) beat(w http.ResponseWriter, r *http.Request) {
 	if h.Probe != nil {
 		if err := h.Probe.Record(r.Context(), nodeFrom(r), b.Version, b.Host, time.Now()); err != nil {
 			h.Log.Error("record beat", "node", nodeFrom(r).ID, "err", err)
+			// Success acknowledges the node's pending measurement batch. A failed
+			// transaction must remain retryable, including its sample cursors.
+			fail(w, http.StatusInternalServerError, "internal error")
+			return
 		}
 	}
 	w.WriteHeader(http.StatusNoContent)

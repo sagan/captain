@@ -100,16 +100,16 @@ func (s *Store) ListNodes(ctx context.Context) ([]*domain.Node, error) {
 
 // TouchNode records a report: liveness, applied revision, host and core status.
 func (s *Store) TouchNode(ctx context.Context, id int64, version, revision string, host spec.SystemStatus, cores any, certs any) error {
-	hostJSON, _ := json.Marshal(host)
+	hostJSON, _ := json.Marshal(MonitorSnapshot(host, time.Now()))
 	coresJSON, _ := json.Marshal(cores)
 	certsJSON, _ := json.Marshal(certs)
 	if certs == nil {
 		certsJSON = []byte("[]")
 	}
 	// A node that reports the requested release has finished upgrading.
-	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET last_seen_at = ?, version = COALESCE(NULLIF(?, ''), version), applied_revision = ?, host_status_json = ?, cores_json = ?, certs_json = ?,
+	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET last_seen_at = ?, version = COALESCE(NULLIF(?, ''), version), applied_revision = ?, host_status_json = ?, host_reported_at = ?, cores_json = ?, certs_json = ?,
 		upgrade_to = CASE WHEN upgrade_to = ? THEN '' ELSE upgrade_to END, updated_at = ? WHERE id = ?`,
-		now(), version, revision, string(hostJSON), string(coresJSON), string(certsJSON), version, now(), id)
+		now(), version, revision, string(hostJSON), now(), string(coresJSON), string(certsJSON), version, now(), id)
 	return err
 }
 

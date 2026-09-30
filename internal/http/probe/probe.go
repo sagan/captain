@@ -39,6 +39,7 @@ type handlers struct {
 // Register mounts the JSON API under /api/probe.
 func Register(mux *http.ServeMux, d Deps) *Router {
 	h := &handlers{Deps: d}
+	mux.HandleFunc("GET /api/probe/nodes/{id}/availability", h.gate(h.availability))
 	mux.HandleFunc("GET /api/probe", h.gate(h.snapshot))
 	mux.HandleFunc("GET /api/probe/nodes/{id}/history", h.gate(h.history))
 	mux.HandleFunc("GET /api/probe/nodes/{id}/pings", h.gate(h.pings))
@@ -47,7 +48,7 @@ func Register(mux *http.ServeMux, d Deps) *Router {
 
 // allowed applies the visibility setting; false with a status to send.
 func (h *handlers) allowed(r *http.Request, s store.ProbeSettings) (bool, int) {
-	if !s.Enabled {
+	if !s.PageOn() {
 		return false, http.StatusNotFound
 	}
 	switch s.Visibility {
@@ -87,6 +88,7 @@ func (h *handlers) isStaff(r *http.Request) bool {
 
 // nodeView is one server on the page.
 type nodeView struct {
+	Group    string              `json:"group"`
 	ID       int64               `json:"id"`
 	Name     string              `json:"name"`
 	Online   bool                `json:"online"`
@@ -129,6 +131,15 @@ func (h *handlers) snapshot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	probes, _ := h.Store.ListNodeProbes(r.Context())
+	persisted, err := h.Store.MonitorNodes(r.Context(), time.Now(), time.Duration(s.Alerts.OfflineSeconds)*time.Second)
+	if err != nil {
+		http.Error(w, "internal error", 500)
+		return
+	}
+	snapshots := make(map[int64]store.MonitorNode, len(persisted))
+	for _, n := range persisted {
+		snapshots[n.ID] = n
+	}
 	now := time.Now()
 	grace := time.Duration(s.Alerts.OfflineSeconds) * time.Second
 	out := []nodeView{}
@@ -142,9 +153,16 @@ func (h *handlers) snapshot(w http.ResponseWriter, r *http.Request) {
 			v.Addr = n.PublicAddr
 		}
 		last := n.LastSeenAt
+		snapshot := snapshots[n.ID]
+		v.Group = snapshot.Group
+		if snapshot.Host != nil {
+			v.Host = publicHost(*snapshot.Host, s)
+		}
 		if l, ok := h.Probe.Live(n.ID); ok {
-			v.Host = l.Host
-			v.Recent = l.Ring
+			if l.At.Unix() >= snapshot.SampledAt {
+				v.Host = publicHost(l.Host, s)
+			}
+			v.Recent = publicSamples(l.Ring, s)
 			if len(v.Recent) > 120 {
 				v.Recent = v.Recent[len(v.Recent)-120:]
 			}
@@ -165,10 +183,29 @@ func (h *handlers) snapshot(w http.ResponseWriter, r *http.Request) {
 				v.Traffic.PeriodStart = np.PeriodStart.Unix()
 			}
 		}
+		if !s.PublicShows("system") {
+			v.Version = ""
+		}
+		if !s.PublicShows("info") {
+			v.Info = store.NodeProbeInfo{}
+		}
+		if !s.PublicShows("traffic") {
+			v.Traffic.UsedB = 0
+			v.Traffic.LimitB = 0
+			v.Traffic.PrevB = 0
+			v.Traffic.Mode = ""
+			v.Traffic.PeriodStart = 0
+			v.Traffic.ResetDay = 0
+		}
+		if !s.PublicShows("history") {
+			v.Recent = []service.Sample{}
+		}
 		out = append(out, v)
 	}
 	doc := map[string]any{
 		"title": firstNonEmpty(s.Title, h.SiteName), "logo": s.Logo, "show_globe": s.ShowGlobe, "beat_seconds": s.BeatSeconds,
+		"layout": s.Layout, "public_sections": s.PublicSections,
+		"appearance": s.Appearance,
 		"visibility": s.Visibility, "carrier_ping": s.CarrierPing, "now": now.Unix(), "nodes": out, "staff": staff,
 	}
 	b, _ := json.Marshal(doc)
@@ -210,6 +247,11 @@ func (h *handlers) nodeID(r *http.Request) (int64, bool) {
 }
 
 func (h *handlers) history(w http.ResponseWriter, r *http.Request) {
+	s := h.Probe.Settings(r.Context())
+	if !s.PublicShows("history") {
+		http.NotFound(w, r)
+		return
+	}
 	id, ok := h.nodeID(r)
 	if !ok {
 		http.NotFound(w, r)
@@ -219,7 +261,7 @@ func (h *handlers) history(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	w.Header().Set("Content-Type", "application/json")
 	if res == "" {
-		_ = json.NewEncoder(w).Encode(map[string]any{"res": "raw", "points": h.Probe.Recent(id, now.Add(-window))})
+		_ = json.NewEncoder(w).Encode(map[string]any{"res": "raw", "points": publicSamples(h.Probe.Recent(id, now.Add(-window)), s), "from": now.Add(-window).Unix(), "to": now.Unix(), "step": s.BeatSeconds})
 		return
 	}
 	pts, err := h.Store.NodeStats(r.Context(), id, res, now.Add(-window), now)
@@ -227,10 +269,23 @@ func (h *handlers) history(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	_ = json.NewEncoder(w).Encode(map[string]any{"res": res, "points": pts})
+	publicStats(pts, s)
+	step := 60
+	if res == "h" {
+		step = 3600
+	}
+	if res == "d" {
+		step = 86400
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"res": res, "points": pts, "from": now.Add(-window).Unix(), "to": now.Unix(), "step": step})
 }
 
 func (h *handlers) pings(w http.ResponseWriter, r *http.Request) {
+	s := h.Probe.Settings(r.Context())
+	if !s.PublicShows("history") || !s.PublicShows("latency") {
+		http.NotFound(w, r)
+		return
+	}
 	id, ok := h.nodeID(r)
 	if !ok {
 		http.NotFound(w, r)
@@ -247,7 +302,14 @@ func (h *handlers) pings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"res": res, "points": pts})
+	step := 60
+	if res == "h" {
+		step = 3600
+	}
+	if res == "d" {
+		step = 86400
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"res": res, "points": pts, "from": now.Add(-window).Unix(), "to": now.Unix(), "step": step})
 }
 
 func firstNonEmpty(a, b string) string {
@@ -295,7 +357,7 @@ func (rt *Router) Wrap(next http.Handler) http.Handler {
 			h.Page.ServeHTTP(w, r)
 			return
 		}
-		if s.Enabled && s.Path != "" && s.Path != "/" {
+		if s.PageOn() && s.Path != "" && s.Path != "/" {
 			p := "/" + strings.Trim(s.Path, "/")
 			if path == p {
 				http.Redirect(w, r, p+"/"+optQuery(r), http.StatusMovedPermanently)

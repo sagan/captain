@@ -13,9 +13,14 @@ import (
 
 // ProbeSettings is the admin-edited monitoring configuration.
 type ProbeSettings struct {
-	Enabled     bool `json:"enabled"`
-	BeatSeconds int  `json:"beat_seconds"` // 5..60, default 10
-	CarrierPing bool `json:"carrier_ping"` // TCP-connect latency to the carrier points
+	Appearance     *ProbeAppearance `json:"appearance,omitempty"`
+	PublicSections *[]string        `json:"public_sections,omitempty"`
+	Layout         string           `json:"layout,omitempty"` // grid | compact
+
+	PageEnabled *bool `json:"page_enabled,omitempty"` // nil preserves the pre-v1.7 enabled-page behavior
+	Enabled     bool  `json:"enabled"`
+	BeatSeconds int   `json:"beat_seconds"` // 5..60, default 10
+	CarrierPing bool  `json:"carrier_ping"` // TCP-connect latency to the carrier points
 	// Carriers replaces the default CT/CU/CM probe points when set.
 	Carriers   []spec.Carrier `json:"carriers"`
 	Path       string         `json:"path"`       // "/status"; "" disables the path mode
@@ -33,6 +38,42 @@ type ProbeSettings struct {
 		WindowMinutes  int  `json:"window_minutes"` // sustained-average window, default 5
 		Traffic        bool `json:"traffic"`        // 80% / 100% of the node monthly limit
 	} `json:"alerts"`
+}
+
+// Presets are bundled UI styles, never operator-supplied CSS or scripts.
+type ProbeAppearance struct {
+	Preset string `json:"preset"` // inherit | aurora | paper | terminal
+	Scheme string `json:"scheme"` // inherit | auto | light | dark
+}
+
+func (p *ProbeAppearance) Normalize() {
+	if p.Preset == "" {
+		p.Preset = "inherit"
+	}
+	if p.Scheme == "" {
+		p.Scheme = "inherit"
+	}
+}
+
+func (p ProbeAppearance) Valid() bool {
+	p.Normalize()
+	return (p.Preset == "inherit" || p.Preset == "aurora" || p.Preset == "paper" || p.Preset == "terminal") &&
+		(p.Scheme == "inherit" || p.Scheme == "auto" || p.Scheme == "light" || p.Scheme == "dark")
+}
+
+func (p ProbeSettings) PageOn() bool { return p.Enabled && (p.PageEnabled == nil || *p.PageEnabled) }
+
+// PublicShows defaults to the pre-1.7 display when the field is omitted.
+func (p ProbeSettings) PublicShows(section string) bool {
+	if p.PublicSections == nil {
+		return true
+	}
+	for _, s := range *p.PublicSections {
+		if s == section {
+			return true
+		}
+	}
+	return false
 }
 
 // SettingProbe is the settings key.
@@ -117,6 +158,8 @@ func (s *Store) DeletePingTask(ctx context.Context, id int64) error {
 
 // NodeProbe is the per-node probe configuration and monthly traffic state.
 type NodeProbe struct {
+	Resources        spec.ResourceOptions `json:"resources"`
+	counters         networkCounters
 	NodeID           int64         `json:"node_id"`
 	Hidden           bool          `json:"hidden"`
 	Info             NodeProbeInfo `json:"info"`
@@ -159,20 +202,22 @@ func (p NodeProbe) Billed() int64 {
 func scanNodeProbe(row interface{ Scan(...any) error }) (*NodeProbe, error) {
 	var p NodeProbe
 	var hidden int
-	var info string
+	var info, resources, counters string
 	var start int64
-	if err := row.Scan(&p.NodeID, &hidden, &info, &p.LimitBytes, &p.ResetDay, &p.Mode, &start, &p.UsedUp, &p.UsedDown, &p.lastUp, &p.lastDown, &p.PrevUsed); err != nil {
+	if err := row.Scan(&p.NodeID, &hidden, &info, &p.LimitBytes, &p.ResetDay, &p.Mode, &start, &p.UsedUp, &p.UsedDown, &p.lastUp, &p.lastDown, &p.PrevUsed, &resources, &counters); err != nil {
 		return nil, wrapNotFound(err)
 	}
 	p.Hidden = hidden == 1
 	_ = json.Unmarshal([]byte(info), &p.Info)
+	_ = json.Unmarshal([]byte(resources), &p.Resources)
+	_ = json.Unmarshal([]byte(counters), &p.counters)
 	if start > 0 {
 		p.PeriodStart = time.Unix(start, 0)
 	}
 	return &p, nil
 }
 
-const nodeProbeCols = `id, probe_hidden, probe_info_json, traffic_limit_bytes, traffic_reset_day, traffic_mode, traffic_period_start, traffic_used_up, traffic_used_down, traffic_last_up, traffic_last_down, traffic_prev_used`
+const nodeProbeCols = `id, probe_hidden, probe_info_json, traffic_limit_bytes, traffic_reset_day, traffic_mode, traffic_period_start, traffic_used_up, traffic_used_down, traffic_last_up, traffic_last_down, traffic_prev_used, probe_resources_json, probe_counters_json`
 
 func (s *Store) NodeProbe(ctx context.Context, nodeID int64) (*NodeProbe, error) {
 	return scanNodeProbe(s.db.QueryRowContext(ctx, `SELECT `+nodeProbeCols+` FROM nodes WHERE id = ?`, nodeID))
@@ -196,7 +241,7 @@ func (s *Store) ListNodeProbes(ctx context.Context) (map[int64]*NodeProbe, error
 }
 
 // UpdateNodeProbe stores the admin-edited part (not the counters).
-func (s *Store) UpdateNodeProbe(ctx context.Context, nodeID int64, hidden bool, info NodeProbeInfo, limit int64, resetDay int, mode string) error {
+func (s *Store) UpdateNodeProbe(ctx context.Context, nodeID int64, hidden bool, info NodeProbeInfo, limit int64, resetDay int, mode string, resources ...*spec.ResourceOptions) error {
 	if resetDay < 1 || resetDay > 28 {
 		resetDay = 1
 	}
@@ -207,8 +252,16 @@ func (s *Store) UpdateNodeProbe(ctx context.Context, nodeID int64, hidden bool, 
 	}
 	info.Region = strings.ToUpper(strings.TrimSpace(info.Region))
 	b, _ := json.Marshal(info)
-	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET probe_hidden = ?, probe_info_json = ?, traffic_limit_bytes = ?, traffic_reset_day = ?, traffic_mode = ?, updated_at = ? WHERE id = ?`,
-		boolInt(hidden), string(b), limit, resetDay, mode, now(), nodeID)
+	var resourceJSON any
+	if len(resources) > 0 && resources[0] != nil {
+		if err := resources[0].Validate(); err != nil {
+			return err
+		}
+		raw, _ := json.Marshal(resources[0])
+		resourceJSON = string(raw)
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET probe_hidden = ?, probe_info_json = ?, traffic_limit_bytes = ?, traffic_reset_day = ?, traffic_mode = ?, probe_resources_json = COALESCE(?, probe_resources_json), updated_at = ? WHERE id = ?`,
+		boolInt(hidden), string(b), limit, resetDay, mode, resourceJSON, now(), nodeID)
 	return err
 }
 
@@ -240,6 +293,18 @@ func (s *Store) RecordBeat(ctx context.Context, nodeID int64, h spec.SystemStatu
 		return err
 	}
 	defer tx.Rollback()
+	p, err := scanNodeProbe(tx.QueryRowContext(ctx, `SELECT `+nodeProbeCols+` FROM nodes WHERE id = ?`, nodeID))
+	if err != nil {
+		return err
+	}
+	if r := h.Resources; r != nil && r.Epoch != "" && r.Epoch == p.counters.Epoch && r.Sequence <= p.counters.Sequence {
+		return ErrStaleBeat
+	}
+	if err := recordResourceHistory(ctx, tx, nodeID, h, at, p.counters.GPU); err != nil {
+		return err
+	}
+	valid := h.Validity()
+	h = validHost(h)
 	for _, b := range []struct {
 		res  string
 		size time.Duration
@@ -249,33 +314,20 @@ func (s *Store) RecordBeat(ctx context.Context, nodeID int64, h spec.SystemStatu
 			y, m, d := at.Date()
 			ts = time.Date(y, m, d, 0, 0, 0, 0, at.Location()).Unix()
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO node_stats (node_id, res, ts, samples, cpu, mem_used, mem_total, swap_used, disk_used, disk_total, net_up, net_down, load1, tcp, udp, procs)
-			VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT(node_id, res, ts) DO UPDATE SET samples = samples + 1, cpu = cpu + excluded.cpu, mem_used = mem_used + excluded.mem_used, mem_total = excluded.mem_total,
-			swap_used = swap_used + excluded.swap_used, disk_used = disk_used + excluded.disk_used, disk_total = excluded.disk_total, net_up = net_up + excluded.net_up, net_down = net_down + excluded.net_down,
-			load1 = load1 + excluded.load1, tcp = tcp + excluded.tcp, udp = udp + excluded.udp, procs = procs + excluded.procs`,
-			nodeID, b.res, ts, h.CPUPercent, float64(h.MemUsed), h.MemTotal, float64(h.SwapUsed), float64(h.DiskUsed), h.DiskTotal, float64(h.NetUp), float64(h.NetDown), h.Load1, h.TCP, h.UDP, h.Processes); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO node_stats (node_id, res, ts, samples, cpu, mem_used, mem_total, swap_used, disk_used, disk_total, net_up, net_down, load1, tcp, udp, procs, cpu_n, mem_n, swap_n, disk_n, net_n, load_n, connections_n, procs_n)
+			VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(node_id, res, ts) DO UPDATE SET samples = samples + 1, cpu = cpu + excluded.cpu, mem_used = mem_used + excluded.mem_used, mem_total = CASE WHEN excluded.mem_n > 0 THEN excluded.mem_total ELSE mem_total END,
+			swap_used = swap_used + excluded.swap_used, disk_used = disk_used + excluded.disk_used, disk_total = CASE WHEN excluded.disk_n > 0 THEN excluded.disk_total ELSE disk_total END, net_up = net_up + excluded.net_up, net_down = net_down + excluded.net_down,
+			load1 = load1 + excluded.load1, tcp = tcp + excluded.tcp, udp = udp + excluded.udp, procs = procs + excluded.procs, cpu_n = cpu_n + excluded.cpu_n, mem_n = mem_n + excluded.mem_n, swap_n = swap_n + excluded.swap_n, disk_n = disk_n + excluded.disk_n, net_n = net_n + excluded.net_n, load_n = load_n + excluded.load_n, connections_n = connections_n + excluded.connections_n, procs_n = procs_n + excluded.procs_n`,
+			nodeID, b.res, ts, h.CPUPercent, float64(h.MemUsed), h.MemTotal, float64(h.SwapUsed), float64(h.DiskUsed), h.DiskTotal, float64(h.NetUp), float64(h.NetDown), h.Load1, h.TCP, h.UDP, h.Processes, boolInt(valid.CPU), boolInt(valid.Memory), boolInt(valid.Swap), boolInt(valid.Disk), boolInt(valid.Network), boolInt(valid.Load), boolInt(valid.Connections), boolInt(valid.Processes)); err != nil {
 			return err
 		}
-		for _, p := range h.Pings {
-			lost, sum := 0, 0.0
-			if p.LatencyMs < 0 {
-				lost = 1
-			} else {
-				sum = p.LatencyMs
-			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO node_ping_stats (node_id, task_id, name, res, ts, samples, lost, sum_ms, sum_mbps) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
-				ON CONFLICT(node_id, task_id, name, res, ts) DO UPDATE SET samples = samples + 1, lost = lost + excluded.lost, sum_ms = sum_ms + excluded.sum_ms, sum_mbps = sum_mbps + excluded.sum_mbps`,
-				nodeID, p.TaskID, p.Name, b.res, ts, lost, sum, p.Mbps); err != nil {
-				return err
-			}
-		}
 	}
-	// Monthly NIC traffic.
-	p, err := scanNodeProbe(tx.QueryRowContext(ctx, `SELECT `+nodeProbeCols+` FROM nodes WHERE id = ?`, nodeID))
-	if err != nil {
+	if err := recordPingHistory(ctx, tx, nodeID, h, at); err != nil {
 		return err
 	}
+
+	// Monthly NIC traffic.
 	start := periodStart(at, p.ResetDay)
 	usedUp, usedDown, prev := p.UsedUp, p.UsedDown, p.PrevUsed
 	if p.PeriodStart.IsZero() || start.After(p.PeriodStart) {
@@ -284,7 +336,14 @@ func (s *Store) RecordBeat(ctx context.Context, nodeID int64, h spec.SystemStatu
 		}
 		usedUp, usedDown = 0, 0
 	}
-	if h.NetTotalUp > 0 || h.NetTotalDown > 0 {
+	if h.Resources != nil {
+		deltaUp, deltaDown, counters := nextNetworkCounters(p.counters, h.Resources)
+		usedUp += deltaUp
+		usedDown += deltaDown
+		p.counters = counters
+		// Do not bridge the old aggregate baseline across a change of protocol.
+		p.lastUp, p.lastDown = 0, 0
+	} else if h.NetTotalUp > 0 || h.NetTotalDown > 0 {
 		up, down := int64(h.NetTotalUp), int64(h.NetTotalDown)
 		if p.lastUp > 0 && up >= p.lastUp {
 			usedUp += up - p.lastUp
@@ -294,8 +353,9 @@ func (s *Store) RecordBeat(ctx context.Context, nodeID int64, h spec.SystemStatu
 		}
 		p.lastUp, p.lastDown = up, down
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE nodes SET traffic_period_start = ?, traffic_used_up = ?, traffic_used_down = ?, traffic_last_up = ?, traffic_last_down = ?, traffic_prev_used = ?, last_seen_at = ? WHERE id = ?`,
-		start.Unix(), usedUp, usedDown, p.lastUp, p.lastDown, prev, at.Unix(), nodeID); err != nil {
+	counterJSON, _ := json.Marshal(p.counters)
+	if _, err := tx.ExecContext(ctx, `UPDATE nodes SET traffic_period_start = ?, traffic_used_up = ?, traffic_used_down = ?, traffic_last_up = ?, traffic_last_down = ?, traffic_prev_used = ?, probe_counters_json = ?, last_seen_at = ? WHERE id = ?`,
+		start.Unix(), usedUp, usedDown, p.lastUp, p.lastDown, prev, string(counterJSON), at.Unix(), nodeID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -303,25 +363,26 @@ func (s *Store) RecordBeat(ctx context.Context, nodeID int64, h spec.SystemStatu
 
 // StatPoint is one averaged bucket.
 type StatPoint struct {
-	TS        int64   `json:"ts"`
-	Samples   int     `json:"n"`
-	CPU       float64 `json:"cpu"`
-	MemUsed   float64 `json:"mem_used"`
-	MemTotal  int64   `json:"mem_total"`
-	SwapUsed  float64 `json:"swap_used"`
-	DiskUsed  float64 `json:"disk_used"`
-	DiskTotal int64   `json:"disk_total"`
-	NetUp     float64 `json:"net_up"`
-	NetDown   float64 `json:"net_down"`
-	Load1     float64 `json:"load1"`
-	TCP       float64 `json:"tcp"`
-	UDP       float64 `json:"udp"`
-	Procs     float64 `json:"procs"`
+	Valid     spec.MetricValidity `json:"valid"`
+	TS        int64               `json:"ts"`
+	Samples   int                 `json:"n"`
+	CPU       float64             `json:"cpu"`
+	MemUsed   float64             `json:"mem_used"`
+	MemTotal  int64               `json:"mem_total"`
+	SwapUsed  float64             `json:"swap_used"`
+	DiskUsed  float64             `json:"disk_used"`
+	DiskTotal int64               `json:"disk_total"`
+	NetUp     float64             `json:"net_up"`
+	NetDown   float64             `json:"net_down"`
+	Load1     float64             `json:"load1"`
+	TCP       float64             `json:"tcp"`
+	UDP       float64             `json:"udp"`
+	Procs     float64             `json:"procs"`
 }
 
 // NodeStats returns averaged buckets in [from, to].
 func (s *Store) NodeStats(ctx context.Context, nodeID int64, res string, from, to time.Time) ([]StatPoint, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT ts, samples, cpu, mem_used, mem_total, swap_used, disk_used, disk_total, net_up, net_down, load1, tcp, udp, procs
+	rows, err := s.db.QueryContext(ctx, `SELECT ts, samples, cpu, mem_used, mem_total, swap_used, disk_used, disk_total, net_up, net_down, load1, tcp, udp, procs, cpu_n, mem_n, swap_n, disk_n, net_n, load_n, connections_n, procs_n
 		FROM node_stats WHERE node_id = ? AND res = ? AND ts >= ? AND ts <= ? ORDER BY ts`, nodeID, res, from.Unix(), to.Unix())
 	if err != nil {
 		return nil, err
@@ -330,21 +391,20 @@ func (s *Store) NodeStats(ctx context.Context, nodeID int64, res string, from, t
 	out := []StatPoint{}
 	for rows.Next() {
 		var p StatPoint
-		if err := rows.Scan(&p.TS, &p.Samples, &p.CPU, &p.MemUsed, &p.MemTotal, &p.SwapUsed, &p.DiskUsed, &p.DiskTotal, &p.NetUp, &p.NetDown, &p.Load1, &p.TCP, &p.UDP, &p.Procs); err != nil {
+		var cpuN, memN, swapN, diskN, netN, loadN, connN, procsN int
+		if err := rows.Scan(&p.TS, &p.Samples, &p.CPU, &p.MemUsed, &p.MemTotal, &p.SwapUsed, &p.DiskUsed, &p.DiskTotal, &p.NetUp, &p.NetDown, &p.Load1, &p.TCP, &p.UDP, &p.Procs, &cpuN, &memN, &swapN, &diskN, &netN, &loadN, &connN, &procsN); err != nil {
 			return nil, err
 		}
-		if n := float64(p.Samples); n > 0 {
-			p.CPU /= n
-			p.MemUsed /= n
-			p.SwapUsed /= n
-			p.DiskUsed /= n
-			p.NetUp /= n
-			p.NetDown /= n
-			p.Load1 /= n
-			p.TCP /= n
-			p.UDP /= n
-			p.Procs /= n
+		p.Valid = spec.MetricValidity{CPU: cpuN > 0, Memory: memN > 0, Swap: swapN > 0, Disk: diskN > 0, Network: netN > 0, Load: loadN > 0, Connections: connN > 0, Processes: procsN > 0}
+		for _, v := range []struct {
+			value *float64
+			count int
+		}{{&p.CPU, cpuN}, {&p.MemUsed, memN}, {&p.SwapUsed, swapN}, {&p.DiskUsed, diskN}, {&p.NetUp, netN}, {&p.NetDown, netN}, {&p.Load1, loadN}, {&p.TCP, connN}, {&p.UDP, connN}, {&p.Procs, procsN}} {
+			if v.count > 0 {
+				*v.value /= float64(v.count)
+			}
 		}
+
 		out = append(out, p)
 	}
 	return out, rows.Err()
@@ -352,17 +412,18 @@ func (s *Store) NodeStats(ctx context.Context, nodeID int64, res string, from, t
 
 // PingPoint is one averaged latency bucket.
 type PingPoint struct {
-	TaskID  int64   `json:"task_id"`
-	Name    string  `json:"name"`
-	TS      int64   `json:"ts"`
-	Samples int     `json:"n"`
-	Lost    int     `json:"lost"`
-	AvgMs   float64 `json:"avg_ms"`   // -1 when every sample was lost
-	AvgMbps float64 `json:"avg_mbps"` // download tasks only
+	Quality *PingStatsQuality `json:"quality,omitempty"`
+	TaskID  int64             `json:"task_id"`
+	Name    string            `json:"name"`
+	TS      int64             `json:"ts"`
+	Samples int               `json:"n"`
+	Lost    int               `json:"lost"`
+	AvgMs   float64           `json:"avg_ms"`   // -1 when every sample was lost
+	AvgMbps float64           `json:"avg_mbps"` // download tasks only
 }
 
 func (s *Store) NodePingStats(ctx context.Context, nodeID int64, res string, from, to time.Time) ([]PingPoint, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT task_id, name, ts, samples, lost, sum_ms, sum_mbps FROM node_ping_stats WHERE node_id = ? AND res = ? AND ts >= ? AND ts <= ? ORDER BY task_id, name, ts`, nodeID, res, from.Unix(), to.Unix())
+	rows, err := s.db.QueryContext(ctx, `SELECT task_id, name, ts, samples, lost, sum_ms, sum_mbps, quality_json FROM node_ping_stats WHERE node_id = ? AND res = ? AND ts >= ? AND ts <= ? ORDER BY task_id, name, ts`, nodeID, res, from.Unix(), to.Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -371,9 +432,15 @@ func (s *Store) NodePingStats(ctx context.Context, nodeID int64, res string, fro
 	for rows.Next() {
 		var p PingPoint
 		var sum, sumMbps float64
-		if err := rows.Scan(&p.TaskID, &p.Name, &p.TS, &p.Samples, &p.Lost, &sum, &sumMbps); err != nil {
+		var qualityJSON string
+		if err := rows.Scan(&p.TaskID, &p.Name, &p.TS, &p.Samples, &p.Lost, &sum, &sumMbps, &qualityJSON); err != nil {
 			return nil, err
 		}
+		var quality networkAggregate
+		if err := json.Unmarshal([]byte(qualityJSON), &quality); err != nil {
+			return nil, err
+		}
+		p.Quality = quality.summary()
 		if okN := p.Samples - p.Lost; okN > 0 {
 			p.AvgMs = sum / float64(okN)
 			p.AvgMbps = sumMbps / float64(okN)
@@ -391,11 +458,11 @@ func (s *Store) SustainedAverage(ctx context.Context, nodeID int64, metric strin
 	var expr string
 	switch metric {
 	case "cpu":
-		expr = "SUM(cpu) / SUM(samples)"
+		expr = "SUM(cpu) / NULLIF(SUM(cpu_n), 0)"
 	case "mem":
-		expr = "100.0 * SUM(mem_used) / SUM(samples) / MAX(mem_total)"
+		expr = "100.0 * SUM(mem_used) / NULLIF(SUM(mem_n), 0) / MAX(mem_total)"
 	case "disk":
-		expr = "100.0 * SUM(disk_used) / SUM(samples) / MAX(disk_total)"
+		expr = "100.0 * SUM(disk_used) / NULLIF(SUM(disk_n), 0) / MAX(disk_total)"
 	default:
 		return 0, false
 	}
@@ -422,7 +489,16 @@ func (s *Store) PruneStats(ctx context.Context, at time.Time) error {
 			return err
 		}
 	}
-	return nil
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM node_ping_cursors WHERE seen_at<?`, at.Add(-7*24*time.Hour).Unix()); err != nil {
+		return err
+	}
+	if err := s.pruneResourceHistory(ctx, at); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM node_jobs WHERE kind = 'network_diagnostic' AND created_at < ?`, at.Add(-24*time.Hour).Unix()); err != nil {
+		return err
+	}
+	return s.pruneMonitoring(ctx, at)
 }
 
 // AlertOnce records kind for node unless it fired within the cool-down;

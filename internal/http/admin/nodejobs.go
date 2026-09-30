@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
+
+	"github.com/zeptop-dev/bosun/pkg/selfupdate"
+	"github.com/zeptop-dev/bosun/pkg/spec"
 
 	"github.com/zeptop-dev/captain/internal/auth"
 	"github.com/zeptop-dev/captain/internal/store"
@@ -12,7 +16,7 @@ import (
 // Node jobs: one-off tasks (REALITY target scans) the panel hands a node
 // through its state. The node answers in its next report; the UI polls.
 
-var jobKinds = map[string]bool{"reality_scan": true, "warp_register": true, "rollback": true}
+var jobKinds = map[string]bool{"reality_scan": true, "warp_register": true, "rollback": true, spec.NetworkDiagnosticKind: true}
 
 func (h *handlers) createNodeJob(w http.ResponseWriter, r *http.Request) {
 	id, okID := pathID(r)
@@ -28,11 +32,45 @@ func (h *handlers) createNodeJob(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "unknown job kind")
 		return
 	}
-	if _, err := h.Store.NodeByID(r.Context(), id); err != nil {
+	n, err := h.Store.NodeByID(r.Context(), id)
+	if err != nil {
 		fail(w, http.StatusNotFound, "node not found")
 		return
 	}
 	jobID := auth.Token(12)
+	if in.Kind == spec.NetworkDiagnosticKind {
+		if !userFrom(r).IsAdmin() {
+			fail(w, 403, "admin only")
+			return
+		}
+		var p spec.DiagnosticRequest
+		if json.Unmarshal(in.Params, &p) != nil {
+			fail(w, 400, "bad diagnostic request")
+			return
+		}
+		if err := p.Validate(); err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		if !n.Paired || n.LastSeenAt == nil || time.Since(*n.LastSeenAt) >= 3*time.Minute {
+			fail(w, 409, "node must be paired and online")
+			return
+		}
+		if n.Version != "v0.56.0" && !selfupdate.Newer(n.Version, "v0.56.0") {
+			fail(w, 409, "network diagnostics require bosun v0.56.0 or newer")
+			return
+		}
+		if err := h.Store.QueueNetworkDiagnostic(r.Context(), jobID, id, p); err != nil {
+			if errors.Is(err, store.ErrDiagnosticPending) {
+				fail(w, 409, err.Error())
+			} else {
+				serverErr(w, err)
+			}
+			return
+		}
+		ok(w, map[string]string{"id": jobID})
+		return
+	}
 	if err := h.Store.CreateNodeJob(r.Context(), jobID, id, in.Kind, in.Params); err != nil {
 		serverErr(w, err)
 		return
@@ -55,5 +93,31 @@ func (h *handlers) getNodeJob(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
+	if j.Kind == spec.NetworkDiagnosticKind && !userFrom(r).IsAdmin() {
+		fail(w, 403, "admin only")
+		return
+	}
 	ok(w, j)
+}
+
+func (h *handlers) networkDiagnostics(w http.ResponseWriter, r *http.Request) {
+	if !userFrom(r).IsAdmin() {
+		fail(w, 403, "admin only")
+		return
+	}
+	id, valid := pathID(r)
+	if !valid {
+		fail(w, 400, "bad id")
+		return
+	}
+	if _, err := h.Store.NodeByID(r.Context(), id); err != nil {
+		fail(w, 404, "node not found")
+		return
+	}
+	list, err := h.Store.NetworkDiagnostics(r.Context(), id)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	ok(w, list)
 }

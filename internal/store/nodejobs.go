@@ -26,13 +26,16 @@ func (s *Store) CreateNodeJob(ctx context.Context, id string, nodeID int64, kind
 	if len(params) == 0 {
 		params = json.RawMessage("{}")
 	}
-	_, _ = s.db.ExecContext(ctx, `DELETE FROM node_jobs WHERE node_id = ? AND kind <> 'node_remove' AND ((done_at IS NOT NULL AND done_at < ?) OR created_at < ?)`, nodeID, time.Now().Add(-time.Hour).Unix(), time.Now().Add(-6*time.Hour).Unix())
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM node_jobs WHERE node_id = ? AND kind NOT IN ('node_remove', 'network_diagnostic') AND ((done_at IS NOT NULL AND done_at < ?) OR created_at < ?)`, nodeID, time.Now().Add(-time.Hour).Unix(), time.Now().Add(-6*time.Hour).Unix())
 	_, err := s.db.ExecContext(ctx, `INSERT INTO node_jobs (id, node_id, kind, params_json, created_at) VALUES (?, ?, ?, ?, ?)`, id, nodeID, kind, string(params), time.Now().Unix())
 	return err
 }
 
 // PendingNodeJobs lists jobs the node has not answered yet.
 func (s *Store) PendingNodeJobs(ctx context.Context, nodeID int64) ([]NodeJob, error) {
+	if err := s.expireNetworkDiagnostics(ctx, nodeID); err != nil {
+		return nil, err
+	}
 	rows, err := s.db.QueryContext(ctx, `SELECT id, node_id, kind, params_json, result_json, error, created_at, done_at FROM node_jobs WHERE node_id = ? AND done_at IS NULL ORDER BY created_at`, nodeID)
 	if err != nil {
 		return nil, err
@@ -51,6 +54,9 @@ func (s *Store) PendingNodeJobs(ctx context.Context, nodeID int64) ([]NodeJob, e
 
 // NodeJob returns one job of a node.
 func (s *Store) NodeJob(ctx context.Context, nodeID int64, id string) (*NodeJob, error) {
+	if err := s.expireNetworkDiagnostics(ctx, nodeID); err != nil {
+		return nil, err
+	}
 	row := s.db.QueryRowContext(ctx, `SELECT id, node_id, kind, params_json, result_json, error, created_at, done_at FROM node_jobs WHERE node_id = ? AND id = ?`, nodeID, id)
 	j, err := scanNodeJob(row)
 	if errors.Is(err, sql.ErrNoRows) {

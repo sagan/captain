@@ -1,5 +1,6 @@
+import type { ResourceHost } from '../lib/resources'
 import { coreName } from '../lib/coreSelection'
-import { NumberInput, Switch, Accordion, ActionIcon, Badge, Button, Card, Code, Group, Modal, Progress, SimpleGrid, Stack, Table, Text, TextInput, Title, Autocomplete, Alert } from '@mantine/core'
+import { NumberInput, Switch, Accordion, ActionIcon, Badge, Button, Card, Code, Group, Modal, Stack, Table, Text, TextInput, Title, Autocomplete, Alert } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -21,7 +22,7 @@ import { IngressesCard, ingressPayload } from '../components/IngressesCard'
 import { OverridesCard } from '../components/OverridesCard'
 import { DeleteNodeModal } from '../components/DeleteNodeModal'
 
-interface Detail { traffic?: Record<string, { today: number; total: number }>; node: Node; inbounds: Inbound[]; ingresses?: Ingress[]; status: { host: Record<string, number> | null; cores: Record<string, { running: boolean; inbounds?: string[] }> | null; certs: CertStatus[] | null; doctor?: DoctorReport | null } | null }
+interface Detail { traffic?: Record<string, { today: number; total: number }>; node: Node; inbounds: Inbound[]; ingresses?: Ingress[]; status: { host: ResourceHost | null; cores: Record<string, { running: boolean; inbounds?: string[] }> | null; certs: CertStatus[] | null; doctor?: DoctorReport | null } | null }
 
 export default function NodePage() {
   const { id } = useParams()
@@ -53,7 +54,6 @@ export default function NodePage() {
   if (!d) return null
   const n = d.node
   const host = d.status?.host
-  const pct = (used?: number, total?: number) => (used && total ? Math.round((used / total) * 100) : 0)
   return (
     <>
       <DeleteNodeModal node={n} opened={deletingNode} onClose={() => setDeletingNode(false)} onDeleted={() => { qc.invalidateQueries({ queryKey: ['nodes'] }); nav('/nodes') }} />
@@ -65,7 +65,7 @@ export default function NodePage() {
       </>} />
 
       {!n.paired && n.pair_code && <Card mb="lg"><Title order={5} mb="sm">{t('nodes.pairTitle')}</Title><PairCodeBox code={n.pair_code} /></Card>}
-      {n.paired && <NodeProbeCard nodeID={n.id} />}
+      {n.paired && <NodeProbeCard key={n.id} nodeID={n.id} reportedHost={host} />}
       {d.status?.doctor && <DoctorCard report={d.status.doctor} />}
       {d.status?.certs && d.status.certs.length > 0 && (
         <Card mb="lg">
@@ -102,16 +102,6 @@ export default function NodePage() {
         </InfoGrid>
       </Card>
 
-      <Card mb="lg">
-        <Text size="sm" c="dimmed" fw={500} mb="xs">{t('nodes.host')}</Text>
-        {host && host.mem_total ? (
-          <SimpleGrid cols={{ base: 1, md: 3 }}>
-            <div><Group justify="space-between"><Text size="sm">{t('nodes.cpu')}</Text><Text size="sm">{Math.round(host.cpu_percent ?? 0)}%</Text></Group><Progress value={host.cpu_percent ?? 0} size="sm" /></div>
-            <div><Group justify="space-between"><Text size="sm">{t('nodes.mem')}</Text><Text size="sm">{bytes(host.mem_used)} / {bytes(host.mem_total)}</Text></Group><Progress value={pct(host.mem_used, host.mem_total)} size="sm" color="violet" /></div>
-            <div><Group justify="space-between"><Text size="sm">{t('nodes.disk')}</Text><Text size="sm">{bytes(host.disk_used)} / {bytes(host.disk_total)}</Text></Group><Progress value={pct(host.disk_used, host.disk_total)} size="sm" color="teal" /></div>
-          </SimpleGrid>
-        ) : <Text size="sm" c="dimmed">{t('nodes.noStatus')}</Text>}
-      </Card>
 
       <Card p={0}>
         <Group justify="space-between" p="md" pb="xs">

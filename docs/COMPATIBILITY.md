@@ -80,6 +80,7 @@ features it has never heard of, which the node page shows as an orange
 
 | Captain | needs bosun | for |
 |---|---|---|
+| 1.7.0 | ≥ 0.56.0 | resource detail, optional GPU, NIC selection, missing-data flags, network-quality attempt batches/timings and on-demand diagnostics; legacy summaries remain supported |
 | 1.6.0 | ≥ 0.55.0 | remote node removal: preserve as standalone or uninstall; record-only DELETE remains compatible |
 | 1.6.0 | ≥ 0.55.0 | core availability, automatic-selection preview and confirmed running assignments; older nodes retain protocol filtering with unknown availability |
 | 1.4 | ≥ 0.53.0 | DStatus active mode (nodes report to the panel under a per-node SID instead of being scraped) |
@@ -187,3 +188,47 @@ Revisit if any of these becomes true: the connection log is on for a fleet
 where reports plus log writes exceed ~50 % of the report interval; the
 hourly trim takes longer than a minute; or the file grows past ~20 GB. The
 scale test above is how to check.
+
+
+### Pending monitoring extension
+
+Captain 1.7.0 accepts existing bosun summaries unchanged.
+Per-NIC selection, detailed resources and explicit missing-data flags require
+bosun 0.56.0. The additions are `SystemStatus.valid/resources`
+and `Probe.resources`; old peers ignore these fields. Migration 54 adds
+valid sample counts and per-node monitoring configuration/counter baselines.
+Migration 55 adds private resource history and monitoring groups; migration 56
+adds network-quality aggregates and persistent attempt cursors. Additive
+`PingResult.quality` carries timestamped, sequenced attempts, classified outcomes,
+rolling statistics and optional phase timings. Optional
+`PingTask.tcp_reachability` preserves automatic line checks; newer nodes also
+recognize older Captains’ negative ingress task IDs for that policy. New agents retain the legacy
+ping fields. New Captain accepts old nodes without inventing missing quality
+measurements; an old Captain ignores the added detail and retains its original
+cached-result history semantics. Both peers must be upgraded for attempt-based
+history. The new admin read endpoint is
+`GET /api/admin/nodes/{id}/network-quality?range=24h`.
+
+
+Migration 57 adds alert lifecycle records, maintenance/silence windows and
+availability intervals on Captain only; it consumes existing beats without new
+agent fields. The existing settings/API fields remain compatible, with the
+additional public `availability` section. Acknowledgement and window APIs are new;
+existing `node.alert` payloads keep their fields and gain incident metadata.
+
+On-demand diagnostics add the `network_diagnostic` job kind using the existing
+state/report job envelopes. Captain only queues it for online bosun >= v0.56.0;
+older nodes retain all previous functionality. Both ends validate the same typed
+request and honor expiry. A retryable report error now covers failed job-result
+storage too. Download measurements gain optional `bytes`; legacy readers ignore
+it. The new standalone endpoint is `POST /api/diagnostics/network`; it is refused
+in managed mode. No existing job kind or management endpoint changes shape.
+
+Optional GPU collection adds `ResourceOptions.gpu` (default false) and
+`Resources.gpu` (state, sample epoch/sequence/time and nullable device metrics),
+requiring bosun 0.56.0. Older nodes continue without GPU data. The GPU cursor
+uses the existing JSON counter column; no additional migration is required.
+Device identities and detailed metrics stay private to management APIs.
+Probe settings and public snapshots gain an optional `appearance` object for
+bundled presets and color scheme. Omitted settings preserve existing values;
+this page-only feature has no bosun version requirement.

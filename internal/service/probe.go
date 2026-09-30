@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -32,15 +34,17 @@ type Probe struct {
 
 	started    time.Time // first CheckOffline; see the grace period there
 	alertMu    sync.Mutex
-	pending    []string
+	pending    []probeNotice
 	alertTimer *time.Timer
 	adminSend  func(ctx context.Context, text string) // tests
 
-	mu       sync.Mutex
-	live     map[int64]*Live
-	settings store.ProbeSettings
-	fetched  time.Time
-	gen      uint64 // bumped on every settings change; the snapshot cache keys on it
+	monitorMu    sync.Mutex
+	monitorEpoch string
+	mu           sync.Mutex
+	live         map[int64]*Live
+	settings     store.ProbeSettings
+	fetched      time.Time
+	gen          uint64 // bumped on every settings change; the snapshot cache keys on it
 }
 
 // Gen is the configuration generation (see Invalidate).
@@ -60,11 +64,12 @@ type Live struct {
 
 // Sample is one point of the in-memory sparkline ring.
 type Sample struct {
-	At      int64   `json:"t"`
-	CPU     float64 `json:"cpu"`
-	MemPct  float64 `json:"mem"`
-	NetUp   uint64  `json:"up"`
-	NetDown uint64  `json:"down"`
+	Valid   *spec.MetricValidity `json:"valid,omitempty"`
+	At      int64                `json:"t"`
+	CPU     float64              `json:"cpu"`
+	MemPct  float64              `json:"mem"`
+	NetUp   uint64               `json:"up"`
+	NetDown uint64               `json:"down"`
 }
 
 const ringMax = 720 // 1h at 5s, 2h at 10s
@@ -98,26 +103,30 @@ func (p *Probe) Invalidate() {
 func (p *Probe) Reset() {
 	p.mu.Lock()
 	p.live = nil
+	p.monitorEpoch = ""
 	p.settings = store.ProbeSettings{}
 	p.fetched, p.started = time.Time{}, time.Time{}
 	p.gen++
 	p.mu.Unlock()
-	p.alertMu.Lock()
-	if p.alertTimer != nil {
-		p.alertTimer.Stop()
-		p.alertTimer = nil
-	}
-	p.pending = nil
-	p.alertMu.Unlock()
+	p.discardPendingAlerts()
 }
 
 // AgentConfig is what a node receives in its state.
 func (p *Probe) AgentConfig(ctx context.Context, nodeID int64) *spec.Probe {
 	s := p.Settings(ctx)
+	var resources *spec.ResourceOptions
+	if np, err := p.Store.NodeProbe(ctx, nodeID); err == nil {
+		if np.Resources.GPU || len(np.Resources.IncludeInterfaces)+len(np.Resources.ExcludeInterfaces) > 0 {
+			resources = &np.Resources
+		}
+	}
 	if !s.Enabled {
+		if resources != nil {
+			return &spec.Probe{Resources: resources}
+		}
 		return nil
 	}
-	cfg := &spec.Probe{Enabled: true, BeatSeconds: s.BeatSeconds, CarrierPing: s.CarrierPing, Carriers: s.Carriers}
+	cfg := &spec.Probe{Resources: resources, Enabled: true, BeatSeconds: s.BeatSeconds, CarrierPing: s.CarrierPing, Carriers: s.Carriers}
 	tasks, _ := p.Store.ListPingTasks(ctx)
 	for _, t := range tasks {
 		if !t.Enabled {
@@ -156,7 +165,7 @@ func (p *Probe) AgentConfig(ctx context.Context, nodeID int64) *spec.Probe {
 			if port == 0 {
 				port = g.ProbePort()
 			}
-			cfg.Tasks = append(cfg.Tasks, spec.PingTask{ID: -g.ID, Name: g.Name, Type: "tcp", Target: net.JoinHostPort(g.LineIP, strconv.Itoa(port)), IntervalSeconds: 30, SourceIP: g.BindIP})
+			cfg.Tasks = append(cfg.Tasks, spec.PingTask{ID: -g.ID, Name: g.Name, Type: "tcp", Target: net.JoinHostPort(g.LineIP, strconv.Itoa(port)), IntervalSeconds: 30, SourceIP: g.BindIP, TCPReachability: true})
 		}
 	}
 	return cfg
@@ -169,6 +178,13 @@ func (p *Probe) Record(ctx context.Context, n *domain.Node, version string, host
 		return nil
 	}
 	p.mu.Lock()
+	if err := p.Store.RecordBeat(ctx, n.ID, host, at); err != nil {
+		p.mu.Unlock()
+		if errors.Is(err, store.ErrStaleBeat) {
+			return nil
+		}
+		return err
+	}
 	if p.live == nil {
 		p.live = map[int64]*Live{}
 	}
@@ -177,72 +193,121 @@ func (p *Probe) Record(ctx context.Context, n *domain.Node, version string, host
 		l = &Live{}
 		p.live[n.ID] = l
 	}
-	wasOffline := !l.At.IsZero() && at.Sub(l.At) > time.Duration(s.Alerts.OfflineSeconds)*time.Second
+	host = store.MonitorSnapshot(host, at)
 	l.Host, l.At, l.Version = host, at, version
 	memPct := 0.0
 	if host.MemTotal > 0 {
 		memPct = float64(host.MemUsed) * 100 / float64(host.MemTotal)
 	}
-	l.Ring = append(l.Ring, Sample{At: at.Unix(), CPU: host.CPUPercent, MemPct: memPct, NetUp: host.NetUp, NetDown: host.NetDown})
+	l.Ring = append(l.Ring, Sample{Valid: host.Valid, At: at.Unix(), CPU: host.CPUPercent, MemPct: memPct, NetUp: host.NetUp, NetDown: host.NetDown})
 	if len(l.Ring) > ringMax {
 		l.Ring = l.Ring[len(l.Ring)-ringMax:]
 	}
 	p.mu.Unlock()
-	if err := p.Store.RecordBeat(ctx, n.ID, host, at); err != nil {
+	p.monitorMu.Lock()
+	defer p.monitorMu.Unlock()
+	s = p.Settings(ctx)
+	if !s.Enabled {
+		return nil
+	}
+	if err := p.Store.ObserveAvailability(ctx, n.ID, p.observationEpoch(), at, at, time.Duration(s.Alerts.OfflineSeconds)*time.Second); err != nil {
 		return err
 	}
-	if wasOffline {
-		_ = p.Store.ClearAlert(ctx, n.ID, "offline")
-		p.notify(ctx, n, "recovered", "✅ "+n.Name+" is back online")
-	}
-	p.thresholds(ctx, n, s, at)
+	p.incident(ctx, n, store.IncidentCheck{Kind: "offline", Threshold: float64(s.Alerts.OfflineSeconds)}, at, "")
+	p.thresholds(ctx, n, s, &host, at)
 	return nil
 }
 
-func (p *Probe) thresholds(ctx context.Context, n *domain.Node, s store.ProbeSettings, at time.Time) {
+func (p *Probe) observationEpoch() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.monitorEpoch == "" {
+		p.monitorEpoch = rand.Text()
+	}
+	return p.monitorEpoch
+}
+
+func (p *Probe) incident(ctx context.Context, n *domain.Node, c store.IncidentCheck, at time.Time, text string) {
+	notice, err := p.Store.CheckIncident(ctx, n.ID, c, at)
+	if err != nil {
+		if p.Log != nil {
+			p.Log.Error("monitor incident", "node", n.ID, "kind", c.Kind, "err", err)
+		}
+		return
+	}
+	if notice == nil {
+		return
+	}
+	kind := c.Kind
+	if notice.Recovered {
+		kind = "recovered"
+		if c.Kind != "offline" {
+			kind = c.Kind + "_recovered"
+		}
+		text = fmt.Sprintf("✅ %s: %s recovered", notify.Escape(n.Name), c.Kind)
+	} else if strings.HasPrefix(kind, "traffic") {
+		kind = "traffic"
+	}
+	p.notify(ctx, n, kind, text, notice)
+}
+
+func (p *Probe) thresholds(ctx context.Context, n *domain.Node, s store.ProbeSettings, host *spec.SystemStatus, at time.Time) {
 	window := time.Duration(s.Alerts.WindowMinutes) * time.Minute
 	for _, m := range []struct {
 		kind  string
 		limit int
 	}{{"cpu", s.Alerts.CPUPct}, {"mem", s.Alerts.MemPct}, {"disk", s.Alerts.DiskPct}} {
+		c := store.IncidentCheck{Kind: m.kind, Threshold: float64(m.limit)}
 		if m.limit <= 0 {
+			c.Resolution = "disabled"
+			p.incident(ctx, n, c, at, "")
+			continue
+		}
+		if host == nil {
+			continue
+		}
+		valid := host.Validity()
+		if (m.kind == "cpu" && !valid.CPU) || (m.kind == "mem" && !valid.Memory) || (m.kind == "disk" && !valid.Disk) {
 			continue
 		}
 		avg, ok := p.Store.SustainedAverage(ctx, n.ID, m.kind, window, at)
-		if !ok || avg < float64(m.limit) {
+		if !ok {
 			continue
 		}
-		if fire, _ := p.Store.AlertOnce(ctx, n.ID, m.kind, time.Hour, at); fire {
-			p.notify(ctx, n, m.kind, fmt.Sprintf("⚠️ %s: %s at %.0f%% over the last %d min (limit %d%%)", n.Name, strings.ToUpper(m.kind), avg, s.Alerts.WindowMinutes, m.limit))
-		}
+		c.Value = avg
+		c.Active = avg >= float64(m.limit)
+		p.incident(ctx, n, c, at, fmt.Sprintf("⚠️ %s: %s at %.0f%% over the last %d min (limit %d%%)", notify.Escape(n.Name), strings.ToUpper(m.kind), avg, s.Alerts.WindowMinutes, m.limit))
 	}
-	if s.Alerts.Traffic {
-		np, err := p.Store.NodeProbe(ctx, n.ID)
-		if err == nil && np.LimitBytes > 0 {
-			pct := np.Billed() * 100 / np.LimitBytes
-			for _, th := range []int64{80, 100} {
-				if pct >= th {
-					if fire, _ := p.Store.AlertOnce(ctx, n.ID, fmt.Sprintf("traffic%d", th), 30*24*time.Hour, at); fire {
-						p.notify(ctx, n, "traffic", fmt.Sprintf("📶 %s: monthly traffic at %d%% (%s of %s)", n.Name, pct, gb(np.Billed()), gb(np.LimitBytes)))
-					}
-				}
-			}
+	np, err := p.Store.NodeProbe(ctx, n.ID)
+	if err != nil {
+		return
+	}
+	for _, th := range []int64{80, 100} {
+		c := store.IncidentCheck{Kind: fmt.Sprintf("traffic%d", th), Threshold: float64(th)}
+		if !s.Alerts.Traffic || np.LimitBytes <= 0 {
+			c.Resolution = "disabled"
+			p.incident(ctx, n, c, at, "")
+			continue
 		}
+		c.Value = float64(np.Billed()) * 100 / float64(np.LimitBytes)
+		c.Active = c.Value >= float64(th)
+		p.incident(ctx, n, c, at, fmt.Sprintf("📶 %s: monthly traffic at %.0f%% (%s of %s)", notify.Escape(n.Name), c.Value, gb(np.Billed()), gb(np.LimitBytes)))
 	}
 }
 
-// CheckOffline raises one notice per node that stopped beating.
+// CheckOffline evaluates persisted incidents as well as liveness. A process
+// restart grants a new offline grace; pending incidents remain in the database.
 func (p *Probe) CheckOffline(ctx context.Context, at time.Time) {
+	p.monitorMu.Lock()
+	defer p.monitorMu.Unlock()
 	s := p.Settings(ctx)
 	if !s.Enabled {
+		if err := p.Store.DisableMonitoring(ctx, at); err != nil && p.Log != nil {
+			p.Log.Error("disable monitoring", "err", err)
+		}
 		return
 	}
 	grace := time.Duration(s.Alerts.OfflineSeconds) * time.Second
-	// A panel restart leaves every node's last_seen_at as old as the
-	// downtime: give the nodes one grace period to beat again before
-	// anything counts as offline, or a restart that took longer than the
-	// grace period alerts on the whole fleet (and then the 24 h
-	// AlertOnce window swallows the real outages).
 	p.mu.Lock()
 	if p.started.IsZero() {
 		p.started = at
@@ -256,34 +321,76 @@ func (p *Probe) CheckOffline(ctx context.Context, at time.Time) {
 	if err != nil {
 		return
 	}
+	epoch := p.observationEpoch()
 	for _, n := range nodes {
 		if !n.Paired || n.LastSeenAt == nil {
 			continue
 		}
 		last := *n.LastSeenAt
-		if l, ok := p.Live(n.ID); ok && l.At.After(last) {
-			last = l.At
+		live, ok := p.Live(n.ID)
+		if ok && live.At.After(last) {
+			last = live.At
 		}
-		if at.Sub(last) <= grace {
+		if err = p.Store.ObserveAvailability(ctx, n.ID, epoch, at, last, grace); err != nil {
+			if p.Log != nil {
+				p.Log.Error("availability", "node", n.ID, "err", err)
+			}
 			continue
 		}
-		if fire, _ := p.Store.AlertOnce(ctx, n.ID, "offline", 24*time.Hour, at); fire {
-			p.notify(ctx, n, "offline", fmt.Sprintf("🔴 %s is offline (last seen %s ago)", n.Name, at.Sub(last).Round(time.Minute)))
+		offline := at.Sub(last) > grace
+		p.incident(ctx, n, store.IncidentCheck{Kind: "offline", Active: offline, Value: at.Sub(last).Seconds(), Threshold: grace.Seconds()}, at, fmt.Sprintf("🔴 %s is offline (last seen %s ago)", notify.Escape(n.Name), at.Sub(last).Round(time.Minute)))
+		var host *spec.SystemStatus
+		if !offline && ok && at.Sub(live.At) <= max(90*time.Second, time.Duration(s.BeatSeconds*2)*time.Second) {
+			host = &live.Host
 		}
+		p.thresholds(ctx, n, s, host, at)
 	}
 }
 
-func (p *Probe) notify(ctx context.Context, n *domain.Node, kind, text string) {
+// MonitoringDisabled is called immediately when the collection switch is saved.
+func (p *Probe) MonitoringDisabled(ctx context.Context, at time.Time) error {
+	p.monitorMu.Lock()
+	defer p.monitorMu.Unlock()
+	p.mu.Lock()
+	p.started = time.Time{}
+	p.monitorEpoch = ""
+	p.mu.Unlock()
+	p.discardPendingAlerts()
+	return p.Store.DisableMonitoring(ctx, at)
+}
+
+func (p *Probe) notify(ctx context.Context, n *domain.Node, kind, text string, incidents ...*store.IncidentNotice) {
 	if p.Notify == nil {
 		return
 	}
-	p.Notify.Event(ctx, webhook.NodeAlert, map[string]any{"node_id": n.ID, "node": n.Name, "kind": kind, "message": text})
-	p.queueAdmin(text)
+	data := map[string]any{"node_id": n.ID, "node": n.Name, "kind": kind, "message": text}
+	if len(incidents) > 0 {
+		data["incident_id"] = incidents[0].ID
+		data["alert_kind"] = incidents[0].Kind
+		data["recovered"] = incidents[0].Recovered
+	}
+	p.Notify.Event(ctx, webhook.NodeAlert, data)
+	p.queueAdmin(text, n.ID)
+}
+
+func (p *Probe) discardPendingAlerts() {
+	p.alertMu.Lock()
+	defer p.alertMu.Unlock()
+	if p.alertTimer != nil {
+		p.alertTimer.Stop()
+		p.alertTimer = nil
+	}
+	p.pending = nil
 }
 
 // queueAdmin collects operator notices for AlertWindow and sends them as
 // one message.
-func (p *Probe) queueAdmin(text string) {
+type probeNotice struct {
+	Text   string
+	NodeID int64
+}
+
+func (p *Probe) queueAdmin(text string, nodeID int64) {
 	send := p.adminSend
 	if send == nil {
 		send = p.Notify.Admin
@@ -298,13 +405,26 @@ func (p *Probe) queueAdmin(text string) {
 	}
 	p.alertMu.Lock()
 	defer p.alertMu.Unlock()
-	p.pending = append(p.pending, text)
+	p.pending = append(p.pending, probeNotice{Text: text, NodeID: nodeID})
 	if p.alertTimer == nil {
 		p.alertTimer = time.AfterFunc(window, func() {
 			p.alertMu.Lock()
-			lines := p.pending
+			pending := p.pending
 			p.pending, p.alertTimer = nil, nil
 			p.alertMu.Unlock()
+			lines := []string{}
+			if p.Store != nil && !p.Settings(context.Background()).Enabled {
+				return
+			}
+			for _, n := range pending {
+				if p.Store != nil {
+					muted, err := p.Store.MonitorMuted(context.Background(), n.NodeID, time.Now())
+					if err != nil || muted {
+						continue
+					}
+				}
+				lines = append(lines, n.Text)
+			}
 			switch len(lines) {
 			case 0:
 			case 1:

@@ -63,6 +63,45 @@ func (h *handlers) putProbe(w http.ResponseWriter, r *http.Request) {
 		carriers = append(carriers, c)
 	}
 	v.Carriers = carriers
+	var old store.ProbeSettings
+	_ = h.Store.GetSetting(r.Context(), store.SettingProbe, &old)
+	if v.Appearance == nil {
+		v.Appearance = old.Appearance
+	}
+	if v.Appearance != nil {
+		v.Appearance.Normalize()
+		if !v.Appearance.Valid() {
+			fail(w, 400, "invalid page appearance")
+			return
+		}
+	}
+	if v.PageEnabled == nil {
+		v.PageEnabled = old.PageEnabled
+	}
+	if v.PublicSections == nil {
+		v.PublicSections = old.PublicSections
+	}
+	if v.Layout == "" {
+		v.Layout = old.Layout
+	}
+	if v.Layout != "" && v.Layout != "grid" && v.Layout != "compact" {
+		fail(w, 400, "invalid page layout")
+		return
+	}
+	if v.PublicSections != nil {
+		if len(*v.PublicSections) > 10 {
+			fail(w, 400, "invalid public sections")
+			return
+		}
+		for _, section := range *v.PublicSections {
+			switch section {
+			case "cpu", "memory", "disk", "network", "system", "info", "traffic", "latency", "history", "availability":
+			default:
+				fail(w, 400, "invalid public section")
+				return
+			}
+		}
+	}
 	v.Normalize()
 	if err := h.Store.SetSetting(r.Context(), store.SettingProbe, v); err != nil {
 		serverErr(w, err)
@@ -70,6 +109,12 @@ func (h *handlers) putProbe(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.Probe != nil {
 		h.Probe.Invalidate()
+		if !v.Enabled {
+			if err := h.Probe.MonitoringDisabled(r.Context(), time.Now()); err != nil {
+				serverErr(w, err)
+				return
+			}
+		}
 	}
 	if h.SubLinks != nil {
 		h.SubLinks.Invalidate()
@@ -103,6 +148,10 @@ func (h *handlers) savePingTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if t.IntervalSeconds < 5 {
 		t.IntervalSeconds = 30
+	}
+	if err := (spec.PingTask{Name: t.Name, Type: t.Type, Target: t.Target}).Validate(); err != nil {
+		fail(w, 400, err.Error())
+		return
 	}
 	t.ID = idOf(r)
 	if err := h.Store.SavePingTask(r.Context(), &t); err != nil {
@@ -142,11 +191,18 @@ func (h *handlers) putNodeProbe(w http.ResponseWriter, r *http.Request) {
 		LimitBytes int64
 		ResetDay   int
 		Mode       string
+		Resources  *spec.ResourceOptions
 	}
 	if !readJSON(w, r, &in) {
 		return
 	}
-	if err := h.Store.UpdateNodeProbe(r.Context(), idOf(r), in.Hidden, in.Info, in.LimitBytes, in.ResetDay, in.Mode); err != nil {
+	if in.Resources != nil {
+		if err := in.Resources.Validate(); err != nil {
+			fail(w, http.StatusBadRequest, "invalid network interface selection")
+			return
+		}
+	}
+	if err := h.Store.UpdateNodeProbe(r.Context(), idOf(r), in.Hidden, in.Info, in.LimitBytes, in.ResetDay, in.Mode, in.Resources); err != nil {
 		serverErr(w, err)
 		return
 	}

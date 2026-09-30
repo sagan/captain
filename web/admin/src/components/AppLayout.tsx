@@ -21,6 +21,7 @@ const languages = [
 const sections = [
   { key: 'workspace', items: [
     { to: '/', key: 'dashboard', icon: IconLayoutDashboard },
+    { to: '/monitoring', key: 'monitoring', icon: IconGauge },
     { to: '/nodes', key: 'nodes', icon: IconServer },
     { to: '/entries', key: 'entries', icon: IconRoute },
     { to: '/external', key: 'external', icon: IconCloudDownload },

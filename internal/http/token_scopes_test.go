@@ -4,9 +4,42 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/zeptop-dev/captain/internal/http/admin"
+	"slices"
 	"strings"
 	"testing"
 )
+
+func TestTokenScopeCatalogUsesAdminAuthorization(t *testing.T) {
+	r := newRig(t)
+	c := &client{t: t, srv: r.srv}
+	const path = "/api/admin/tokens/scopes"
+	if code, _, _ := c.do("GET", path, nil, nil); code != 401 {
+		t.Fatalf("anonymous catalog: %d", code)
+	}
+	code, b, _ := r.c.do("GET", path, nil, nil)
+	if code != 200 {
+		t.Fatalf("staff catalog: %d %s", code, b)
+	}
+	resources := mustJSON[[]string](t, b)
+	for _, resource := range []string{"users", "nodes", "config-presets"} {
+		if !slices.Contains(resources, resource) {
+			t.Fatalf("catalog missing %q", resource)
+		}
+	}
+	for _, grant := range []string{"users:read", "tokens:read"} {
+		token, _, err := r.st.CreateAPIToken(context.Background(), 1, "catalog", "read", nil, []string{grant})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := 403
+		if grant == "tokens:read" {
+			want = 200
+		}
+		if code, _, _ := c.do("GET", path, nil, map[string]string{"Authorization": "Bearer " + token}); code != want {
+			t.Fatalf("catalog grant %s: got %d want %d", grant, code, want)
+		}
+	}
+}
 
 func TestResourceTokenScopesApplyToRESTAndMCP(t *testing.T) {
 	r := newRig(t)

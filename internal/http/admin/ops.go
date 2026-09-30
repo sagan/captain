@@ -210,6 +210,9 @@ func (h *handlers) registerOps(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/admin/users/{id}/subscriptions/{sid}", h.requireAdmin(h.cancelQueuedSub))
 	mux.HandleFunc("GET /api/admin/renewals", h.requireAdmin(h.renewals))
 	mux.HandleFunc("GET /api/admin/tokens", h.requireAdmin(h.listTokens))
+	mux.HandleFunc("GET /api/admin/tokens/scopes", h.requireAdmin(func(w http.ResponseWriter, r *http.Request) {
+		ok(w, store.TokenResources)
+	}))
 	mux.HandleFunc("POST /api/admin/tokens", h.requireAdmin(h.createToken))
 	mux.HandleFunc("DELETE /api/admin/tokens/{id}", h.requireAdmin(h.deleteToken))
 	mux.HandleFunc("POST /api/admin/2fa/setup", h.requireAdmin(h.totpSetup))

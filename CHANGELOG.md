@@ -6,6 +6,8 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Version and updates).
 
+- **v1.8.1** (2026-09-30) — Register the authenticated token-resource catalog used by the permission editor; v1.8.0 returned HTTP 405 and left the suggested grants empty. Add route and authorization regression coverage. Keep the asset node selector full-width on small screens and align its import button with the input on desktop.
+
 - **v1.8.0** (2026-09-30) — Make traffic receipts, customer accounting and node totals atomic, with epoch-aware deduplication and legacy node support. Add resource/action and exact-endpoint API token grants shared by REST and MCP. Add composable user filters, saved table preferences, bounded previewed bulk operations with retry-safe results, and private user/node metadata.
   - Add staff Passkeys with configured RP/origin, single-use session-bound enrollment, required user verification, password/TOTP reauthentication and existing TOTP retained at login. Add named subscription templates and per-user/default presentation profiles, controlled headers, HWID overrides and an optional escaped subscription page without changing access entitlements.
   - Add typed inbound/outbound/route preset libraries with diff and impact previews, fresh inbound server keys, core validation and route-graph checks. Add administrator-only suppliers, node assets, calendar billing, immutable idempotent payment records, currency-separated totals and daily renewal reminders. Migrations 58–64 preserve account-ID references and site-reset behavior.

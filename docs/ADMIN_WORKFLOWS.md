@@ -188,3 +188,5 @@ API lives under `/api/admin/settings/infrastructure`: supplier/asset CRUD,
 `POST /assets/{id}/payments`, and paginated `GET /payments` (100 rows per page,
 `offset` and optional `asset_id`). A payment requires `request_key`, `revision`,
 `amount_minor` and `paid_date`; optional `reference` and `notes` are retained.
+
+The token editor obtains its permission suggestions from `GET /api/admin/tokens/scopes` (fixed in Captain v1.8.1). It requires an authenticated staff session or a token with read access to the token resource; the catalog grants no additional permission.

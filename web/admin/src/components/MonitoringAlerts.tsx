@@ -8,13 +8,17 @@ import { useAuth } from '../lib/auth'
 import { toast } from '../lib/notify'
 import type { MonitorNode } from '../lib/monitoring'
 import { AvailabilityCard } from './AvailabilityCard'
+import { useURLChoice } from '../lib/use-url-choice'
 interface Incident { id: number; node_id: number; node: string; kind: string; started_at: number; updated_at: number; ended_at: number | null; resolution: string; value: number; threshold: number; acknowledged_at: number; acknowledged_by: string }
 interface MonitorWindow { id: number; node_id: number | null; kind: string; starts_at: number; ends_at: number; note: string; canceled_at: number | null }
 const date = (v: number) => new Date(v * 1000).toLocaleString()
 export function MonitoringAlerts({ nodes }: { nodes: MonitorNode[] }) {
  const { t } = useTranslation(), qc = useQueryClient(), { me } = useAuth()
  const admin = me?.role === 'admin'
- const [node, setNode] = useState<string | null>(null), [state, setState] = useState<string | null>('open'), [before, setBefore] = useState(0)
+ const [nodeChoice, setNodeChoice] = useURLChoice('node', ['all', ...nodes.map(n => String(n.id))], 'all')
+ const node = nodeChoice === 'all' ? null : nodeChoice
+ const setNode = (value: string | null) => setNodeChoice(value ?? 'all')
+ const [state, setState] = useState<string | null>('open'), [before, setBefore] = useState(0)
  const [scope, setScope] = useState<string | null>('all'), [kind, setKind] = useState<string | null>('maintenance')
  const [immediate, setImmediate] = useState(true), [start, setStart] = useState(''), [minutes, setMinutes] = useState<number | string>(60), [note, setNote] = useState('')
  const q = useQuery({ queryKey: ['monitor-incidents', node, state, before], queryFn: () => api.get<{ items: Incident[]; next: number }>(`/api/admin/monitoring/incidents?state=${state ?? ''}&before=${before || ''}&node_id=${node ?? ''}`), refetchInterval: 30_000 })
@@ -33,7 +37,7 @@ export function MonitoringAlerts({ nodes }: { nodes: MonitorNode[] }) {
    <Group grow align="flex-start"><Select label={t('alerts.node')} placeholder={t('alerts.allNodes')} clearable searchable data={options} value={node} onChange={(v) => { setNode(v); setBefore(0) }} /><Select label={t('alerts.state')} value={state} onChange={(v) => { setState(v); setBefore(0) }} allowDeselect={false} data={['open', 'acknowledged', 'resolved', ''].map((value) => ({ value, label: t(`alerts.states.${value || 'all'}`) }))} /></Group>
    {q.isLoading && <Loader size="sm" />}{q.isError && <Alert color="red">{t('alerts.error')}</Alert>}
    <Table.ScrollContainer minWidth={850}><Table striped><Table.Thead><Table.Tr>{['node', 'kind', 'state', 'started', 'ended', 'value', 'ack'].map((k) => <Table.Th key={k}>{t(`alerts.${k}`)}</Table.Th>)}</Table.Tr></Table.Thead><Table.Tbody>{q.data?.items.map((i) => <Table.Tr key={i.id}>
-    <Table.Td><Text component={Link} to={`/nodes/${i.node_id}`} size="sm">{i.node}</Text></Table.Td><Table.Td>{t(`alerts.kinds.${i.kind}`)}</Table.Td>
+    <Table.Td><Text component={Link} to={`/nodes/${i.node_id}`} size="sm">{i.node}</Text>{admin && <Button component={Link} to={`/nodes/${i.node_id}#diagnostics`} size="compact-xs" variant="subtle">{t('diagnostics.title')}</Button>}</Table.Td><Table.Td>{t(`alerts.kinds.${i.kind}`)}</Table.Td>
     <Table.Td><Badge color={i.ended_at ? 'gray' : i.acknowledged_at ? 'orange' : 'red'}>{t(`alerts.states.${i.ended_at ? 'resolved' : i.acknowledged_at ? 'acknowledged' : 'open'}`)}</Badge>{i.resolution && <Text size="xs" c="dimmed">{t(`alerts.resolutions.${i.resolution}`)}</Text>}</Table.Td>
     <Table.Td><Text size="xs">{date(i.started_at)}</Text></Table.Td><Table.Td><Text size="xs">{i.ended_at ? date(i.ended_at) : '—'}</Text></Table.Td><Table.Td><Text size="xs">{i.value.toFixed(1)} / {i.threshold.toFixed(1)} {i.kind === 'offline' ? 's' : '%'}</Text></Table.Td>
     <Table.Td>{i.acknowledged_at ? <><Text size="xs">{i.acknowledged_by}</Text><Text size="xs" c="dimmed">{date(i.acknowledged_at)}</Text></> : !i.ended_at ? <Button size="compact-xs" variant="light" loading={ack.isPending && ack.variables === i.id} onClick={() => ack.mutate(i.id)}>{t('alerts.ack')}</Button> : '—'}</Table.Td>

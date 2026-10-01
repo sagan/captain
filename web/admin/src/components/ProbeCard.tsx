@@ -1,5 +1,7 @@
+import { SettingsFields } from './SettingsFields'
+import { SettingsLoadState } from './SettingsLoadState'
 import { ActionIcon, Button, Card, Code, Group, MultiSelect, NumberInput, Select, Stack, Switch, Table, Text, TextInput, Title, Textarea } from '@mantine/core'
-import { useForm } from '@mantine/form'
+import { useSettingsForm as useForm } from '../lib/settings-draft'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
@@ -22,66 +24,68 @@ export function ProbeCard() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['probe-settings'], queryFn: () => api.get<ProbeSettings>('/api/admin/settings/probe') })
   const form = useForm<ProbeSettings & { hostsText: string; carriersText: string }>({ initialValues: { appearance: { preset: 'inherit', scheme: 'inherit' }, enabled: false, page_enabled: true, public_sections: ['cpu', 'memory', 'disk', 'network', 'system', 'info', 'traffic', 'latency', 'history', 'availability'], layout: 'grid', beat_seconds: 10, carrier_ping: true, carriersText: '', path: '/status', hosts: [], hostsText: '', visibility: 'public', title: '', logo: '', show_globe: false, show_ip: false, alerts: { offline_seconds: 180, cpu_pct: 0, mem_pct: 0, disk_pct: 0, window_minutes: 5, traffic: true } } })
-  useEffect(() => { if (q.data) form.setValues({ ...q.data, appearance: q.data.appearance ?? { preset: 'inherit', scheme: 'inherit' }, public_sections: q.data.public_sections ?? ['cpu', 'memory', 'disk', 'network', 'system', 'info', 'traffic', 'latency', 'history', 'availability'], layout: q.data.layout || 'grid', page_enabled: q.data.page_enabled ?? true, hostsText: (q.data.hosts ?? []).join(', '), carriersText: (q.data.carriers ?? []).map((c) => `${c.name} ${c.addr}`).join('\n') }) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (q.data) form.hydrate({ ...q.data, appearance: q.data.appearance ?? { preset: 'inherit', scheme: 'inherit' }, public_sections: q.data.public_sections ?? ['cpu', 'memory', 'disk', 'network', 'system', 'info', 'traffic', 'latency', 'history', 'availability'], layout: q.data.layout || 'grid', page_enabled: q.data.page_enabled ?? true, hostsText: (q.data.hosts ?? []).join(', '), carriersText: (q.data.carriers ?? []).map((c) => `${c.name} ${c.addr}`).join('\n') }) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
   const parseCarriers = (text: string) => text.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const [name, ...rest] = l.split(/[\s,=]+/); return { name, addr: rest.join('') } })
-  const save = useMutation({ mutationFn: (v: ProbeSettings & { hostsText: string; carriersText: string }) => api.put('/api/admin/settings/probe', { ...v, hosts: v.hostsText.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean), carriers: parseCarriers(v.carriersText) }), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['probe-settings'] }) }, onError: toast.err })
+  const save = useMutation({ mutationFn: (v: ProbeSettings & { hostsText: string; carriersText: string }) => api.put('/api/admin/settings/probe', { ...v, hosts: v.hostsText.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean), carriers: parseCarriers(v.carriersText) }), onSuccess: () => { form.resetDirty(); toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['probe-settings'] }) }, onError: toast.err })
   const v = form.values
   const origin = window.location.origin
+  if (q.data === undefined) return <SettingsLoadState query={q} />
   return (
     <Card>
       <Title order={5} mb="xs">{t('probe.title')}</Title>
       <Text size="xs" c="dimmed" mb="sm">{t('probe.hint')}</Text>
       <form onSubmit={form.onSubmit((vals) => save.mutate(vals))}><Stack gap="sm">
-        <Group grow align="flex-end">
+        <SettingsFields>
           <Switch label={t('probe.collection')} {...form.getInputProps('enabled', { type: 'checkbox' })} />
           <NumberInput label={t('probe.beat')} min={3} max={300} {...form.getInputProps('beat_seconds')} />
           <Switch label={t('probe.carrier')} {...form.getInputProps('carrier_ping', { type: 'checkbox' })} />
-        </Group>
+        </SettingsFields>
         <Switch label={t('probe.pageEnabled')} description={t('probe.pageEnabledHint')} {...form.getInputProps('page_enabled', { type: 'checkbox' })} />
         {v.carrier_ping && <Textarea label={t('probe.carriers')} description={t('probe.carriersHint')} autosize minRows={2} placeholder={'CT ct.tz.cloudcpp.com:80\nCU cu.tz.cloudcpp.com:80\nCM cm.tz.cloudcpp.com:80'} styles={{ input: { fontFamily: 'monospace', fontSize: 12 } }} {...form.getInputProps('carriersText')} />}
-        <Group grow align="flex-end">
+        <SettingsFields>
           <TextInput label={t('probe.path')} description={t('probe.pathHint')} placeholder="/status" {...form.getInputProps('path')} />
           <TextInput label={t('probe.hosts')} description={t('probe.hostsHint')} placeholder="status.example.com, probes.example.com" {...form.getInputProps('hostsText')} />
-        </Group>
+        </SettingsFields>
         {v.enabled && v.page_enabled && <Text size="xs" c="dimmed">{t('probe.urls')}: {v.path && <Code>{origin}{v.path.replace(/\/+$/, '')}/</Code>} {v.hostsText.split(/[,\s]+/).filter(Boolean).map((h) => <Code key={h} ml={4}>https://{h}/</Code>)}</Text>}
-        <Group grow align="flex-end">
+        <SettingsFields>
           <Select label={t('probe.visibility')} data={[{ value: 'public', label: t('probe.vis.public') }, { value: 'users', label: t('probe.vis.users') }, { value: 'admins', label: t('probe.vis.admins') }]} allowDeselect={false} {...form.getInputProps('visibility')} />
           <Switch label={t('probe.showIP')} {...form.getInputProps('show_ip', { type: 'checkbox' })} />
           <Switch label={t('probe.showGlobe')} {...form.getInputProps('show_globe', { type: 'checkbox' })} />
-        </Group>
-        <Group grow>
+        </SettingsFields>
+        <SettingsFields>
           <TextInput label={t('probe.pageTitle')} placeholder={t('probe.pageTitleHint')} {...form.getInputProps('title')} />
           <TextInput label={t('probe.logo')} placeholder="https://…/logo.png" {...form.getInputProps('logo')} />
-        </Group>
+        </SettingsFields>
         <MultiSelect label={t('monitoring.publicSections')} description={t('monitoring.publicHint')} data={['cpu', 'memory', 'disk', 'network', 'system', 'info', 'traffic', 'latency', 'history', 'availability'].map((value) => ({ value, label: t(`monitoring.sections.${value}`) }))} {...form.getInputProps('public_sections')} />
         <Select label={t('monitoring.layout')} data={['grid', 'compact'].map((value) => ({ value, label: t(`monitoring.layouts.${value}`) }))} allowDeselect={false} {...form.getInputProps('layout')} />
         <ProbeAppearanceFields value={v.appearance} onChange={(a) => form.setFieldValue('appearance', a)} />
         <Text size="sm" fw={600} mt="xs">{t('probe.alerts')}</Text>
-        <Group grow align="flex-end">
+        <SettingsFields>
           <NumberInput label={t('probe.offline')} min={30} {...form.getInputProps('alerts.offline_seconds')} />
           <NumberInput label="CPU %" min={0} max={100} {...form.getInputProps('alerts.cpu_pct')} />
           <NumberInput label={t('probe.memPct')} min={0} max={100} {...form.getInputProps('alerts.mem_pct')} />
           <NumberInput label={t('probe.diskPct')} min={0} max={100} {...form.getInputProps('alerts.disk_pct')} />
           <NumberInput label={t('probe.window')} min={1} {...form.getInputProps('alerts.window_minutes')} />
           <Switch label={t('probe.trafficAlert')} mb={6} {...form.getInputProps('alerts.traffic', { type: 'checkbox' })} />
-        </Group>
+        </SettingsFields>
         <Group justify="flex-end"><Button type="submit" size="xs" loading={save.isPending}>{t('common.save')}</Button></Group>
       </Stack></form>
-      <PingTasks />
+
     </Card>
   )
 }
 
-function PingTasks() {
+export function PingTasks() {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['ping-tasks'], queryFn: () => api.get<PingTask[]>('/api/admin/ping-tasks') })
   const nodes = useQuery({ queryKey: ['nodes'], queryFn: () => api.get<Node[]>('/api/admin/nodes') })
   const [adding, setAdding] = useState(false)
   const form = useForm({ initialValues: { Name: '', Type: 'tcp', Target: '', IntervalSeconds: 30, NodeIDs: [] as string[] } })
-  const save = useMutation({ mutationFn: (v: typeof form.values) => api.post('/api/admin/ping-tasks', { name: v.Name, type: v.Type, target: v.Target, interval_seconds: v.IntervalSeconds, node_ids: v.NodeIDs.map(Number), enabled: true }), onSuccess: () => { toast.ok(t('common.saved')); form.reset(); setAdding(false); qc.invalidateQueries({ queryKey: ['ping-tasks'] }) }, onError: toast.err })
+  const save = useMutation({ mutationFn: (v: typeof form.values) => api.post('/api/admin/ping-tasks', { name: v.Name, type: v.Type, target: v.Target, interval_seconds: v.IntervalSeconds, node_ids: v.NodeIDs.map(Number), enabled: true }), onSuccess: () => { form.resetDirty(); toast.ok(t('common.saved')); form.reset(); setAdding(false); qc.invalidateQueries({ queryKey: ['ping-tasks'] }) }, onError: toast.err })
   const toggle = useMutation({ mutationFn: (tk: PingTask) => api.patch(`/api/admin/ping-tasks/${tk.id}`, { ...tk, node_ids: tk.node_ids ?? [], enabled: !tk.enabled }), onSuccess: () => qc.invalidateQueries({ queryKey: ['ping-tasks'] }), onError: toast.err })
   const del = useMutation({ mutationFn: (id: number) => api.del(`/api/admin/ping-tasks/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: ['ping-tasks'] }), onError: toast.err })
+  if (q.data === undefined) return <SettingsLoadState query={q} />
   return (
     <Stack gap="xs" mt="lg">
       <Group justify="space-between"><Text size="sm" fw={600}>{t('probe.tasks')}</Text><Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={() => setAdding((a) => !a)}>{t('probe.addTask')}</Button></Group>

@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import { AppLayout } from './components/AppLayout'
 import LoginPage from './pages/LoginPage'
@@ -13,6 +13,8 @@ import OrdersPage from './pages/OrdersPage'
 import InfrastructurePage from './pages/InfrastructurePage'
 import AccountPage from './pages/AccountPage'
 import SettingsPage from './pages/SettingsPage'
+import BusinessPage from './pages/BusinessPage'
+import { canVisit } from './lib/navigation'
 import SitePage from './pages/SitePage'
 import SubTemplatesPage from './pages/SubTemplatesPage'
 import DomainsPage from './pages/DomainsPage'
@@ -28,8 +30,10 @@ import { Center, Loader } from '@mantine/core'
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { me, loading } = useAuth()
+  const location = useLocation()
   if (loading) return <Center h="100vh"><Loader /></Center>
   if (!me) return <Navigate to="/login" replace />
+  if (!canVisit(location.pathname + location.search, me.role)) return <Navigate to="/" replace />
   return <>{children}</>
 }
 
@@ -57,7 +61,8 @@ export default function App() {
           <Route path="/admins" element={<AdminsPage />} />
           <Route path="/infrastructure" element={<InfrastructurePage />} />
           <Route path="/account" element={<AccountPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/*" element={<SettingsPage />} />
+          <Route path="/business/:section" element={<BusinessPage />} />
           <Route path="/site" element={<SitePage />} />
           <Route path="/sub-templates" element={<SubTemplatesPage />} />
           <Route path="/domains" element={<DomainsPage />} />

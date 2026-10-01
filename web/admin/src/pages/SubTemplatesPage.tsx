@@ -9,6 +9,7 @@ import { SubDesigner } from '../components/SubDesigner'
 import { SubTemplateLibrary } from '../components/SubTemplateLibrary'
 import { SubscriptionProfiles } from '../components/SubscriptionProfiles'
 import { ResponseRules } from '../components/ResponseRules'
+import { useURLChoice } from '../lib/use-url-choice'
 
 interface Data { templates: Record<string, string>; defaults: Record<string, string> }
 const labels: Record<string, string> = { clash: 'mihomo / Clash Meta', stash: 'Stash', surge: 'Surge', surfboard: 'Surfboard', loon: 'Loon', qx: 'Quantumult X', egern: 'Egern' }
@@ -18,9 +19,9 @@ const labels: Record<string, string> = { clash: 'mihomo / Clash Meta', stash: 'S
 export default function SubTemplatesPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const q = useQuery({ queryKey: ['sub-templates'], queryFn: () => api.get<Data>('/api/admin/settings/sub-templates') })
-  const [mode, setMode] = useState('design')
-  const [format, setFormat] = useState('clash')
+  const [mode, setMode] = useURLChoice('mode', ['design', 'text', 'rules', 'library', 'profiles'], 'design')
+  const [format, setFormat] = useURLChoice('format', Object.keys(labels), 'clash')
+  const q = useQuery({ queryKey: ['sub-templates'], queryFn: () => api.get<Data>('/api/admin/settings/sub-templates'), enabled: mode === 'text' })
   const [body, setBody] = useState('')
   const custom = q.data?.templates[format] ?? ''
   const fallback = q.data?.defaults[format] ?? ''

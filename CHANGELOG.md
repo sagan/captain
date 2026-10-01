@@ -4,7 +4,11 @@ One entry per release tag, newest first, condensed from the commit subjects
 between that tag and the previous one (`git log --format=%s <prev>..<tag>`).
 Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
-installs them (Settings → Version and updates).
+installs them (Settings → Backups and maintenance → Version and updates).
+
+- **v1.9.0** (2026-10-01) — Organize the console into six task groups and replace the long settings page with a searchable directory and 25 independently addressable editors. Put business rules beside their related tasks and personal security in the account menu, with existing role and API permissions preserved.
+  - Protect unsaved settings from background refresh and accidental navigation; block empty forms after a failed initial load, retry reads, clear write-only secret inputs after saving, and align responsive forms in all six languages. Check translation keys used by navigation metadata.
+  - Preserve user, monitoring and subscription editor views in URLs. Keep new users open through plan assignment, link subscription profiles to their editor, guide node/inbound creation into publishing an entry, and link alerts to diagnostics. Distinguish reported running inbounds from configured entries and unknown old-node state. No database migration or agent protocol change.
 
 - **v1.8.1** (2026-09-30) — Register the authenticated token-resource catalog used by the permission editor; v1.8.0 returned HTTP 405 and left the suggested grants empty. Add route and authorization regression coverage. Keep the asset node selector full-width on small screens and align its import button with the input on desktop.
 

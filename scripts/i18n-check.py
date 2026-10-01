@@ -27,6 +27,9 @@ USE = re.compile(r"""\bt\(\s*['"]([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)['"]""")
 # A key built at run time: t('plan.' + kind) or t(`plan.${kind}`).
 DYN = re.compile(r"""\bt\(\s*['"`]([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*\.)['"`]?\s*(?:\+|\$\{)""")
 
+# Declarative navigation/settings metadata is translated by shared renderers.
+META = re.compile(r"""\b(?:labelKey|titleKey|hintKey):\s*['"]([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)['"]""")
+
 def sources(d):
     """The source tree the locale directory belongs to (its parent)."""
     root = os.path.dirname(os.path.abspath(d))
@@ -57,7 +60,7 @@ for d in sys.argv[1:]:
     used, prefixes = set(), set()
     for path in sources(d):
         text = open(path, encoding="utf-8").read()
-        used |= set(USE.findall(text))
+        used |= set(USE.findall(text)) | set(META.findall(text))
         prefixes |= set(DYN.findall(text))
     undefined = sorted(k for k in used - union)
     if undefined:

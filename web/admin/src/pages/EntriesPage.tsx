@@ -12,6 +12,7 @@ import { api, type Entry, type Inbound, type Ingress, type Node } from '../lib/a
 import { toast } from '../lib/notify'
 import { PageHeader } from '../components/PageHeader'
 import { REGIONS, flag } from '../lib/regions'
+import { Link, useSearchParams } from 'react-router-dom'
 
 type Values = { Name: string; InboundID: string; DisplayHost: string; DisplayPort: number; Rate: number; Sort: number; Enabled: boolean; Tags: string[]; Region: string; ClientExtra: string }
 const empty: Values = { Name: '', InboundID: '', DisplayHost: '', DisplayPort: 443, Rate: 1, Sort: 0, Enabled: true, Tags: [], Region: '', ClientExtra: '' }
@@ -20,6 +21,8 @@ const parseExtra = (s: string) => { try { const v = JSON.parse(s || '{}'); retur
 export default function EntriesPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
+  const [params, setParams] = useSearchParams()
+  const nodeFilter = params.get('node') ?? ''
   const q = useQuery({ queryKey: ['entries'], queryFn: () => api.get<Entry[]>('/api/admin/entries') })
   const tags = useQuery({ queryKey: ['entry-tags'], queryFn: () => api.get<string[]>('/api/admin/entries/tags') })
   const nodes = useQuery({ queryKey: ['nodes'], queryFn: () => api.get<Node[]>('/api/admin/nodes') })
@@ -35,13 +38,17 @@ export default function EntriesPage() {
   const del = useMutation({ mutationFn: (id: number) => api.del(`/api/admin/entries/${id}`), onSuccess: () => { toast.ok(t('common.deleted')); invalidate() }, onError: toast.err })
   const reorder = useMutation({ mutationFn: (ids: number[]) => api.put('/api/admin/entries/order', { IDs: ids }), onSuccess: invalidate, onError: (e: Error) => { toast.err(e); invalidate() } })
   const openEdit = (e: Entry | 'new') => {
-    if (e === 'new') form.setValues(empty)
+    if (e === 'new') {
+      form.setValues(empty)
+      const inbound = inbounds.find(({ ib }) => String(ib.ID) === params.get('inbound'))
+      if (inbound) { form.setFieldValue('Name', inbound.ib.Tag); onInbound(String(inbound.ib.ID)) }
+    }
     else form.setValues({ Name: e.Name, InboundID: String(e.InboundID), DisplayHost: e.DisplayHost, DisplayPort: e.DisplayPort, Rate: e.Rate, Sort: e.Sort, Enabled: e.Enabled, Tags: e.Tags ?? [], Region: e.Region ?? '', ClientExtra: e.ClientExtra ? JSON.stringify(e.ClientExtra, null, 2) : '' })
     setEditing(e)
   }
   // Picking an inbound pre-fills the display address from the node.
   // Address prefill: a line ingress gives its public entry and mapped port; otherwise the TLS name, the node domain, then the node IP.
-  const onInbound = (id: string | null) => { form.setFieldValue('InboundID', id ?? ''); const x = inbounds.find((i) => String(i.ib.ID) === id); if (x && !form.values.DisplayHost) { if (x.ingress) { form.setValues({ DisplayHost: x.ingress.entry_domain || x.ingress.entry_host, DisplayPort: x.ib.Port + (x.ingress.port_offset || 0) }); return } const tls = x.ib.Settings?.tls as { mode?: number; server_name?: string } | undefined; form.setValues({ DisplayHost: (tls?.mode === 1 && tls.server_name) || x.node.domain || x.node.public_addr || '', DisplayPort: x.ib.Port }) } }
+  const onInbound = (id: string | null) => { form.setFieldValue('InboundID', id ?? ''); const x = inbounds.find((i) => String(i.ib.ID) === id); if (x && !form.getValues().DisplayHost) { if (x.ingress) { form.setValues({ DisplayHost: x.ingress.entry_domain || x.ingress.entry_host, DisplayPort: x.ib.Port + (x.ingress.port_offset || 0) }); return } const tls = x.ib.Settings?.tls as { mode?: number; server_name?: string } | undefined; form.setValues({ DisplayHost: (tls?.mode === 1 && tls.server_name) || x.node.domain || x.node.public_addr || '', DisplayPort: x.ib.Port }) } }
 
   // Local order for drag-and-drop; the server is told the new id order on drop.
   const [rows, setRows] = useState<Entry[]>([])
@@ -55,10 +62,11 @@ export default function EntriesPage() {
     setRows(next)
     reorder.mutate(next.map((r) => r.ID))
   }
-  const visible = filter ? rows.filter((r) => (r.Tags ?? []).includes(filter)) : rows
+  const visible = rows.filter(r => (!filter || (r.Tags ?? []).includes(filter)) && (!nodeFilter || inbounds.some(({ ib }) => ib.ID === r.InboundID && String(ib.NodeID) === nodeFilter)))
   return (
     <>
       <PageHeader title={t('entries.title')} subtitle={t('entries.subtitle')} actions={<Group gap="xs">{(tags.data?.length ?? 0) > 0 && <Select size="xs" w={160} clearable placeholder={t('entries.filterTag')} data={tags.data ?? []} value={filter} onChange={setFilter} />}<Button leftSection={<IconPlus size={16} />} onClick={() => openEdit('new')}>{t('entries.create')}</Button></Group>} />
+      <Group mb="md" align="flex-end"><Select label={t('nodes.title')} placeholder={t('alerts.allNodes')} clearable searchable data={(nodes.data ?? []).map(n => ({ value: String(n.id), label: n.name }))} value={nodeFilter || null} onChange={value => setParams(previous => { const next = new URLSearchParams(previous); next.delete('inbound'); if (value) next.set('node', value); else next.delete('node'); return next })} />{nodeFilter && <Button component={Link} variant="subtle" to={`/nodes/${nodeFilter}`}>{t('nodes.info')}</Button>}<Button component={Link} variant="subtle" to="/users">{t('nav.users')}</Button></Group>
       <Card p={0}>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={visible.map((r) => r.ID)} strategy={verticalListSortingStrategy}>

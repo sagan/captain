@@ -11,8 +11,8 @@ interface Check { id: string; status: 'ok' | 'warn' | 'fail' | 'skip'; code?: st
 
 // Where each finding is fixed in the console.
 const fixAt: Record<string, string> = {
-  backup_local: '/settings', backup_remote: '/settings', backup_encrypt: '/settings', heartbeat: '/settings',
-  mail: '/settings', staff_2fa: '/admins', version: '/settings', nodes: '/nodes',
+  backup_local: '/settings/backup', backup_remote: '/settings/backup', backup_encrypt: '/settings/backup', heartbeat: '/settings/heartbeat',
+  mail: '/settings/mail', staff_2fa: '/admins', version: '/settings/update', nodes: '/nodes',
 }
 
 // Panel self-check on the dashboard (admins only): the panel's own gaps —

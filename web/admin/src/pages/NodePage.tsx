@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { IconInfoCircle, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api, type DoctorReport, type Ingress, type CertStatus, type Group as UGroup, type Inbound, type Node } from '../lib/api'
 import { ago, bytes, when } from '../lib/format'
@@ -17,6 +17,7 @@ import { InfoGrid, InfoTile, SectionTitle } from '../components/InfoTile'
 import { InboundForm, toPayload, toValues, type InboundValues } from '../components/InboundForm'
 import { NodeStatus, PairCodeBox } from './NodesPage'
 import { NodeProbeCard } from '../components/NodeProbeCard'
+import { NodeWorkflow } from '../components/NodeWorkflow'
 import { RoutingCard } from '../components/RoutingCard'
 import { ForwardsCard } from '../components/ForwardsCard'
 import { IngressesCard, ingressPayload } from '../components/IngressesCard'
@@ -68,6 +69,7 @@ export default function NodePage() {
         <Button color="red" variant="light" size="xs" leftSection={<IconTrash size={14} />} onClick={() => setDeletingNode(true)}>{t('common.delete')}</Button>
       </>} />
 
+      <NodeWorkflow node={n} inbounds={d.inbounds} cores={d.status?.cores} />
       {!n.paired && n.pair_code && <Card mb="lg"><Title order={5} mb="sm">{t('nodes.pairTitle')}</Title><PairCodeBox code={n.pair_code} /></Card>}
       {n.paired && <NodeProbeCard key={n.id} nodeID={n.id} reportedHost={host} />}
       <Card mb="lg"><MetadataEditor endpoint={`/api/admin/nodes/${n.id}/metadata`} /></Card>
@@ -108,10 +110,10 @@ export default function NodePage() {
       </Card>
 
 
-      <Card p={0}>
+      <Card p={0} id="node-inbounds" style={{ scrollMarginTop: 80 }}>
         <Group justify="space-between" p="md" pb="xs">
           <div><Text fw={600}>{t('inbounds.title')}</Text><Text size="xs" c="dimmed">{t('inbounds.subtitle')}</Text></div>
-          <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setEditing('new')}>{t('inbounds.create')}</Button>
+          <Group gap="xs"><Button component={Link} to={`/entries?node=${n.id}`} variant="light" size="xs">{t('entries.title')}</Button><Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setEditing('new')}>{t('inbounds.create')}</Button></Group>
         </Group>
         <Table>
           <Table.Thead><Table.Tr><Table.Th>{t('inbounds.tag')}</Table.Th><Table.Th>{t('inbounds.protocol')}</Table.Th><Table.Th>{t('inbounds.port')}</Table.Th><Table.Th>{t('inbounds.core')}</Table.Th><Table.Th>{t('inbounds.traffic')}</Table.Th><Table.Th>{t('inbounds.group')}</Table.Th><Table.Th>{t('inbounds.enabled')}</Table.Th><Table.Th /></Table.Tr></Table.Thead>
@@ -126,6 +128,7 @@ export default function NodePage() {
                 <Table.Td>{ib.GroupID ? (groups.data?.find((g) => g.ID === ib.GroupID)?.Name ?? ib.GroupID) : t('inbounds.groupAll')}</Table.Td>
                 <Table.Td>{ib.Enabled ? <Badge color="teal">{t('common.enabled')}</Badge> : <Badge color="gray">{t('common.disabled')}</Badge>}</Table.Td>
                 <Table.Td><Group gap={4} justify="flex-end">
+                  <Button component={Link} to={`/entries?node=${n.id}&inbound=${ib.ID}`} variant="subtle" size="compact-xs">{t('entries.create')}</Button>
                   <ActionIcon variant="subtle" onClick={() => setEditing(ib)}><IconPencil size={16} /></ActionIcon>
                   <ActionIcon variant="subtle" color="red" onClick={() => modals.openConfirmModal({ title: t('common.delete'), children: <Text size="sm">{t('common.confirmDelete')}</Text>, labels: { confirm: t('common.delete'), cancel: t('common.cancel') }, confirmProps: { color: 'red' }, onConfirm: () => del.mutate(ib.ID) })}><IconTrash size={16} /></ActionIcon>
                 </Group></Table.Td>

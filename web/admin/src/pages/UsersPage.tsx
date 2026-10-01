@@ -24,6 +24,7 @@ import { UserDirectory } from '../components/UserDirectory'
 import { UserSubscriptionProfile } from '../components/UserSubscriptionProfile'
 import { MetadataEditor } from '../components/MetadataEditor'
 import { SegmentedControl } from '@mantine/core'
+import { useURLChoice } from '../lib/use-url-choice'
 
 export default function UsersPage() {
   const { t } = useTranslation()
@@ -34,18 +35,22 @@ export default function UsersPage() {
   const groups = useQuery({ queryKey: ['groups'], queryFn: () => api.get<UGroup[]>('/api/admin/groups'), enabled: canManageGroups })
   const [sel, setSel] = useState<UserRow | null>(null)
   const [creating, setCreating] = useState(false)
-  const [view, setView] = useState('list')
+  const [view, setView] = useURLChoice('tab', canManageGroups ? ['list', 'groups', 'renewals'] : ['list', 'renewals'], 'list')
   const invalidate = () => qc.invalidateQueries({ queryKey: ['users'] })
 
   const createForm = useForm({ initialValues: { Email: '', Password: '' } })
-  const create = useMutation({ mutationFn: (v: typeof createForm.values) => api.post('/api/admin/users', v), onSuccess: () => { toast.ok(t('common.saved')); setCreating(false); createForm.reset(); invalidate() }, onError: toast.err })
+  const create = useMutation({ mutationFn: (v: typeof createForm.values) => api.post<{ id: number }>('/api/admin/users', v), onSuccess: async (created) => {
+    toast.ok(t('common.saved')); setCreating(false); createForm.reset(); invalidate()
+    // Continue with the newly created user's plan and subscription, without searching again.
+    try { open(await api.get<UserRow>(`/api/admin/users/${created.id}`)) } catch (error) { toast.err(error) }
+  }, onError: toast.err })
 
   const editForm = useForm({ initialValues: { Status: 'active', GroupID: '', Password: '' } })
   const update = useMutation({ mutationFn: (v: typeof editForm.values) => api.patch(`/api/admin/users/${sel!.id}`, { Status: v.Status, GroupID: v.GroupID ? Number(v.GroupID) : null, Password: v.Password }), onSuccess: () => { toast.ok(t('common.saved')); invalidate() }, onError: toast.err })
   const detail = useQuery({ queryKey: ['user', sel?.id], queryFn: () => api.get<{ devices: OnlineDevice[]; subscriptions: UserSub[]; hwid_devices: HwidDevice[]; hwid_limit: number | null; sub_requests: SubRequest[]; first_connected_at: string | null; dyn_limit: { mbps: number; until: string; rate_mbps: number } | null }>(`/api/admin/users/${sel!.id}`), enabled: sel !== null, refetchInterval: 15000 })
   const [grantPlan, setGrantPlan] = useState<string | null>(null)
   const [grantHow, setGrantHow] = useState<string>('')
-  const grant = useMutation({ mutationFn: () => api.post(`/api/admin/users/${sel!.id}/grant`, { PlanID: Number(grantPlan), Activation: grantHow }), onSuccess: () => { toast.ok(t('common.saved')); invalidate(); setSel(null) }, onError: toast.err })
+  const grant = useMutation({ mutationFn: () => api.post(`/api/admin/users/${sel!.id}/grant`, { PlanID: Number(grantPlan), Activation: grantHow }), onSuccess: () => { toast.ok(t('common.saved')); invalidate(); qc.invalidateQueries({ queryKey: ['user', sel?.id] }); qc.invalidateQueries({ queryKey: ['user-entries', sel?.id] }); setGrantPlan(null) }, onError: toast.err })
   const [delta, setDelta] = useState<number | string>(0)
   const [manualMbps, setManualMbps] = useState<number | string>(10)
   const [manualMin, setManualMin] = useState<number | string>(30)

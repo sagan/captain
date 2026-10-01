@@ -1,5 +1,7 @@
+import { SettingsFields } from './SettingsFields'
+import { SettingsLoadState } from './SettingsLoadState'
 import { Badge, Button, Card, Group, NumberInput, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
-import { useForm } from '@mantine/form'
+import { useSettingsForm as useForm } from '../lib/settings-draft'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -18,20 +20,21 @@ export function HeartbeatCard() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['heartbeat'], queryFn: () => api.get<{ settings: Settings; status: Status }>('/api/admin/settings/heartbeat') })
   const form = useForm<Settings>({ initialValues: { enabled: false, url: '', interval_seconds: 60 } })
-  useEffect(() => { if (q.data) form.setValues({ ...q.data.settings, interval_seconds: q.data.settings.interval_seconds || 60 }) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
-  const save = useMutation({ mutationFn: (v: Settings) => api.put('/api/admin/settings/heartbeat', v), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['heartbeat'] }) }, onError: toast.err })
+  useEffect(() => { if (q.data) form.hydrate({ ...q.data.settings, interval_seconds: q.data.settings.interval_seconds || 60 }) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
+  const save = useMutation({ mutationFn: (v: Settings) => api.put('/api/admin/settings/heartbeat', v), onSuccess: () => { form.resetDirty(); toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['heartbeat'] }) }, onError: toast.err })
   const test = useMutation({ mutationFn: () => api.post('/api/admin/settings/heartbeat/test', {}), onSuccess: () => { toast.ok(t('heartbeat.sent')); qc.invalidateQueries({ queryKey: ['heartbeat'] }) }, onError: toast.err })
   const st = q.data?.status
+  if (q.data === undefined) return <SettingsLoadState query={q} />
   return (
     <Card>
       <Title order={5} mb="xs">{t('heartbeat.title')}</Title>
       <Text size="xs" c="dimmed" mb="sm">{t('heartbeat.hint')}</Text>
       <form onSubmit={form.onSubmit((v) => save.mutate(v))}><Stack gap="sm">
         <Switch label={t('heartbeat.enabled')} {...form.getInputProps('enabled', { type: 'checkbox' })} />
-        <Group grow align="flex-end">
+        <SettingsFields>
           <TextInput label={t('heartbeat.url')} placeholder="https://hc-ping.com/<uuid>" {...form.getInputProps('url')} />
           <NumberInput label={t('heartbeat.interval')} min={60} step={60} w={160} {...form.getInputProps('interval_seconds')} />
-        </Group>
+        </SettingsFields>
         {st?.at && (
           <Group gap="xs">
             <Text size="xs" c="dimmed">{t('heartbeat.last')} {when(st.at)}</Text>

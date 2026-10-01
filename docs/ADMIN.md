@@ -2,6 +2,36 @@
 
 Who can do what, how the panel is reached, and everything it can talk to.
 
+## Finding a task
+
+The console has six main navigation groups: Overview, Users, Nodes,
+Subscriptions, Monitoring and Operations. Each group opens its main list in
+one click and expands to show related pages. Settings stays at the bottom of
+the sidebar; account security is in the avatar menu.
+
+Settings is a directory, with separate pages for each editor. Registration and
+trial rules are under Users; certificates, connection recording, audit and
+speed policies under Nodes; subscription URLs, HWID and clients under
+Subscriptions; collection, the public status page, ping tasks and heartbeat
+under Monitoring; notices, referrals and purchase credit under Operations.
+Global security, notification integrations and maintenance stay under Settings.
+The directory search covers names and descriptions across these categories,
+without loading configuration values. Moving a setting does not change its
+admin-only API permission.
+
+Editor URLs such as `/admin/settings/mail` can be bookmarked. Only the selected
+editor loads its data. Unsaved changes survive background refreshes, and leaving
+the editor asks whether to discard them. A failed initial load must be retried
+before editing. User-group and monitoring tabs, and subscription template modes,
+also keep their selection in the URL. Existing page and API URLs remain valid.
+
+Creating a user opens that user's detail drawer; granting a plan leaves it open
+for subscription checks. Node details show connection, confirmed running
+inbounds and enabled entries separately: an enabled entry is not proof of
+end-to-end connectivity. An inbound's **Add entry** action carries its selection
+into the entry editor. Alert rows link full administrators directly to the
+node's existing network diagnostic form.
+
 ## User groups
 
 Users → User groups lists and creates groups beside the user list and renewals
@@ -11,7 +41,7 @@ support accounts cannot. The APIs remain `GET` and `POST /api/admin/groups`.
 
 ## Staff roles
 
-Admin → Staff creates console accounts with a role:
+Settings → Staff creates console accounts with a role:
 
 | Role | Can |
 |---|---|
@@ -63,7 +93,7 @@ staff endpoint; API tokens cannot call it. Node accounting uses a separate
 immutable identity, so pending traffic reports cannot be billed to a new
 owner of the old account ID.
 
-**Two-factor sign-in** — Settings → Two-factor authentication: each staff
+**Two-factor sign-in** — Account security → Two-factor authentication: each staff
 account can add a TOTP authenticator, and the console then asks for the
 code after the password. Re-enrolling requires the current code. The replay
 guard is keyed on the step that matched, so the next code still works. API
@@ -71,7 +101,7 @@ tokens are unaffected.
 
 ## API tokens and MCP
 
-Settings → API tokens & MCP issues personal bearer tokens (`cap_…`) for the
+Account security → API tokens & MCP issues personal bearer tokens (`cap_…`) for the
 admin API and for AI agents. Captain serves the Model Context Protocol at
 `POST /mcp` with tools for nodes, users, plans, orders, tickets, the probe
 and TCPing; write tools require `confirm: true`. See [MCP.md](MCP.md).
@@ -88,7 +118,7 @@ A token carries its owner's role, narrowed by what it was issued with:
 
 ## Access control and the client address
 
-- **Admin allow-list** — Settings → Security → *Admin allow-list*
+- **Admin allow-list** — Settings → Staff and site security → Console access control
   (`admin_allow_cidrs`: bare addresses or CIDRs) restricts the admin login,
   every `/api/admin` route including API tokens, and `/mcp`. Saving a list
   that would exclude your own address is refused.
@@ -118,7 +148,7 @@ injected before `</head>` and `</body>` on every portal and landing page
 
 ## Event webhooks
 
-Settings → Event webhooks: Captain POSTs JSON to your URLs with
+Settings → Notifications and integrations → Event webhooks: Captain POSTs JSON to your URLs with
 `X-Captain-Event` and an HMAC-SHA256 `X-Captain-Signature` over the body,
 retrying a failed delivery three times. This is the integration point for
 n8n, a script or a CRM, in place of an in-process plugin system that a
@@ -139,9 +169,9 @@ Payload stability is part of the 1.x promise — see
   tickets can ping the admin chat.
 - **Knowledge base and downloads** — Admin → Knowledge base holds Markdown
   guides grouped by category, with `{{sub_url}}`, `{{email}}` and
-  `{{site_name}}` substituted per reader; Settings → Client downloads lists
+  `{{site_name}}` substituted per reader; Subscriptions → Client downloads lists
   the apps. Both appear under Help in the portal.
-- **Telegram bot** — Settings → Telegram: paste a BotFather token, and your
+- **Telegram bot** — Settings → Notifications and integrations → Telegram: paste a BotFather token, and your
   chat id for order, ticket and node notices. Users link their chat from
   the portal with a one-time `/bind CODE`; the bot answers `/sub`,
   `/status`, `/unbind`, `/id` and delivers expiry, traffic and ticket
@@ -151,7 +181,7 @@ Payload stability is part of the 1.x promise — see
 
 ## Mail
 
-Settings → Mail: SMTP (any provider; port 587 STARTTLS, 465 TLS or 25
+Settings → Notifications and integrations → Mail: SMTP (any provider; port 587 STARTTLS, 465 TLS or 25
 plain) or the Resend HTTP API for hosts that block mail ports, plus a
 "send test email" button. With mail configured, registration can require an
 emailed code, users can reset their own password, and the hourly job sends
@@ -167,7 +197,7 @@ if you want to reword them or add a language.
 
 ## External login (OIDC)
 
-Settings → External login takes any OpenID Connect provider (Casdoor,
+Settings → Staff and site security → External login takes any OpenID Connect provider (Casdoor,
 Authentik, Keycloak, Zitadel, Google …): id, display name, issuer URL,
 client id and secret. Register
 `https://<your domain>/api/oauth/<id>/callback` as the redirect URI at the
@@ -186,7 +216,7 @@ Casdoor example: issuer `https://door.example.com`, default scopes
 
 Captain snapshots its database once a day with `VACUUM INTO`, so the copy is
 consistent while the panel keeps serving, into `<data_dir>/backups`, keeping
-the newest seven. Settings → Database backups sets the hour and retention,
+the newest seven. Settings → Backups and maintenance → Database backups sets the hour and retention,
 adds a remote (WebDAV with basic auth, or any S3-compatible bucket: AWS,
 Cloudflare R2, Backblaze B2, MinIO with path-style) that receives each
 snapshot gzipped with its own retention, tests the remote, runs a backup on
@@ -202,7 +232,7 @@ caveat that silently corrupts a careless restore — are in
 
 ## Reset site
 
-Settings → Reset site starts Captain over with an empty business database.
+Settings → Backups and maintenance → Reset site starts Captain over with an empty business database.
 Only an active **admin** using a console cookie session can preview or execute
 it; operator/support accounts, customer sessions and API tokens cannot. The
 confirmation dialog shows affected record counts, requires the current password,

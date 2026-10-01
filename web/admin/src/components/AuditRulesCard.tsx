@@ -1,10 +1,12 @@
+import { SettingsLoadState } from './SettingsLoadState'
 import { ActionIcon, Badge, Button, Card, Group, NumberInput, Select, Stack, Switch, Table, TagsInput, Text, TextInput, Title } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { when } from '../lib/format'
+import { useSettingsDirty } from '../lib/settings-draft'
 import { toast } from '../lib/notify'
 
 interface Rule { id?: number; name: string; match: string[]; action: string; enabled: boolean; hits?: number }
@@ -21,15 +23,17 @@ export function AuditRulesCard() {
   const hits = useQuery({ queryKey: ['audit-log'], queryFn: () => api.get<Hit[]>('/api/admin/audit-log?limit=50'), refetchInterval: 30000 })
   const [rules, setRules] = useState<Rule[] | null>(null)
   const [st, setSt] = useState<Settings | null>(null)
-  useEffect(() => { if (q.data && rules === null) setRules(q.data) }, [q.data, rules])
   const list = rules ?? q.data ?? []
   const settings = st ?? sq.data ?? { auto_ban_hits: 0, window_hours: 24, notify_admin: false }
   const dirty = (rules !== null && JSON.stringify(rules) !== JSON.stringify(q.data ?? [])) || (st !== null && JSON.stringify(st) !== JSON.stringify(sq.data))
+  useSettingsDirty(dirty)
   const save = useMutation({
     mutationFn: async () => { await api.put('/api/admin/audit-rules', list); if (st) await api.put('/api/admin/settings/audit', st) },
     onSuccess: () => { toast.ok(t('common.saved')); setRules(null); setSt(null); qc.invalidateQueries({ queryKey: ['audit-rules'] }); qc.invalidateQueries({ queryKey: ['audit-settings'] }) }, onError: toast.err,
   })
   const set = (i: number, patch: Partial<Rule>) => setRules(list.map((r, j) => (j === i ? { ...r, ...patch } : r)))
+  if (q.data === undefined) return <SettingsLoadState query={q} />
+  if (sq.data === undefined) return <SettingsLoadState query={sq} />
   return (
     <Card>
       <Group justify="space-between" mb="xs">

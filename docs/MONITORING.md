@@ -6,7 +6,7 @@ against bosun 0.47.
 
 ## Probe and status page
 
-Settings → Probe. Off by default — nothing extra runs on the nodes until it
+Monitoring → Collection and status page → Probe. Off by default — nothing extra runs on the nodes until it
 is on. Once enabled, bosun (≥ 0.11) sends a light host beat every few
 seconds — CPU, memory, swap, disk, load, network rate and totals, TCP/UDP
 and process counts, uptime, IPv4/IPv6 reachability, host facts — plus
@@ -54,7 +54,7 @@ minutes, which also lands in the status page history.
 
 ## Komari reporting
 
-Settings → Komari reporting attaches every managed node to a Komari monitor
+Settings → Notifications and integrations → Komari reporting attaches every managed node to a Komari monitor
 as an agent: give the Komari URL and its auto-discovery key and each node
 (bosun ≥ 0.17) registers under its node name, reports metrics every few
 seconds and answers Komari's ping tasks. Only the ping capability is
@@ -63,7 +63,7 @@ if you prefer Komari's.
 
 ## DStatus
 
-Settings → DStatus lets a [DStatus](https://github.com/fev125/dstatus)
+Settings → Notifications and integrations → DStatus lets a [DStatus](https://github.com/fev125/dstatus)
 panel — the open-source one or the official build at dstatus.sh, which
 share the wire protocol — monitor the nodes **without installing its
 agent on them**. Do not use DStatus' own SSH-based agent installer for
@@ -111,7 +111,7 @@ on it. Each bosun node also exposes its own `/metrics`.
 
 ## Connection log (off by default)
 
-Settings → Connection log makes every node report each accepted connection
+Nodes → Node policies → Connection log makes every node report each accepted connection
 — user, inbound, client address, destination host and port, TCP or UDP —
 taken from the cores' own logs (sing-box, xray, hysteria; mieru has none).
 Rows are listed per user in the user drawer ("Connections") for abuse
@@ -128,7 +128,7 @@ cleanup never holds the database. What that costs at scale is measured in
 
 ## Audit rules
 
-Settings → Audit rules is a panel-wide list every node receives. A `block`
+Nodes → Node policies → Audit rules is a panel-wide list every node receives. A `block`
 rule becomes a route rule on sing-box and xray — the connection is rejected
 — and every hit, block or `log`, comes back with the next report as user,
 client address and destination.
@@ -155,7 +155,7 @@ Needs bosun ≥ 0.43 (0.45 for the validation and the log checks).
 
 ## Dynamic speed limit
 
-Settings → Dynamic speed limit throttles a user whose average rate across
+Nodes → Node policies → Dynamic speed limit throttles a user whose average rate across
 all nodes stays above the trigger for the trigger window (100 Mbps over
 60 s by default) down to a lower speed for a while (30 Mbps for 10 min),
 optionally only during given hours and never for whitelisted users.
@@ -185,7 +185,7 @@ address is what [HWID](SUBSCRIPTIONS.md#device-identification-hwid) does.
 
 ## Traffic thresholds and connection events
 
-Settings → Mail → *Traffic thresholds* lists the used-percentages (90 by
+Settings → Notifications and integrations → Mail → *Traffic thresholds* lists the used-percentages (90 by
 default) at which a user is told, once per quota period, by Telegram or
 mail; each crossing also emits a `subscription.traffic` webhook.
 
@@ -294,7 +294,7 @@ Management APIs:
   timestamp grid with average, peak and valid sample count; a bounded series
   catalog supplies opaque keys for device selection. URL-encode the full key.
 
-**Settings → Probe** also controls public sections and card/compact layout.
+**Monitoring → Collection and status page → Probe** also controls public sections and card/compact layout.
 CPU, memory, disk, network, system facts, server details, traffic, latency and
 history can be shown independently. The server masks hidden sections in both
 snapshot and history APIs; disabling history or latency also closes the
@@ -549,7 +549,7 @@ Standalone bosun provides current readings without persistent GPU history.
 
 ## Status-page appearance (Captain 1.7)
 
-Settings → Probe provides bundled **Aurora**, **Paper** and **Terminal** presets,
+Monitoring → Collection and status page → Probe provides bundled **Aurora**, **Paper** and **Terminal** presets,
 with a preview, plus **Inherit site theme** for the existing primary color,
 radius and font. Choose light, dark or system mode independently, or inherit
 the site's scheme. The page background, cards, controls and text now follow

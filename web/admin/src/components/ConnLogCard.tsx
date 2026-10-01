@@ -1,5 +1,6 @@
+import { SettingsLoadState } from './SettingsLoadState'
 import { Button, Card, Group, NumberInput, Stack, Switch, Text, Title } from '@mantine/core'
-import { useForm } from '@mantine/form'
+import { useSettingsForm as useForm } from '../lib/settings-draft'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -15,8 +16,9 @@ export function ConnLogCard() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['connlog-settings'], queryFn: () => api.get<ConnLog>('/api/admin/settings/connlog') })
   const form = useForm({ initialValues: { enabled: false, retention_days: 7, max_per_user: 1000 } })
-  useEffect(() => { if (q.data) form.setValues({ enabled: q.data.enabled, retention_days: q.data.retention_days || 7, max_per_user: q.data.max_per_user || 1000 }) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
-  const save = useMutation({ mutationFn: (v: typeof form.values) => api.put('/api/admin/settings/connlog', v), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['connlog-settings'] }) }, onError: toast.err })
+  useEffect(() => { if (q.data) form.hydrate({ enabled: q.data.enabled, retention_days: q.data.retention_days || 7, max_per_user: q.data.max_per_user || 1000 }) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
+  const save = useMutation({ mutationFn: (v: typeof form.values) => api.put('/api/admin/settings/connlog', v), onSuccess: () => { form.resetDirty(); toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['connlog-settings'] }) }, onError: toast.err })
+  if (q.data === undefined) return <SettingsLoadState query={q} />
   return (
     <Card>
       <Title order={5} mb="xs">{t('connlog.title')}</Title>

@@ -1,5 +1,7 @@
+import { SettingsFields } from './SettingsFields'
+import { SettingsLoadState } from './SettingsLoadState'
 import { Button, Card, Group, NumberInput, PasswordInput, SegmentedControl, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
-import { useForm } from '@mantine/form'
+import { useSettingsForm as useForm } from '../lib/settings-draft'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -17,9 +19,10 @@ export function DStatusCard() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['dstatus'], queryFn: () => api.get<DStatus>('/api/admin/settings/dstatus') })
   const form = useForm({ initialValues: { enabled: false, mode: 'passive', listen: '', server: '', interval: 3, key: '' } })
-  useEffect(() => { if (q.data) form.setValues({ enabled: q.data.enabled, mode: q.data.mode || 'passive', listen: q.data.listen, server: q.data.server ?? '', interval: q.data.interval || 3, key: '' }) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
-  const save = useMutation({ mutationFn: (v: typeof form.values) => api.put('/api/admin/settings/dstatus', v), onSuccess: () => { toast.ok(t('common.saved')); form.setFieldValue('key', ''); qc.invalidateQueries({ queryKey: ['dstatus'] }) }, onError: toast.err })
+  useEffect(() => { if (q.data) form.hydrate({ enabled: q.data.enabled, mode: q.data.mode || 'passive', listen: q.data.listen, server: q.data.server ?? '', interval: q.data.interval || 3, key: '' }) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
+  const save = useMutation({ mutationFn: (v: typeof form.values) => api.put('/api/admin/settings/dstatus', v), onSuccess: () => { form.resetDirty(); toast.ok(t('common.saved')); form.hydrate({ ...form.getValues(), key: '' }); qc.invalidateQueries({ queryKey: ['dstatus'] }) }, onError: toast.err })
   const active = form.values.mode === 'active'
+  if (q.data === undefined) return <SettingsLoadState query={q} />
   return (
     <Card>
       <Title order={5} mb="xs">{t('dstatus.title')}</Title>
@@ -29,12 +32,12 @@ export function DStatusCard() {
           <SegmentedControl size="xs" data={[{ value: 'passive', label: t('dstatus.passive') }, { value: 'active', label: t('dstatus.active') }]} {...form.getInputProps('mode')} />
           <Text size="xs" c="dimmed" mt={4}>{active ? t('dstatus.activeHint') : t('dstatus.passiveHint')}</Text>
         </Group>
-        <Group grow align="flex-start">
+        <SettingsFields>
           {active
             ? <TextInput label={t('dstatus.server')} description={t('dstatus.serverHint')} placeholder="https://status.example.com" {...form.getInputProps('server')} />
             : <TextInput label={t('dstatus.listen')} description={t('dstatus.listenHint')} placeholder=":9999" {...form.getInputProps('listen')} />}
           <PasswordInput label={t('dstatus.key')} description={q.data?.has_key ? t('dstatus.keySet') : t('dstatus.keyHint')} placeholder={q.data?.has_key ? '••••••••' : ''} {...form.getInputProps('key')} />
-        </Group>
+        </SettingsFields>
         {active && <NumberInput label={t('dstatus.interval')} description={t('dstatus.intervalHint')} min={1} max={300} {...form.getInputProps('interval')} />}
         <Group justify="space-between" align="flex-start">
           <Switch label={t('dstatus.enabled')} {...form.getInputProps('enabled', { type: 'checkbox' })} />

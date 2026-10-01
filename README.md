@@ -39,6 +39,7 @@ in lockstep with the panel.
 
 ## Features
 
+- Task-based console navigation, searchable settings categories and independent editors, protected drafts, responsive forms, and direct user-to-subscription and node-to-entry workflows. [Console navigation](docs/ADMIN.md#finding-a-task).
 - Fleet administration: scoped automation tokens, staff Passkeys, subscription-aware user filters and previewed bulk operations, private metadata, named subscription profiles/templates, typed configuration presets, and a supplier/asset renewal ledger. [Workflows and boundaries](docs/ADMIN_WORKFLOWS.md).
 - Reliable traffic delivery pairs atomic receipts/accounting with bosun's durable frozen batches; node exit diagnostics add structured IPv4/IPv6, ASN/region and optional service observations (bosun >= 0.57.0).
 

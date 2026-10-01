@@ -1,12 +1,14 @@
-import { ActionIcon, AppShell, Avatar, Badge, Box, Burger, Divider, Group, Indicator, Menu, NavLink, ScrollArea, Stack, Text, ThemeIcon, UnstyledButton, useMantineColorScheme } from '@mantine/core'
+import { ActionIcon, AppShell, Avatar, Badge, Box, Burger, Group, Indicator, Menu, NavLink, ScrollArea, Text, ThemeIcon, UnstyledButton, useMantineColorScheme } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconLayoutDashboard, IconServer, IconRoute, IconUsers, IconPackage, IconReceipt, IconSettings, IconLogout, IconLanguage, IconWorld, IconTicket, IconMessages, IconGift, IconBook, IconCashBanknote, IconUserShield, IconFileCode, IconCloudDownload, IconGauge, IconCertificate, IconShip, IconSun, IconMoon, IconDotsVertical, IconChevronDown } from '@tabler/icons-react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { IconLayoutDashboard, IconServer, IconUsers, IconSettings, IconLogout, IconLanguage, IconGauge, IconShip, IconSun, IconMoon, IconDotsVertical, IconChevronDown, IconLink, IconBriefcase } from '@tabler/icons-react'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useQuery } from '@tanstack/react-query'
 import { api, type SystemUpdate } from '../lib/api'
 import { pageBackground } from '../theme'
+import { navigation, canVisit, navigationGroup } from '../lib/navigation'
+import { GroupedNavigation } from './GroupedNavigation'
 
 const languages = [
   { code: 'zh-CN', label: '简体中文' },
@@ -17,35 +19,7 @@ const languages = [
   { code: 'ru', label: 'Русский' },
 ]
 
-// Sidebar groups separated by hairlines, like a hosting console.
-const sections = [
-  { key: 'workspace', items: [
-    { to: '/', key: 'dashboard', icon: IconLayoutDashboard },
-    { to: '/monitoring', key: 'monitoring', icon: IconGauge },
-    { to: '/nodes', key: 'nodes', icon: IconServer },
-    { to: '/entries', key: 'entries', icon: IconRoute },
-    { to: '/external', key: 'external', icon: IconCloudDownload },
-    { to: '/speedtest', key: 'speedtest', icon: IconGauge },
-    { to: '/users', key: 'users', icon: IconUsers },
-  ] },
-  { key: 'business', items: [
-    { to: '/plans', key: 'plans', icon: IconPackage },
-    { to: '/orders', key: 'orders', icon: IconReceipt },
-    { to: '/coupons', key: 'coupons', icon: IconTicket },
-    { to: '/gifts', key: 'gifts', icon: IconGift },
-    { to: '/withdrawals', key: 'withdrawals', icon: IconCashBanknote },
-    { to: '/tickets', key: 'tickets', icon: IconMessages },
-    { to: '/articles', key: 'articles', icon: IconBook },
-  ] },
-  { key: 'system', items: [
-    { to: '/infrastructure', key: 'infrastructure', icon: IconServer },
-    { to: '/admins', key: 'admins', icon: IconUserShield },
-    { to: '/domains', key: 'domains', icon: IconCertificate },
-    { to: '/site', key: 'site', icon: IconWorld },
-    { to: '/sub-templates', key: 'subTemplates', icon: IconFileCode },
-    { to: '/settings', key: 'settings', icon: IconSettings },
-  ] },
-]
+const icons = { overview: IconLayoutDashboard, users: IconUsers, nodes: IconServer, subscription: IconLink, monitoring: IconGauge, business: IconBriefcase }
 
 export function Brand({ name, size = 'md' }: { name: string; size?: 'md' | 'lg' }) {
   return (
@@ -63,12 +37,10 @@ export function AppLayout() {
   const nav = useNavigate()
   const loc = useLocation()
   const { colorScheme, setColorScheme } = useMantineColorScheme()
-  const active = (to: string) => (to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(to))
-  // Support sees tickets, users and orders; operators everything but the system section.
-  const role = me?.role ?? 'admin'
-  const visible = (to: string) => role === 'admin' ? true : role === 'operator' ? !['/site', '/settings', '/admins', '/sub-templates', '/infrastructure'].includes(to) : ['/', '/tickets', '/users', '/orders'].includes(to)
-  const shown = sections.map((s) => ({ ...s, items: s.items.filter((it) => visible(it.to)) })).filter((s) => s.items.length > 0)
-  const upd = useQuery({ queryKey: ['update'], queryFn: () => api.get<SystemUpdate>('/api/admin/system/update'), staleTime: 10 * 60_000, refetchInterval: 30 * 60_000, retry: false })
+  const role = me?.role ?? ''
+  const shown = navigation.map(group => ({ ...group, items: group.items.filter(item => canVisit(item.to, role)) })).filter(group => group.items.length > 0)
+  const group = navigationGroup(loc.pathname)
+  const upd = useQuery({ queryKey: ['update'], queryFn: () => api.get<SystemUpdate>('/api/admin/system/update'), staleTime: 10 * 60_000, refetchInterval: 30 * 60_000, retry: false, enabled: role === 'admin' })
   const lang = languages.find((l) => l.code === i18n.language) ?? languages[0]
   const dark = colorScheme === 'dark'
 
@@ -77,13 +49,13 @@ export function AppLayout() {
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            <Burger aria-label={t('workspace.navigation')} opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <UnstyledButton onClick={() => { nav('/'); close() }}><Brand name="Captain" /></UnstyledButton>
           </Group>
           <Group gap="xs" wrap="nowrap">
             {me?.version && (
               <Indicator disabled={!upd.data?.captain?.has_update} color="red" size={8} offset={2} processing styles={{ root: { display: 'flex' } }}>
-                <Badge variant="light" color="gray" style={{ cursor: 'pointer' }} onClick={() => nav('/settings')} title={upd.data?.captain?.has_update ? t('update.available', { version: upd.data.captain.latest }) : undefined}>{me.version}</Badge>
+                <Badge variant="light" color="gray" style={{ cursor: role === 'admin' ? 'pointer' : undefined }} onClick={role === 'admin' ? () => nav('/settings/update') : undefined} title={upd.data?.captain?.has_update ? t('update.available', { version: upd.data.captain.latest }) : undefined}>{me.version}</Badge>
               </Indicator>
             )}
           </Group>
@@ -92,20 +64,10 @@ export function AppLayout() {
 
       <AppShell.Navbar>
         <AppShell.Section grow component={ScrollArea} type="auto" scrollbarSize={6} px="sm" py="sm">
-          <Stack gap={0}>
-            {shown.map((s, i) => (
-              <Box key={s.key}>
-                {i > 0 && <Divider my="xs" />}
-                {s.items.map((it) => (
-                  <NavLink key={it.to} component={UnstyledButton} label={t(`nav.${it.key}`)} leftSection={<it.icon size={18} stroke={1.7} />}
-                    variant="light" active={active(it.to)} onClick={(e) => { e.currentTarget.blur(); nav(it.to); close() }}
-                    styles={{ root: { borderRadius: 8, marginBottom: 2 }, label: { fontWeight: 500 } }} />
-                ))}
-              </Box>
-            ))}
-          </Stack>
+          <GroupedNavigation groups={shown} icons={icons} activeGroup={group} onNavigate={close} />
         </AppShell.Section>
         <AppShell.Section p="sm" style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
+          {role === 'admin' && <NavLink component={Link} to="/settings" label={t('nav.settings')} leftSection={<IconSettings size={18} />} active={group === 'system'} onClick={close} mb="sm" styles={{ root: { borderRadius: 8 } }} />}
           <Group justify="space-between" mb="sm" px={4}>
             <Menu shadow="md" width={160}>
               <Menu.Target>

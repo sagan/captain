@@ -1,0 +1,11 @@
+.tasks { height: 100%; }
+.task {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mantine-spacing-md);
+  padding: 11px 0;
+  color: var(--mantine-color-text);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  &:hover { color: var(--mantine-primary-color-filled); }
+}

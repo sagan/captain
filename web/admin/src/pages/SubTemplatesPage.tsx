@@ -35,7 +35,7 @@ export default function SubTemplatesPage() {
   const isYaml = format === 'clash' || format === 'stash'
   return (
     <>
-      <PageHeader title={t('subTemplates.title')} subtitle={t('subTemplates.subtitle')} actions={<><Select hiddenFrom="sm" w={260} aria-label={t('subTemplates.title')} value={mode} onChange={v => v && setMode(v)} data={modes} allowDeselect={false} /><SegmentedControl visibleFrom="sm" size="xs" value={mode} onChange={setMode} data={modes} /></>} />
+      <PageHeader title={mode === 'profiles' ? t('subProfiles.profiles') : mode === 'rules' ? t('subTemplates.modeRules') : t('workspace.templates')} subtitle={t('subTemplates.subtitle')} actions={<><Select hiddenFrom="sm" w={260} aria-label={t('subTemplates.title')} value={mode} onChange={v => v && setMode(v)} data={modes} allowDeselect={false} /><SegmentedControl visibleFrom="sm" size="xs" value={mode} onChange={setMode} data={modes} /></>} />
       {mode === 'library' && <SubTemplateLibrary />}
       {mode === 'profiles' && <SubscriptionProfiles />}
       {mode === 'design' && <SubDesigner />}

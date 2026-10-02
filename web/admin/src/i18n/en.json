@@ -50,11 +50,11 @@
     "deleted": "Deleted",
     "confirmDelete": "Delete? This cannot be undone.",
     "all": "All",
-    "total": "{{count}} total"
+    "total": "{{count}} total",
+    "refresh": "Refresh"
   },
   "dashboard": {
     "title": "Overview",
-    "subtitle": "{{online}}/{{nodes}} nodes online, {{active}} active subscriptions.",
     "onlineDevices": "Online devices",
     "activeSubs": "Active subscriptions",
     "ofUsers": "of {{count}} users",
@@ -62,12 +62,22 @@
     "revenueToday": "Revenue today",
     "revenueMonth": "{{amount}} this month",
     "nodesOnline": "Nodes online",
-    "allUp": "All responding",
-    "someDown": "{{count}} down",
-    "pendingOrders": "{{count}} pending orders",
     "trafficChart": "Traffic, last 14 days",
-    "trafficChartSub": "Daily sum across all nodes",
-    "openTickets": "{{count}} open tickets"
+    "workspaceHint": "Review node issues and daily tasks, then follow business activity.",
+    "loadFailed": "Dashboard could not be refreshed.",
+    "stale": "The values below are from the last successful refresh.",
+    "operations": "Nodes and alerts",
+    "offlineNodes": "Offline nodes",
+    "lastCheckFailed": "Last self-check failed",
+    "openIncidents": "Unresolved incidents",
+    "operationsHint": "Offline means no contact for three minutes. Self-check results are the last report; acknowledged incidents remain unresolved until recovery.",
+    "tasks": "Tasks",
+    "ticketsToReply": "Tickets awaiting reply",
+    "ordersToPay": "Orders awaiting payment",
+    "assetsDue": "Assets due for renewal",
+    "businessSummary": "Business activity",
+    "utcHint": "Daily totals use UTC. Today is still in progress; traffic is recorded usage, not network availability.",
+    "systemChecks": "System and maintenance"
   },
   "nodes": {
     "title": "Nodes",
@@ -1983,7 +1993,7 @@
     "registration": "Registration and trial",
     "nodeSettings": "Node policies",
     "subscription": "Subscriptions",
-    "templates": "Profiles and templates",
+    "templates": "Templates",
     "subscriptionSettings": "Subscription settings",
     "monitorSettings": "Collection and status page",
     "business": "Operations",
@@ -2010,6 +2020,11 @@
     "applicationUnknown": "Running configuration is not confirmed by a current report.",
     "publishedEntries": "Enabled entries: {{count}}",
     "publicationHint": "Entries publish enabled inbounds to subscriptions. Users also need an active plan and permission to use them.",
-    "navigation": "Navigation menu"
+    "navigation": "Navigation menu",
+    "moreIn": "More in {{section}}",
+    "more": "More",
+    "userManagement": "Users",
+    "nodeManagement": "Nodes",
+    "monitoring": "Monitoring"
   }
 }

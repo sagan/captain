@@ -1,24 +1,24 @@
 import { settingsCatalog, systemAreas } from './settings-catalog'
 
 export type StaffRole = 'admin' | 'operator' | 'support'
-export interface NavigationItem { to: string; labelKey: string }
+export interface NavigationItem { to: string; labelKey: string; secondary?: boolean }
 export interface NavigationGroup { id: string; labelKey: string; items: NavigationItem[] }
 export const navigation: NavigationGroup[] = [
   { id: 'overview', labelKey: 'nav.dashboard', items: [{ to: '/', labelKey: 'nav.dashboard' }] },
-  { id: 'users', labelKey: 'nav.users', items: [
-    { to: '/users', labelKey: 'nav.users' }, { to: '/users?tab=groups', labelKey: 'users.groups' }, { to: '/settings/area/users', labelKey: 'workspace.registration' },
+  { id: 'users', labelKey: 'workspace.userManagement', items: [
+    { to: '/users', labelKey: 'nav.users' }, { to: '/users?tab=groups', labelKey: 'users.groups' }, { to: '/users?tab=renewals', labelKey: 'users.viewRenewals', secondary: true }, { to: '/settings/area/users', labelKey: 'workspace.registration', secondary: true },
   ] },
-  { id: 'nodes', labelKey: 'nav.nodes', items: [
-    { to: '/nodes', labelKey: 'nav.nodes' }, { to: '/infrastructure', labelKey: 'nav.infrastructure' }, { to: '/domains', labelKey: 'nav.domains' }, { to: '/settings/area/nodes', labelKey: 'workspace.nodeSettings' },
+  { id: 'nodes', labelKey: 'workspace.nodeManagement', items: [
+    { to: '/nodes', labelKey: 'nav.nodes' }, { to: '/infrastructure', labelKey: 'nav.infrastructure' }, { to: '/domains', labelKey: 'nav.domains', secondary: true }, { to: '/settings/area/nodes', labelKey: 'workspace.nodeSettings', secondary: true },
   ] },
   { id: 'subscription', labelKey: 'workspace.subscription', items: [
-    { to: '/entries', labelKey: 'nav.entries' }, { to: '/external', labelKey: 'nav.external' }, { to: '/sub-templates', labelKey: 'workspace.templates' }, { to: '/settings/subscription', labelKey: 'workspace.subscriptionSettings' }, { to: '/settings/clients', labelKey: 'clients.title' },
+    { to: '/entries', labelKey: 'nav.entries' }, { to: '/sub-templates?mode=profiles', labelKey: 'subProfiles.profiles' }, { to: '/sub-templates', labelKey: 'workspace.templates' }, { to: '/sub-templates?mode=rules', labelKey: 'subTemplates.modeRules' }, { to: '/external', labelKey: 'nav.external', secondary: true }, { to: '/settings/subscription', labelKey: 'workspace.subscriptionSettings', secondary: true }, { to: '/settings/clients', labelKey: 'clients.title', secondary: true },
   ] },
-  { id: 'monitoring', labelKey: 'nav.monitoring', items: [
-    { to: '/monitoring', labelKey: 'nav.monitoring' }, { to: '/speedtest', labelKey: 'nav.speedtest' }, { to: '/monitoring?tab=alerts', labelKey: 'alerts.title' }, { to: '/settings/area/monitoring', labelKey: 'workspace.monitorSettings' },
+  { id: 'monitoring', labelKey: 'workspace.monitoring', items: [
+    { to: '/monitoring', labelKey: 'nav.monitoring' }, { to: '/speedtest', labelKey: 'nav.speedtest', secondary: true }, { to: '/monitoring?tab=alerts', labelKey: 'alerts.title' }, { to: '/settings/area/monitoring', labelKey: 'workspace.monitorSettings', secondary: true },
   ] },
   { id: 'business', labelKey: 'workspace.business', items: [
-    { to: '/plans', labelKey: 'nav.plans' }, { to: '/orders', labelKey: 'nav.orders' }, { to: '/business/marketing', labelKey: 'workspace.marketing' }, { to: '/tickets', labelKey: 'nav.tickets' }, { to: '/business/content', labelKey: 'workspace.content' }, { to: '/settings/area/business', labelKey: 'workspace.businessSettings' },
+    { to: '/plans', labelKey: 'nav.plans' }, { to: '/orders', labelKey: 'nav.orders' }, { to: '/business/marketing', labelKey: 'workspace.marketing', secondary: true }, { to: '/tickets', labelKey: 'nav.tickets' }, { to: '/business/content', labelKey: 'workspace.content', secondary: true }, { to: '/settings/area/business', labelKey: 'workspace.businessSettings', secondary: true },
   ] },
 ]
 
@@ -28,7 +28,7 @@ export function canVisit(to: string, role: string) {
   const path = to.split('?')[0]
   if (role === 'admin') return true
   if (role === 'operator') return !['/settings', '/site', '/admins', '/sub-templates', '/infrastructure'].some(p => path === p || path.startsWith(`${p}/`))
-  if (path === '/users' && new URLSearchParams(to.split('?')[1]).get('tab') === 'groups') return false
+  if (path === '/users' && ['groups', 'renewals'].includes(new URLSearchParams(to.split('?')[1]).get('tab') ?? '')) return false
   return ['/', '/users', '/orders', '/tickets', '/account'].includes(path)
 }
 

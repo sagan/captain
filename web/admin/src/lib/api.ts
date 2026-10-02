@@ -109,6 +109,7 @@ export interface Dashboard {
   }
   traffic: { day: number; up: number; down: number }[]
   open_tickets?: number
+  attention?: { nodes?: { offline: number; unpaired: number; doctor_fail: number }; open_incidents?: number; assets_due?: number }
 }
 export interface UpdateInfo {
   current: string; latest: string; has_update: boolean; release_build: boolean; in_container: boolean

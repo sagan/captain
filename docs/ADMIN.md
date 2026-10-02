@@ -5,9 +5,13 @@ Who can do what, how the panel is reached, and everything it can talk to.
 ## Finding a task
 
 The console has six main navigation groups: Overview, Users, Nodes,
-Subscriptions, Monitoring and Operations. Each group opens its main list in
-one click and expands to show related pages. Settings stays at the bottom of
-the sidebar; account security is in the avatar menu.
+Subscriptions, Monitoring and Operations. On desktop, section headings group
+always-visible common pages; only secondary settings and tools collapse.
+Headings do not navigate. On phones, section buttons expand their pages, and
+choosing a page closes the drawer. Secondary expansion survives navigation.
+Settings stays at the bottom; account security is in the avatar menu.
+Subscription profiles, templates and response rules have separate direct links
+to the existing editor modes, with one active navigation item.
 
 Settings is a directory, with separate pages for each editor. Registration and
 trial rules are under Users; certificates, connection recording, audit and
@@ -23,7 +27,8 @@ Editor URLs such as `/admin/settings/mail` can be bookmarked. Only the selected
 editor loads its data. Unsaved changes survive background refreshes, and leaving
 the editor asks whether to discard them. A failed initial load must be retried
 before editing. User-group and monitoring tabs, and subscription template modes,
-also keep their selection in the URL. Existing page and API URLs remain valid.
+also keep their selection in the URL. Dashboard links preserve node, order and
+asset filters in URLs as well. Existing page and API URLs remain valid.
 
 Creating a user opens that user's detail drawer; granting a plan leaves it open
 for subscription checks. Node details show connection, confirmed running
@@ -31,6 +36,23 @@ inbounds and enabled entries separately: an enabled entry is not proof of
 end-to-end connectivity. An inbound's **Add entry** action carries its selection
 into the entry editor. Alert rows link full administrators directly to the
 node's existing network diagnostic form.
+
+## Dashboard tasks
+
+The dashboard places node issues and daily tasks before four business metrics,
+the traffic chart and system maintenance checks. Offline nodes have paired but
+not contacted Captain for three minutes; unpaired nodes are separate setup
+tasks. Self-check failures describe the last reported check, and acknowledged
+incidents remain unresolved until recovery. Asset reminders use each active
+asset's UTC calendar date and reminder window, including overdue items. Pending
+orders are payment status, not necessarily a manual intervention or a failure.
+
+The existing `GET /api/admin/dashboard` adds an optional `attention` object.
+Node, incident and asset counts require the source endpoint's role and API token
+permission; omitted counts mean unavailable, never zero. No asset costs, notes,
+node addresses or self-check output are included. Failed reads return an error;
+the console marks any retained snapshot as stale and offers refresh. Traffic
+labels use UTC to match accounting buckets; the current day is incomplete.
 
 ## User groups
 

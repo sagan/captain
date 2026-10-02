@@ -1,6 +1,6 @@
 import { ActionIcon, AppShell, Avatar, Badge, Box, Burger, Group, Indicator, Menu, NavLink, ScrollArea, Text, ThemeIcon, UnstyledButton, useMantineColorScheme } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconLayoutDashboard, IconServer, IconUsers, IconSettings, IconLogout, IconLanguage, IconGauge, IconShip, IconSun, IconMoon, IconDotsVertical, IconChevronDown, IconLink, IconBriefcase } from '@tabler/icons-react'
+import { IconLayoutDashboard, IconServer, IconUsers, IconSettings, IconLogout, IconLanguage, IconGauge, IconShip, IconSun, IconMoon, IconDotsVertical, IconChevronDown, IconLink, IconUsersGroup, IconReceipt, IconMessage, IconTemplate, IconAdjustments, IconFilter, IconWorld, IconBuilding, IconFileText, IconTag, IconBell, IconCertificate } from '@tabler/icons-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
@@ -19,7 +19,15 @@ const languages = [
   { code: 'ru', label: 'Русский' },
 ]
 
-const icons = { overview: IconLayoutDashboard, users: IconUsers, nodes: IconServer, subscription: IconLink, monitoring: IconGauge, business: IconBriefcase }
+const icons = {
+  overview: IconLayoutDashboard,
+  '/users': IconUsers, '/users?tab=groups': IconUsersGroup, '/users?tab=renewals': IconReceipt,
+  '/nodes': IconServer, '/infrastructure': IconBuilding, '/domains': IconWorld,
+  '/entries': IconLink, '/sub-templates': IconTemplate, '/sub-templates?mode=profiles': IconAdjustments, '/sub-templates?mode=rules': IconFilter, '/external': IconWorld,
+  '/monitoring': IconGauge, '/monitoring?tab=alerts': IconBell, '/speedtest': IconGauge,
+  '/plans': IconReceipt, '/orders': IconReceipt, '/tickets': IconMessage, '/business/marketing': IconTag, '/business/content': IconFileText,
+  '/settings/area/users': IconSettings, '/settings/area/nodes': IconCertificate, '/settings/subscription': IconSettings, '/settings/clients': IconFileText, '/settings/area/monitoring': IconSettings, '/settings/area/business': IconSettings,
+}
 
 export function Brand({ name, size = 'md' }: { name: string; size?: 'md' | 'lg' }) {
   return (
@@ -64,7 +72,7 @@ export function AppLayout() {
 
       <AppShell.Navbar>
         <AppShell.Section grow component={ScrollArea} type="auto" scrollbarSize={6} px="sm" py="sm">
-          <GroupedNavigation groups={shown} icons={icons} activeGroup={group} onNavigate={close} />
+          <GroupedNavigation key={role} groups={shown} icons={icons} activeGroup={group} onNavigate={close} />
         </AppShell.Section>
         <AppShell.Section p="sm" style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
           {role === 'admin' && <NavLink component={Link} to="/settings" label={t('nav.settings')} leftSection={<IconSettings size={18} />} active={group === 'system'} onClick={close} mb="sm" styles={{ root: { borderRadius: 8 } }} />}

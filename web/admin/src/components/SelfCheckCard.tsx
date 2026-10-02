@@ -1,4 +1,4 @@
-import { Anchor, Badge, Button, Card, Group, Stack, Text, ThemeIcon } from '@mantine/core'
+import { Anchor, Badge, Box, Button, Card, Group, Stack, Text, ThemeIcon } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { IconAlertTriangle, IconCircleCheck, IconRefresh } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { bytes, when } from '../lib/format'
+import classes from './SelfCheckCard.module.css'
 
 interface Check { id: string; status: 'ok' | 'warn' | 'fail' | 'skip'; code?: string; args?: Record<string, string | number> }
 
@@ -49,13 +50,11 @@ export function SelfCheckCard() {
       </Group>
       {issues.length > 0 && <Stack gap={6}>
         {issues.map((c) => (
-          <Group key={c.id} justify="space-between" wrap="nowrap" align="flex-start">
-            <Group gap="xs" wrap="nowrap" align="flex-start" style={{ minWidth: 0 }}>
-              <Badge color={c.status === 'fail' ? 'red' : 'orange'} variant="light" miw={72} mt={2}>{t(`selfcheck.status.${c.status}`)}</Badge>
-              <Text size="sm"><Text span fw={500} inherit>{t(`selfcheck.names.${c.id}`)}</Text> <Text span c="dimmed" inherit>{t(`selfcheck.msg.${c.id}_${c.code}`, args(c))}</Text></Text>
-            </Group>
-            {fixAt[c.id] && <Anchor component={Link} to={fixAt[c.id]} size="sm" style={{ whiteSpace: 'nowrap' }}>{t('selfcheck.fix')}</Anchor>}
-          </Group>
+          <Box key={c.id} className={classes.issue}>
+            <Badge color={c.status === 'fail' ? 'red' : 'orange'} variant="light" miw={72} mt={2}>{t(`selfcheck.status.${c.status}`)}</Badge>
+            <Text size="sm" className={classes.details}><Text span fw={500} inherit>{t(`selfcheck.names.${c.id}`)}</Text> <Text span c="dimmed" inherit>{t(`selfcheck.msg.${c.id}_${c.code}`, args(c))}</Text></Text>
+            {fixAt[c.id] && <Anchor component={Link} to={fixAt[c.id]} size="sm" className={classes.fix}>{t('selfcheck.fix')}</Anchor>}
+          </Box>
         ))}
       </Stack>}
     </Card>

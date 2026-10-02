@@ -50,11 +50,11 @@
     "deleted": "已删除",
     "confirmDelete": "确定删除？此操作不可撤销。",
     "all": "全部",
-    "total": "共 {{count}} 条"
+    "total": "共 {{count}} 条",
+    "refresh": "刷新"
   },
   "dashboard": {
     "title": "概览",
-    "subtitle": "{{online}}/{{nodes}} 个节点在线，{{active}} 个有效订阅。",
     "onlineDevices": "在线设备",
     "activeSubs": "有效订阅",
     "ofUsers": "共 {{count}} 个用户",
@@ -62,12 +62,22 @@
     "revenueToday": "今日收入",
     "revenueMonth": "本月 {{amount}}",
     "nodesOnline": "节点在线",
-    "allUp": "全部在线",
-    "someDown": "{{count}} 个离线",
-    "pendingOrders": "{{count}} 个待支付订单",
     "trafficChart": "最近 14 天流量",
-    "trafficChartSub": "所有节点每日合计",
-    "openTickets": "{{count}} 个待处理工单"
+    "workspaceHint": "先处理节点异常与日常待办，再查看业务变化。",
+    "loadFailed": "首页数据刷新失败。",
+    "stale": "下方保留上次成功获取的数据。",
+    "operations": "节点与告警",
+    "offlineNodes": "离线节点",
+    "lastCheckFailed": "上次自检失败",
+    "openIncidents": "未恢复告警",
+    "operationsHint": "离线指超过三分钟未联系。自检为上次上报结果；已确认的告警仍需等待恢复。",
+    "tasks": "待办事项",
+    "ticketsToReply": "待回复工单",
+    "ordersToPay": "待付款订单",
+    "assetsDue": "待续费资产",
+    "businessSummary": "业务概况",
+    "utcHint": "按 UTC 自然日统计，今日尚未结束；流量表示已记账用量，不代表网络可用性。",
+    "systemChecks": "系统与维护"
   },
   "nodes": {
     "title": "节点",
@@ -1983,7 +1993,7 @@
     "registration": "注册与试用",
     "nodeSettings": "节点规则",
     "subscription": "订阅",
-    "templates": "方案与模板",
+    "templates": "订阅模板",
     "subscriptionSettings": "订阅设置",
     "monitorSettings": "采集与状态页",
     "business": "运营",
@@ -2010,6 +2020,11 @@
     "applicationUnknown": "当前上报尚不能确认入站运行状态。",
     "publishedEntries": "已启用入口：{{count}} 个",
     "publicationHint": "入口将已启用入站发布到订阅；用户仍需有效套餐及相应权限才能使用。",
-    "navigation": "导航菜单"
+    "navigation": "导航菜单",
+    "moreIn": "更多{{section}}选项",
+    "more": "更多",
+    "userManagement": "用户管理",
+    "nodeManagement": "节点管理",
+    "monitoring": "监控"
   }
 }

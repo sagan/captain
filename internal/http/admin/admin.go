@@ -454,8 +454,17 @@ func (h *handlers) dashboard(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	open, _ := h.Store.OpenTickets(r.Context())
-	ok(w, map[string]any{"stats": stats, "traffic": series, "open_tickets": open})
+	open, err := h.Store.OpenTickets(r.Context())
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	attention, err := h.dashboardAttention(r, now)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	ok(w, map[string]any{"stats": stats, "traffic": series, "open_tickets": open, "attention": attention})
 }
 
 // --- nodes ---

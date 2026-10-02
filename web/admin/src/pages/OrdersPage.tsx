@@ -5,12 +5,13 @@ import { useTranslation } from 'react-i18next'
 import { api, type Order, type Page } from '../lib/api'
 import { money, when } from '../lib/format'
 import { PageHeader } from '../components/PageHeader'
+import { useURLChoice } from '../lib/use-url-choice'
 
 const colors: Record<string, string> = { pending: 'orange', paid: 'teal', cancelled: 'gray' }
 
 export default function OrdersPage() {
   const { t } = useTranslation()
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useURLChoice('status', ['', 'pending', 'paid', 'cancelled'], '')
   const [page, setPage] = useState(1)
   const q = useQuery({ queryKey: ['orders', status, page], queryFn: () => api.get<Page<Order>>(`/api/admin/orders?status=${status}&page=${page}`) })
   const pages = q.data ? Math.max(1, Math.ceil(q.data.total / q.data.per_page)) : 1

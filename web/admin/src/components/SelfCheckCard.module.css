@@ -1,0 +1,12 @@
+.issue {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--mantine-spacing-xs);
+}
+.details { overflow-wrap: anywhere; }
+.fix { white-space: nowrap; }
+@media (max-width: 47.99em) {
+  .issue { grid-template-columns: 72px minmax(0, 1fr); }
+  .fix { grid-column: 2; justify-self: start; }
+}

@@ -50,11 +50,11 @@
     "deleted": "已刪除",
     "confirmDelete": "確定刪除？此操作無法復原。",
     "all": "全部",
-    "total": "共 {{count}} 筆"
+    "total": "共 {{count}} 筆",
+    "refresh": "重新整理"
   },
   "dashboard": {
     "title": "總覽",
-    "subtitle": "{{online}}/{{nodes}} 個節點在線，{{active}} 個有效訂閱。",
     "onlineDevices": "線上裝置",
     "activeSubs": "有效訂閱",
     "ofUsers": "共 {{count}} 位使用者",
@@ -62,12 +62,22 @@
     "revenueToday": "今日收入",
     "revenueMonth": "本月 {{amount}}",
     "nodesOnline": "節點在線",
-    "allUp": "全部在線",
-    "someDown": "{{count}} 個離線",
-    "pendingOrders": "{{count}} 筆待付款訂單",
     "trafficChart": "最近 14 天流量",
-    "trafficChartSub": "所有節點每日合計",
-    "openTickets": "{{count}} 個待處理工單"
+    "workspaceHint": "先處理節點異常與日常待辦，再查看業務變化。",
+    "loadFailed": "首頁資料重新整理失敗。",
+    "stale": "下方保留上次成功取得的資料。",
+    "operations": "節點與告警",
+    "offlineNodes": "離線節點",
+    "lastCheckFailed": "上次自檢失敗",
+    "openIncidents": "未恢復告警",
+    "operationsHint": "離線指超過三分鐘未聯繫。自檢為上次回報結果；已確認的告警仍需等待恢復。",
+    "tasks": "待辦事項",
+    "ticketsToReply": "待回覆工單",
+    "ordersToPay": "待付款訂單",
+    "assetsDue": "待續費資產",
+    "businessSummary": "業務概況",
+    "utcHint": "按 UTC 自然日統計，今日尚未結束；流量表示已記帳用量，不代表網路可用性。",
+    "systemChecks": "系統與維護"
   },
   "nodes": {
     "title": "節點",
@@ -1983,7 +1993,7 @@
     "registration": "註冊與試用",
     "nodeSettings": "節點規則",
     "subscription": "訂閱",
-    "templates": "方案與範本",
+    "templates": "訂閱範本",
     "subscriptionSettings": "訂閱設定",
     "monitorSettings": "採集與狀態頁",
     "business": "營運",
@@ -2010,6 +2020,11 @@
     "applicationUnknown": "目前回報尚不能確認入站執行狀態。",
     "publishedEntries": "已啟用入口：{{count}} 個",
     "publicationHint": "入口將已啟用入站發佈到訂閱；使用者仍需有效方案及相應權限才能使用。",
-    "navigation": "導覽選單"
+    "navigation": "導覽選單",
+    "moreIn": "更多{{section}}選項",
+    "more": "更多",
+    "userManagement": "使用者管理",
+    "nodeManagement": "節點管理",
+    "monitoring": "監控"
   }
 }

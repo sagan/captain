@@ -50,11 +50,11 @@
     "deleted": "削除しました",
     "confirmDelete": "削除しますか？この操作は取り消せません。",
     "all": "すべて",
-    "total": "合計 {{count}} 件"
+    "total": "合計 {{count}} 件",
+    "refresh": "更新"
   },
   "dashboard": {
     "title": "ダッシュボード",
-    "subtitle": "ノード {{online}}/{{nodes}} 台がオンライン、有効なサブスクリプション {{active}} 件。",
     "onlineDevices": "オンラインデバイス",
     "activeSubs": "有効なサブスクリプション",
     "ofUsers": "ユーザー合計 {{count}} 人",
@@ -62,12 +62,22 @@
     "revenueToday": "本日の売上",
     "revenueMonth": "今月 {{amount}}",
     "nodesOnline": "オンラインのノード",
-    "allUp": "すべてオンライン",
-    "someDown": "{{count}} 台がオフライン",
-    "pendingOrders": "支払い待ちの注文 {{count}} 件",
     "trafficChart": "直近 14 日間のトラフィック",
-    "trafficChartSub": "全ノードの日別合計",
-    "openTickets": "未対応のチケット {{count}} 件"
+    "workspaceHint": "ノードの問題と日々の対応事項を確認し、利用状況を把握します。",
+    "loadFailed": "ダッシュボードを更新できませんでした。",
+    "stale": "以下は前回正常に取得した値です。",
+    "operations": "ノードとアラート",
+    "offlineNodes": "オフラインのノード",
+    "lastCheckFailed": "前回の自己診断で失敗",
+    "openIncidents": "未復旧のアラート",
+    "operationsHint": "3分間通信がない場合はオフラインです。自己診断は前回の報告です。確認済みのアラートも復旧までは未解決です。",
+    "tasks": "対応事項",
+    "ticketsToReply": "返信待ちのチケット",
+    "ordersToPay": "支払い待ちの注文",
+    "assetsDue": "更新期限の資産",
+    "businessSummary": "利用・売上の概要",
+    "utcHint": "日別集計はUTCです。本日は集計中です。通信量は記録済みの使用量であり、ネットワークの可用性ではありません。",
+    "systemChecks": "システムと保守"
   },
   "nodes": {
     "title": "ノード",
@@ -1983,7 +1993,7 @@
     "registration": "登録と試用",
     "nodeSettings": "ノードのポリシー",
     "subscription": "サブスクリプション",
-    "templates": "プロファイルとテンプレート",
+    "templates": "購読テンプレート",
     "subscriptionSettings": "サブスクリプション設定",
     "monitorSettings": "収集とステータスページ",
     "business": "運営",
@@ -2010,6 +2020,11 @@
     "applicationUnknown": "現在の報告では稼働設定を確認できません。",
     "publishedEntries": "有効エントリー：{{count}}",
     "publicationHint": "エントリーで有効なインバウンドを公開します。利用には有効なプランと権限も必要です。",
-    "navigation": "ナビゲーションメニュー"
+    "navigation": "ナビゲーションメニュー",
+    "moreIn": "{{section}}のその他の項目",
+    "more": "その他",
+    "userManagement": "ユーザー管理",
+    "nodeManagement": "ノード管理",
+    "monitoring": "監視"
   }
 }

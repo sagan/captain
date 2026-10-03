@@ -1,4 +1,4 @@
-import { Anchor, Button, Card, Center, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Anchor, Button, Card, Center, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -18,7 +18,9 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const oauth = useQuery({ queryKey: ['oauth-providers'], queryFn: () => api.get<{ providers: { id: string; name: string }[]; password_login: boolean }>('/api/oauth/providers') })
   useEffect(() => { const e = new URLSearchParams(window.location.search).get('error'); if (e) setError(e) }, [])
   const providers = oauth.data?.providers ?? []
-  const policy = useQuery({ queryKey: ['register-policy'], queryFn: () => api.get<{ open: boolean; verify: boolean; reset: boolean; invite_only: boolean; email_suffixes: string[]; captcha?: { provider: string; site_key: string } }>('/api/portal/register/policy') })
+  const policy = useQuery({ queryKey: ['register-policy'], refetchInterval: 30_000, queryFn: () => api.get<{ open: boolean; verify: boolean; reset: boolean; invite_only: boolean; email_suffixes: string[]; captcha?: { provider: string; site_key: string } }>('/api/portal/register/policy') })
+  const registering = mode === 'register'
+  const registrationOpen = policy.data?.open === true && !policy.isError
   const [captcha, setCaptcha] = useState('')
   const [codeSent, setCodeSent] = useState(false)
   const [sending, setSending] = useState(false)
@@ -27,6 +29,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     try { await api.post('/api/portal/verify/send', { Email: form.values.Email, Purpose: 'register' }); setCodeSent(true) } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setSending(false) }
   }
   const passwordLogin = oauth.data?.password_login ?? true
+  const showPasswordForm = passwordLogin && (!registering || registrationOpen)
   const form = useForm({ initialValues: { Email: '', Password: '', Code: '', Invite: new URLSearchParams(window.location.search).get('ref') ?? '', Captcha: '' } })
   const submit = form.onSubmit(async (v) => {
     setBusy(true); setError('')
@@ -39,14 +42,16 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       <Card w={400}>
         <form onSubmit={submit}><Stack>
           <Title order={2}>{t(`auth.${mode}`)}</Title>
-          {providers.length > 0 && (
+          {registering && policy.isError && <Alert color="red">{t('auth.policyFailed')} <Anchor component="button" type="button" onClick={() => policy.refetch()}>{t('auth.retry')}</Anchor></Alert>}
+          {registering && !policy.isError && policy.data && !registrationOpen && <Alert>{t('auth.closed')}</Alert>}
+          {providers.length > 0 && (!registering || registrationOpen) && (
             <Stack gap="xs">
               {providers.map((p) => <Button key={p.id} component="a" href={`/api/oauth/${p.id}/start?next=/portal/`} variant="default" size="md">{t('auth.with', { name: p.name })}</Button>)}
               {passwordLogin && <Divider label={t('auth.or')} labelPosition="center" />}
             </Stack>
           )}
           {!passwordLogin && error && <Text c="red" size="sm">{error}</Text>}
-          {passwordLogin && (<>
+          {showPasswordForm && (<>
           <TextInput label={t('auth.email')} type="email" size="md" required autoFocus {...form.getInputProps('Email')} />
           <PasswordInput label={t('auth.password')} size="md" required minLength={8} description={mode === 'register' ? t('auth.passwordHint') : undefined} {...form.getInputProps('Password')} />
           {mode === 'register' && policy.data?.verify && (
@@ -61,8 +66,8 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           {mode === 'login' && policy.data?.reset && <Text size="sm" ta="right"><Anchor component={Link} to="/forgot">{t('auth.forgot')}</Anchor></Text>}
           {error && <Text c="red" size="sm">{error}</Text>}
           <Button type="submit" size="md" loading={busy}>{t(`auth.${mode}`)}</Button>
-          <Text size="sm" ta="center"><Anchor component={Link} to={mode === 'login' ? '/register' : '/login'}>{t(mode === 'login' ? 'auth.toRegister' : 'auth.toLogin')}</Anchor></Text>
           </>)}
+          {(registering || registrationOpen) && <Text size="sm" ta="center"><Anchor component={Link} to={registering ? '/login' : '/register'}>{t(registering ? 'auth.toLogin' : 'auth.toRegister')}</Anchor></Text>}
           <Group justify="center"><Anchor href="/" size="xs" c="dimmed">{t('auth.home')}</Anchor></Group>
         </Stack></form>
       </Card>

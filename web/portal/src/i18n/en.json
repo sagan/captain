@@ -34,7 +34,9 @@
     "invite": "Invite code (optional)",
     "inviteHint": "A friend's invite code",
     "suffixes": "Accepted email domains: {{list}}",
-    "inviteRequired": "Invite code (required)"
+    "inviteRequired": "Invite code (required)",
+    "policyFailed": "Unable to load the registration policy. Please try again.",
+    "retry": "Retry"
   },
   "home": {
     "hello": "Hi, {{email}}",

@@ -34,7 +34,9 @@
     "invite": "邀請碼（選填）",
     "inviteHint": "朋友給你的邀請碼",
     "suffixes": "僅接受這些信箱：{{list}}",
-    "inviteRequired": "邀請碼（必填）"
+    "inviteRequired": "邀請碼（必填）",
+    "policyFailed": "暫時無法取得註冊狀態，請重試。",
+    "retry": "重試"
   },
   "home": {
     "hello": "你好，{{email}}",

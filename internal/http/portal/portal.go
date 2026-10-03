@@ -143,7 +143,12 @@ func (h *handlers) requireUser(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (h *handlers) register(w http.ResponseWriter, r *http.Request) {
-	if !h.Registration {
+	var reg store.RegistrationSettings
+	if err := h.Store.GetSetting(r.Context(), store.SettingRegistration, &reg); err != nil {
+		h.serverErr(w, "registration settings", err)
+		return
+	}
+	if !reg.PasswordOpen(h.Registration) {
 		fail(w, http.StatusForbidden, "registration is closed")
 		return
 	}
@@ -155,7 +160,7 @@ func (h *handlers) register(w http.ResponseWriter, r *http.Request) {
 	email := strings.ToLower(strings.TrimSpace(in.Email))
 	ip := ratelimit.ClientIP(r)
 	inviter := h.inviterFrom(r, in.Invite)
-	if err := h.registrationAllowed(r, email, ip, inviter, in.Captcha); err != nil {
+	if err := h.registrationAllowed(r, reg, email, ip, inviter, in.Captcha); err != nil {
 		fail(w, http.StatusForbidden, err.Error())
 		return
 	}
@@ -415,8 +420,12 @@ func (h *handlers) mailSettings(r *http.Request) mail.Settings {
 func (h *handlers) registerPolicy(w http.ResponseWriter, r *http.Request) {
 	ms := h.mailSettings(r)
 	var reg store.RegistrationSettings
-	_ = h.Store.GetSetting(r.Context(), store.SettingRegistration, &reg)
-	out := map[string]any{"open": h.Registration, "verify": ms.Enabled() && ms.VerifyRegistration, "reset": ms.Enabled(),
+	if err := h.Store.GetSetting(r.Context(), store.SettingRegistration, &reg); err != nil {
+		h.serverErr(w, "registration settings", err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	out := map[string]any{"open": reg.PasswordOpen(h.Registration), "verify": ms.Enabled() && ms.VerifyRegistration, "reset": ms.Enabled(),
 		"invite_only": reg.InviteOnly, "email_suffixes": reg.EmailSuffixes}
 	if cs := (captcha.Settings{Provider: reg.Captcha.Provider, SiteKey: reg.Captcha.SiteKey, SecretKey: reg.Captcha.SecretKey}); cs.Enabled() {
 		out["captcha"] = map[string]string{"provider": cs.Provider, "site_key": cs.SiteKey}
@@ -433,6 +442,17 @@ func (h *handlers) sendCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(in.Email))
+	var reg store.RegistrationSettings
+	if in.Purpose == "register" {
+		if err := h.Store.GetSetting(r.Context(), store.SettingRegistration, &reg); err != nil {
+			h.serverErr(w, "registration settings", err)
+			return
+		}
+		if !reg.PasswordOpen(h.Registration) {
+			fail(w, http.StatusForbidden, "registration is closed")
+			return
+		}
+	}
 	ms := h.mailSettings(r)
 	if !ms.Enabled() {
 		fail(w, http.StatusConflict, "mail is not configured")
@@ -451,12 +471,6 @@ func (h *handlers) sendCode(w http.ResponseWriter, r *http.Request) {
 	}
 	switch in.Purpose {
 	case "register":
-		if !h.Registration {
-			fail(w, http.StatusForbidden, "registration is closed")
-			return
-		}
-		var reg store.RegistrationSettings
-		_ = h.Store.GetSetting(r.Context(), store.SettingRegistration, &reg)
 		if !reg.EmailAllowed(email) {
 			fail(w, http.StatusForbidden, "this email domain is not accepted")
 			return
@@ -645,9 +659,7 @@ func (h *handlers) bindInvite(w http.ResponseWriter, r *http.Request) {
 
 // registrationAllowed applies the sign-up limits: email whitelist, invite
 // requirement, per-IP cap and captcha.
-func (h *handlers) registrationAllowed(r *http.Request, email, ip string, inviter *int64, captchaToken string) error {
-	var reg store.RegistrationSettings
-	_ = h.Store.GetSetting(r.Context(), store.SettingRegistration, &reg)
+func (h *handlers) registrationAllowed(r *http.Request, reg store.RegistrationSettings, email, ip string, inviter *int64, captchaToken string) error {
 	if !reg.EmailAllowed(email) {
 		return errors.New("this email domain is not accepted")
 	}

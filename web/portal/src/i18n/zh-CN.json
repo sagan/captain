@@ -34,7 +34,9 @@
     "invite": "邀请码（可选）",
     "inviteHint": "朋友给你的邀请码",
     "suffixes": "仅接受这些邮箱：{{list}}",
-    "inviteRequired": "邀请码（必填）"
+    "inviteRequired": "邀请码（必填）",
+    "policyFailed": "暂时无法获取注册状态，请重试。",
+    "retry": "重试"
   },
   "home": {
     "hello": "你好，{{email}}",

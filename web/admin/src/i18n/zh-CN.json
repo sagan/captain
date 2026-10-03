@@ -545,14 +545,21 @@
   },
   "registration": {
     "title": "注册限制",
-    "hint": "对密码注册生效；邮箱白名单和邀请制同样约束外部登录的自动建号。",
+    "hint": "总开关控制密码注册和外部登录自动建号。邮箱白名单和邀请制约束两者；IP 限制和验证码用于密码注册。",
     "suffixes": "邮箱后缀白名单",
     "suffixesHint": "每行一个域名，留空不限制",
     "ipLimit": "同 IP 注册上限",
     "ipLimitHint": "0 表示不限",
     "ipWindow": "时间窗口（小时）",
     "inviteOnly": "邀请制（必须有邀请码）",
-    "captcha": "验证码"
+    "captcha": "验证码",
+    "enabled": "开放注册",
+    "enabledHint": "保存后立即生效。关闭后禁止密码注册和外部登录自动建号；已有用户仍可登录，管理员仍可手动创建账号。",
+    "inherited": "尚未保存总开关，当前沿用部署配置和外部登录规则。",
+    "passwordStatus": "当前密码注册",
+    "oidcStatus": "当前外部登录自动建号",
+    "open": "开放",
+    "closed": "关闭"
   },
   "tickets": {
     "title": "工单",
@@ -1761,14 +1768,16 @@
       "inherit": "继承全站主题",
       "aurora": "极光",
       "paper": "纸面",
-      "terminal": "终端"
+      "terminal": "终端",
+      "glass": "玻璃拟态"
     },
     "schemes": {
       "inherit": "继承全站设置",
       "auto": "跟随系统",
       "light": "明亮",
       "dark": "深色"
-    }
+    },
+    "glassHint": "使用 Komari Glassmorphism 原版公开页面：玻璃卡片、列表、延迟／丢包色条和详情图。地球按公开地区显示近似位置。"
   },
   "directory": {
     "access": "订阅状态",

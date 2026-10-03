@@ -34,7 +34,9 @@
     "invite": "招待コード（任意）",
     "inviteHint": "友達からもらった招待コード",
     "suffixes": "利用できるメールドメイン：{{list}}",
-    "inviteRequired": "招待コード（必須）"
+    "inviteRequired": "招待コード（必須）",
+    "policyFailed": "登録設定を取得できませんでした。もう一度お試しください。",
+    "retry": "再試行"
   },
   "home": {
     "hello": "こんにちは、{{email}}",

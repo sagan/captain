@@ -104,6 +104,11 @@ func Defaults(name string) Settings {
 // Register mounts GET /api/site.
 func Register(mux *http.ServeMux, d Deps) {
 	mux.HandleFunc("GET /api/site", func(w http.ResponseWriter, r *http.Request) {
+		var reg store.RegistrationSettings
+		if err := d.Store.GetSetting(r.Context(), store.SettingRegistration, &reg); err != nil {
+			http.Error(w, "site settings unavailable", http.StatusInternalServerError)
+			return
+		}
 		s := Defaults(d.SiteName)
 		_ = d.Store.GetSetting(r.Context(), SettingSite, &s)
 		if s.Name == "" {
@@ -120,11 +125,11 @@ func Register(mux *http.ServeMux, d Deps) {
 		}
 		out := map[string]any{
 			"name": s.Name, "tagline": s.Tagline, "description": s.Description, "features": s.Features, "locations": s.Locations,
-			"hub": s.Hub, "faq": s.FAQ, "links": s.Links, "show_plans": s.ShowPlans, "registration": d.Registration, "probe_url": probeURL(d, r),
+			"hub": s.Hub, "faq": s.FAQ, "links": s.Links, "show_plans": s.ShowPlans, "registration": reg.PasswordOpen(d.Registration), "probe_url": probeURL(d, r),
 			"stats": stats(r.Context(), d.Store, len(s.Locations)),
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "public, max-age=60")
+		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(out)
 	})
 }

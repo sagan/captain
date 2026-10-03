@@ -545,14 +545,21 @@
   },
   "registration": {
     "title": "註冊限制",
-    "hint": "對密碼註冊生效；信箱白名單和邀請制同樣約束外部登入的自動建立帳號。",
+    "hint": "總開關控制密碼註冊與外部登入自動建號。信箱白名單與邀請制約束兩者；IP 限制與驗證碼用於密碼註冊。",
     "suffixes": "信箱後綴白名單",
     "suffixesHint": "每行一個網域，留空不限制",
     "ipLimit": "同 IP 註冊上限",
     "ipLimitHint": "0 表示不限",
     "ipWindow": "時間窗口（小時）",
     "inviteOnly": "邀請制（必須有邀請碼）",
-    "captcha": "驗證碼"
+    "captcha": "驗證碼",
+    "enabled": "開放註冊",
+    "enabledHint": "儲存後立即生效。關閉後禁止密碼註冊與外部登入自動建立帳號；既有使用者仍可登入，管理員仍可手動建立帳號。",
+    "inherited": "尚未儲存總開關，目前沿用部署設定與外部登入規則。",
+    "passwordStatus": "目前密碼註冊",
+    "oidcStatus": "目前外部登入自動建號",
+    "open": "開放",
+    "closed": "關閉"
   },
   "tickets": {
     "title": "工單",
@@ -1761,14 +1768,16 @@
       "inherit": "繼承全站主題",
       "aurora": "極光",
       "paper": "紙面",
-      "terminal": "終端"
+      "terminal": "終端",
+      "glass": "玻璃擬態"
     },
     "schemes": {
       "inherit": "繼承全站設定",
       "auto": "跟隨系統",
       "light": "明亮",
       "dark": "深色"
-    }
+    },
+    "glassHint": "使用 Komari Glassmorphism 原版公開頁面：玻璃卡片、清單、延遲／丟包色條及詳細圖表。地球依公開地區顯示概略位置。"
   },
   "directory": {
     "access": "訂閱狀態",

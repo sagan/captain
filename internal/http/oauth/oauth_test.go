@@ -181,3 +181,79 @@ func TestOIDCLogin(t *testing.T) {
 	}
 	_ = fmt.Sprint
 }
+
+func TestOIDCRegistrationMasterSwitch(t *testing.T) {
+	ctx := context.Background()
+	idp := newFakeIdP(t)
+	cfg := config.Default()
+	cfg.Portal.Registration = false
+	conn, err := db.Open("sqlite", filepath.Join(t.TempDir(), "registration.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if err := db.Migrate(ctx, conn, "sqlite"); err != nil {
+		t.Fatal(err)
+	}
+	st := store.New(conn)
+	if err := st.SetSetting(ctx, store.SettingOIDC, store.OIDCSettings{Providers: []store.OIDCProvider{{ID: "idp", Name: "Example", Issuer: idp.srv.URL, ClientID: "captain-client", AutoRegister: true}}}); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewUnstartedServer(nil)
+	cfg.BaseURL = "http://" + srv.Listener.Addr().String()
+	srv.Config.Handler = chttp.New(cfg, st, slog.Default()).Handler()
+	srv.Start()
+	defer srv.Close()
+	login := func(sub, email string, allowed bool) {
+		t.Helper()
+		idp.sub, idp.email = sub, email
+		jar, _ := cookiejar.New(nil)
+		c := &http.Client{Jar: jar}
+		resp, err := c.Get(srv.URL + "/api/oauth/idp/start")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		failed := strings.Contains(resp.Request.URL.String(), "/portal/login?error=")
+		if failed == allowed {
+			t.Fatalf("allowed=%v redirect=%s", allowed, resp.Request.URL)
+		}
+		resp, err = c.Get(srv.URL + "/api/portal/me")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if (resp.StatusCode == http.StatusOK) != allowed {
+			t.Fatalf("session allowed=%v status=%d", allowed, resp.StatusCode)
+		}
+	}
+	set := func(enabled bool) {
+		t.Helper()
+		if err := st.SetSetting(ctx, store.SettingRegistration, store.RegistrationSettings{Enabled: &enabled}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Preserve legacy provider-only signup until the master policy is saved.
+	login("existing", "existing@example.com", true)
+	set(false)
+	login("blocked", "blocked@example.com", false)
+	if _, err := st.UserByEmail(ctx, "blocked@example.com"); err == nil {
+		t.Fatal("AutoRegister bypassed master switch")
+	}
+	login("existing", "existing@example.com", true)
+	// Existing verified-email accounts can still link their first identity.
+	u, err := admin.NewUser("manual@example.com", "password123", "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.CreateUser(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	login("manual", "manual@example.com", true)
+	set(true)
+	login("reopened", "reopened@example.com", true)
+	if _, err := conn.Exec(`UPDATE settings SET value_json='broken' WHERE key=?`, store.SettingRegistration); err != nil {
+		t.Fatal(err)
+	}
+	login("read-error", "read-error@example.com", false)
+}

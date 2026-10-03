@@ -34,7 +34,9 @@
     "invite": "초대 코드(선택)",
     "inviteHint": "친구에게 받은 초대 코드",
     "suffixes": "허용되는 이메일 도메인: {{list}}",
-    "inviteRequired": "초대 코드(필수)"
+    "inviteRequired": "초대 코드(필수)",
+    "policyFailed": "가입 설정을 불러오지 못했습니다. 다시 시도해 주세요.",
+    "retry": "다시 시도"
   },
   "home": {
     "hello": "안녕하세요, {{email}}",

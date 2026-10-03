@@ -549,7 +549,7 @@ Standalone bosun provides current readings without persistent GPU history.
 
 ## Status-page appearance (Captain 1.7)
 
-Monitoring → Collection and status page → Probe provides bundled **Aurora**, **Paper** and **Terminal** presets,
+Monitoring → Collection and status page → Probe provides bundled **Aurora**, **Paper**, **Terminal** and **Glassmorphism** presets,
 with a preview, plus **Inherit site theme** for the existing primary color,
 radius and font. Choose light, dark or system mode independently, or inherit
 the site's scheme. The page background, cards, controls and text now follow
@@ -557,34 +557,50 @@ that scheme; system mode follows the visitor's OS preference. Presets work with
 both card and compact layouts and the six existing page languages.
 
 The optional `appearance` object on probe settings and `/api/probe` contains
-`preset` (`inherit`, `aurora`, `paper`, `terminal`) and `scheme` (`inherit`,
+`preset` (`inherit`, `aurora`, `paper`, `terminal`, `glass`) and `scheme` (`inherit`,
 `auto`, `light`, `dark`). Older settings clients that omit it preserve the
 current appearance. Only bundled options are accepted; themes do not execute
 remote code or custom CSS. Existing public-page visibility and section controls
 remain authoritative. GPU details are never exposed by a theme choice.
 
-## Monitoring development sequence
+**Glassmorphism** embeds the MIT-licensed public Vue frontend from
+[Komari Glassmorphism](https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism)
+(v3.3.7, commit `06999d5`). Cards, list, background, globe, details and charts use
+the upstream components and styles. Its visitor theme button can override the
+configured default light/dark mode. The two twenty-segment latency/loss bars
+show weighted time buckets and open the original monitoring chart on click.
+Missing intervals stay grey; complete loss does not become zero latency.
+Captain supplies the data through its existing public probe API. No Komari
+agent or server is needed. Attribution and adaptation notes are in
+`web/probe/glass/README.md`.
 
-1. Resource collection, missing-data semantics, interface accounting and basic
-   management detail (the phase above).
-2. Monitoring workspace: grouping/filtering, node comparison, resource history,
-   peaks and gaps, configurable public page and mobile layouts.
-3. Network quality: ICMP/TCP/HTTP semantics, failure reasons, jitter, percentiles
-   and distinct DNS/connect/TLS/response timings where supported.
-4. Alert lifecycle: incidents, recovery, availability, maintenance and silence.
-5. On-demand diagnostics: MTR/traceroute, DNS, throughput and service reachability.
-6. Optional GPU collection and bundled status-page themes.
+Monthly monitoring traffic and OS lifetime counters retain their different
+meanings. Free-form price notes cannot be converted to billing amounts, so
+unsupported monetary summaries display a dash. Invalid resources stay unknown;
+section and history controls apply to components and their requests.
 
-All six phases above ship in Captain 1.7 / bosun 0.56. Test deployment covers
-resource history, network diagnostics and quality, visibility, themes and mobile
-layouts, plus subscription, billing, isolation and shaping regressions. Physical
-GPU validation remains pending because the test hosts have no GPU. Terminal,
-files and arbitrary remote execution remain separately scoped capabilities
-with explicit authorization and audit rules.
+The optional globe uses bundled textures and the node's public region for an
+approximate marker. It does not query external IP geolocation services. Icons
+are bundled too; upstream visitor fingerprinting, external exchange-rate
+requests and administrative operations are not enabled. The snapshot adds
+`appearance_scheme` so inherited light/dark/system mode works on a dedicated
+status hostname without exposing `/api/site`. Other presets retain the React
+frontend. The selected frontend is served at the existing status URL.
 
-Each phase ships a usable UI, additive protocol fields and regression checks;
-features present in another monitor are not evidence that they already exist here.
+With Glassmorphism selected, enabling carrier monitoring automatically uses the
+[three-network variant](https://github.com/vlongx/komari-theme-Glassmorphism-three-network)
+for the card/list latency section: Unicom, Telecom and Mobile each have latency
+and loss bars. CT/CU/CM are separate identities despite sharing built-in task
+ID zero. Missing carrier samples keep their own grey row. Custom carrier points
+must retain recognised operator names to use the three-row mode; other names
+remain ordinary labelled monitoring data.
 
-## Additions in 1.8.0
-
-Captain 1.8.0 with bosun 0.57.0 adds the Exit diagnostic: structured IPv4/IPv6, ASN/location, reputation and optional service checks. It describes host egress, not every proxy path. Failed/missing observations remain explicit; JSON export preserves the provider results. The optional MIT GeoCheck tool is rebuilt with the pinned Go toolchain and installed from a fixed, checksummed bosun release.
+With carrier monitoring off, the first enabled monitoring task assigned to the
+node (ascending task ID) supplies both latency and loss. The task name appears
+in the tooltip. A missing sample does not select a different task. The additive
+public node field `ping_tasks` supplies configured IDs and names without targets
+or private task settings, and is empty when the latency section is hidden.
+The overview retains six default cards: memory, disk, remaining value, cumulative
+traffic, upload rate and download rate (subject to public section controls).
+Unknown remaining value displays a dash. A local static globe remains available
+when WebGL cannot initialize or loses its context.

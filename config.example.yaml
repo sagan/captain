@@ -30,7 +30,7 @@ site_name: Captain
 # min_version: v1.0.0      # refuse self-update or rollback below this release
 
 portal:
-  registration: true        # allow self sign-up
+  registration: true        # initial signup default; console registration switch overrides it
 
 payments:
   # epay:                    # 易支付 v1 (MD5), e.g. z-pay.cn

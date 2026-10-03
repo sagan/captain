@@ -201,6 +201,32 @@ Payload stability is part of the 1.x promise — see
   token cannot be shared with a bosun panel (Telegram allows one
   `getUpdates` consumer).
 
+## Registration
+
+Users → More → Registration and trials → Registration limits
+(`/admin/settings/registration`) has an **Allow registration** master switch.
+Saving it takes effect without restarting Captain. Off blocks password signup,
+registration-code emails and automatic account creation through every OIDC
+provider, including providers with `auto_register: true`. Existing accounts
+can still sign in, link an external identity and reset passwords; administrators
+can still create customers manually. Existing unwanted accounts must be banned
+separately.
+
+Before the switch is first changed, existing deployments retain their
+`portal.registration` default and provider `auto_register` exceptions. The
+editor shows current password and external-signup status separately. Saving
+other limits does not silently replace these defaults. Once explicitly saved,
+the master switch overrides both defaults: on permits either signup path,
+subject to the existing limits, and off closes both. Old API clients that omit
+the new optional `enabled` field preserve its stored value; null also preserves
+it. Read failures refuse signup rather than assuming the default is open.
+
+The portal policy and landing-page registration link use the same runtime
+setting. Already-open portal login/register pages refresh policy every 30
+seconds; server requests enforce the setting immediately. Email suffix and
+invitation restrictions also apply to external signup; IP limits and CAPTCHA
+apply to password signup. Only complete administrators can edit this policy.
+
 ## Mail
 
 Settings → Notifications and integrations → Mail: SMTP (any provider; port 587 STARTTLS, 465 TLS or 25
@@ -227,8 +253,9 @@ provider.
 
 The portal then shows "Continue with …". Accounts are matched by the
 provider's subject, linked to an existing account with the same verified
-email, or created when registration is open (or `auto_register` is set for
-that provider). Users link and unlink logins from the portal home page, and
+email, or created when registration allows it. Before the runtime master switch
+is set, a provider's `auto_register` can permit signup despite a closed deployment
+default; an explicitly closed master switch takes precedence. Users link and unlink logins from the portal home page, and
 password login can be switched off entirely.
 
 Casdoor example: issuer `https://door.example.com`, default scopes

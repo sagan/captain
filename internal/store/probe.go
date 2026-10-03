@@ -42,7 +42,7 @@ type ProbeSettings struct {
 
 // Presets are bundled UI styles, never operator-supplied CSS or scripts.
 type ProbeAppearance struct {
-	Preset string `json:"preset"` // inherit | aurora | paper | terminal
+	Preset string `json:"preset"` // inherit | aurora | paper | terminal | glass
 	Scheme string `json:"scheme"` // inherit | auto | light | dark
 }
 
@@ -57,7 +57,7 @@ func (p *ProbeAppearance) Normalize() {
 
 func (p ProbeAppearance) Valid() bool {
 	p.Normalize()
-	return (p.Preset == "inherit" || p.Preset == "aurora" || p.Preset == "paper" || p.Preset == "terminal") &&
+	return (p.Preset == "inherit" || p.Preset == "aurora" || p.Preset == "paper" || p.Preset == "terminal" || p.Preset == "glass") &&
 		(p.Scheme == "inherit" || p.Scheme == "auto" || p.Scheme == "light" || p.Scheme == "dark")
 }
 

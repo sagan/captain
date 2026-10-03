@@ -545,14 +545,21 @@
   },
   "registration": {
     "title": "Registration limits",
-    "hint": "Apply to password sign-up; the email whitelist and invite-only rule also govern accounts auto-created by external login.",
+    "hint": "The master switch controls password and external signup. Email and invitation limits apply to both; IP limits and CAPTCHA apply to password signup.",
     "suffixes": "Email domain whitelist",
     "suffixesHint": "One domain per line; blank = any",
     "ipLimit": "Sign-ups per IP",
     "ipLimitHint": "0 = unlimited",
     "ipWindow": "Window (hours)",
     "inviteOnly": "Invite only",
-    "captcha": "Captcha"
+    "captcha": "Captcha",
+    "enabled": "Allow registration",
+    "enabledHint": "Saving takes effect immediately. Off blocks password sign-up and automatic account creation through external login. Existing users can still sign in, and administrators can still create accounts.",
+    "inherited": "No master override has been saved. Current access follows the deployment and external login settings.",
+    "passwordStatus": "Current password registration",
+    "oidcStatus": "Current external account creation",
+    "open": "Open",
+    "closed": "Closed"
   },
   "tickets": {
     "title": "Tickets",
@@ -1761,14 +1768,16 @@
       "inherit": "Inherit site theme",
       "aurora": "Aurora",
       "paper": "Paper",
-      "terminal": "Terminal"
+      "terminal": "Terminal",
+      "glass": "Glassmorphism"
     },
     "schemes": {
       "inherit": "Inherit site setting",
       "auto": "Follow system",
       "light": "Light",
       "dark": "Dark"
-    }
+    },
+    "glassHint": "Uses the original Komari Glassmorphism public UI: glass cards, list, latency/loss bars and detail charts. Globe markers use approximate public regions."
   },
   "directory": {
     "access": "Subscription access",

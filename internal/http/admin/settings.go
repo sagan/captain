@@ -309,13 +309,28 @@ func (h *handlers) putNotice(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlers) getRegistration(w http.ResponseWriter, r *http.Request) {
 	var v store.RegistrationSettings
-	_ = h.Store.GetSetting(r.Context(), store.SettingRegistration, &v)
+	if err := h.Store.GetSetting(r.Context(), store.SettingRegistration, &v); err != nil {
+		serverErr(w, err)
+		return
+	}
+	var oidc store.OIDCSettings
+	if err := h.Store.GetSetting(r.Context(), store.SettingOIDC, &oidc); err != nil {
+		serverErr(w, err)
+		return
+	}
+	passwordOpen, oidcOpen := v.PasswordOpen(h.Registration), false
+	for _, p := range oidc.Providers {
+		if p.Issuer != "" && p.ClientID != "" {
+			oidcOpen = oidcOpen || v.OIDCOpen(h.Registration, p.AutoRegister)
+		}
+	}
 	if v.EmailSuffixes == nil {
 		v.EmailSuffixes = []string{}
 	}
 	has := v.Captcha.SecretKey != ""
 	v.Captcha.SecretKey = ""
-	ok(w, map[string]any{"settings": v, "has_captcha_secret": has})
+	ok(w, map[string]any{"settings": v, "has_captcha_secret": has,
+		"enabled": passwordOpen || oidcOpen, "password_open": passwordOpen, "oidc_open": oidcOpen})
 }
 
 func (h *handlers) putRegistration(w http.ResponseWriter, r *http.Request) {
@@ -324,7 +339,15 @@ func (h *handlers) putRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var cur store.RegistrationSettings
-	_ = h.Store.GetSetting(r.Context(), store.SettingRegistration, &cur)
+	if err := h.Store.GetSetting(r.Context(), store.SettingRegistration, &cur); err != nil {
+		serverErr(w, err)
+		return
+	}
+	// Old clients do not send enabled. Neither omission nor null may erase a
+	// closed master switch and restore a permissive deployment/provider default.
+	if v.Enabled == nil {
+		v.Enabled = cur.Enabled
+	}
 	if strings.TrimSpace(v.Captcha.SecretKey) == "" {
 		v.Captcha.SecretKey = cur.Captcha.SecretKey
 	}

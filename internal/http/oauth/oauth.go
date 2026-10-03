@@ -312,11 +312,13 @@ func (h *handlers) resolveUser(ctx context.Context, r *http.Request, p *store.OI
 	if staff {
 		return nil, errors.New("no staff account for this login")
 	}
-	if !h.Registration && !p.AutoRegister {
+	var reg store.RegistrationSettings
+	if err := h.Store.GetSetting(ctx, store.SettingRegistration, &reg); err != nil {
+		return nil, errors.New("registration settings unavailable")
+	}
+	if !reg.OIDCOpen(h.Registration, p.AutoRegister) {
 		return nil, errors.New("no account for this login and registration is closed")
 	}
-	var reg store.RegistrationSettings
-	_ = h.Store.GetSetting(ctx, store.SettingRegistration, &reg)
 	if !reg.EmailAllowed(email) {
 		return nil, errors.New("this email domain is not accepted")
 	}

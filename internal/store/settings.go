@@ -54,6 +54,9 @@ const SettingNotice = "notice"
 
 // RegistrationSettings limits who can sign up.
 type RegistrationSettings struct {
+	// Enabled overrides deployment and OIDC auto-registration defaults. Nil
+	// preserves existing installations until an administrator chooses a policy.
+	Enabled *bool `json:"enabled,omitempty"`
 	// EmailSuffixes, when non-empty, allows only these domains ("gmail.com").
 	EmailSuffixes []string `json:"email_suffixes"`
 	// InviteOnly requires a valid invite code (link or field) to register.
@@ -73,6 +76,23 @@ type captchaSettings = struct {
 
 // SettingRegistration is the settings key.
 const SettingRegistration = "registration"
+
+// PasswordOpen resolves the runtime override against the deployment default.
+func (r RegistrationSettings) PasswordOpen(configDefault bool) bool {
+	if r.Enabled != nil {
+		return *r.Enabled
+	}
+	return configDefault
+}
+
+// OIDCOpen retains legacy provider exceptions only before the master switch
+// has been set. Explicitly closing registration blocks all automatic signup.
+func (r RegistrationSettings) OIDCOpen(configDefault, autoRegister bool) bool {
+	if r.Enabled != nil {
+		return *r.Enabled
+	}
+	return configDefault || autoRegister
+}
 
 // EmailAllowed applies the suffix whitelist.
 func (r RegistrationSettings) EmailAllowed(email string) bool {

@@ -105,7 +105,7 @@ type Config struct {
 	} `yaml:"payments"`
 
 	Portal struct {
-		Registration bool `yaml:"registration"` // allow self sign-up
+		Registration bool `yaml:"registration"` // initial self-signup default; runtime settings may override it
 	} `yaml:"portal"`
 
 	Limits struct {

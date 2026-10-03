@@ -7,11 +7,13 @@ package probe
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/zeptop-dev/bosun/pkg/spec"
 	"github.com/zeptop-dev/captain/internal/domain"
 	"github.com/zeptop-dev/captain/internal/service"
 	"github.com/zeptop-dev/captain/internal/store"
@@ -25,7 +27,8 @@ type Deps struct {
 	// Resolve returns the signed-in user for a request, nil when none.
 	Resolve func(r *http.Request) *domain.User
 	// Page serves the built status SPA (index + assets) relative to "/".
-	Page http.Handler
+	Page      http.Handler
+	GlassPage http.Handler
 }
 
 type handlers struct {
@@ -88,16 +91,17 @@ func (h *handlers) isStaff(r *http.Request) bool {
 
 // nodeView is one server on the page.
 type nodeView struct {
-	Group    string              `json:"group"`
-	ID       int64               `json:"id"`
-	Name     string              `json:"name"`
-	Online   bool                `json:"online"`
-	Addr     string              `json:"addr,omitempty"`
-	Info     store.NodeProbeInfo `json:"info"`
-	Host     any                 `json:"host"`
-	Version  string              `json:"version,omitempty"`
-	LastSeen *time.Time          `json:"last_seen"`
-	Traffic  struct {
+	PingTasks []pingTaskView      `json:"ping_tasks"`
+	Group     string              `json:"group"`
+	ID        int64               `json:"id"`
+	Name      string              `json:"name"`
+	Online    bool                `json:"online"`
+	Addr      string              `json:"addr,omitempty"`
+	Info      store.NodeProbeInfo `json:"info"`
+	Host      any                 `json:"host"`
+	Version   string              `json:"version,omitempty"`
+	LastSeen  *time.Time          `json:"last_seen"`
+	Traffic   struct {
 		Used, Limit, PrevUsed int64  `json:"-"`
 		UsedB                 int64  `json:"used"`
 		LimitB                int64  `json:"limit"`
@@ -107,6 +111,34 @@ type nodeView struct {
 		ResetDay              int    `json:"reset_day"`
 	} `json:"traffic"`
 	Recent []service.Sample `json:"recent"`
+}
+
+// Only the identity and public label are exposed, never probe destinations.
+type pingTaskView struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+func publicPingTasks(s store.ProbeSettings, tasks []store.PingTask, nodeID int64) []pingTaskView {
+	out := []pingTaskView{}
+	if !s.PublicShows("latency") {
+		return out
+	}
+	if s.CarrierPing {
+		carriers := s.Carriers
+		if len(carriers) == 0 {
+			carriers = spec.DefaultCarriers()
+		}
+		for _, c := range carriers {
+			out = append(out, pingTaskView{ID: 0, Name: c.Name})
+		}
+	}
+	for _, task := range tasks {
+		if task.Enabled && (len(task.NodeIDs) == 0 || slices.Contains(task.NodeIDs, nodeID)) {
+			out = append(out, pingTaskView{ID: task.ID, Name: task.Name})
+		}
+	}
+	return out
 }
 
 // snapshot is the page's main document, cached for a few seconds because
@@ -131,6 +163,14 @@ func (h *handlers) snapshot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	probes, _ := h.Store.ListNodeProbes(r.Context())
+	var tasks []store.PingTask
+	if s.PublicShows("latency") {
+		tasks, err = h.Store.ListPingTasks(r.Context())
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+	}
 	persisted, err := h.Store.MonitorNodes(r.Context(), time.Now(), time.Duration(s.Alerts.OfflineSeconds)*time.Second)
 	if err != nil {
 		http.Error(w, "internal error", 500)
@@ -148,7 +188,7 @@ func (h *handlers) snapshot(w http.ResponseWriter, r *http.Request) {
 		if !n.Paired || (np != nil && np.Hidden && !staff) {
 			continue
 		}
-		v := nodeView{ID: n.ID, Name: n.Name, Version: n.Version}
+		v := nodeView{ID: n.ID, Name: n.Name, Version: n.Version, PingTasks: publicPingTasks(s, tasks, n.ID)}
 		if s.ShowIP || staff {
 			v.Addr = n.PublicAddr
 		}
@@ -202,11 +242,28 @@ func (h *handlers) snapshot(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, v)
 	}
+	// Dedicated probe hosts do not expose /api/site. Resolve only the public
+	// colour scheme here, without exposing the site's other settings.
+	scheme := "dark"
+	var siteTheme struct {
+		Theme struct {
+			Scheme string `json:"site_scheme"`
+		} `json:"theme"`
+	}
+	if h.Store.GetSetting(r.Context(), "site", &siteTheme) == nil {
+		if v := siteTheme.Theme.Scheme; v == "light" || v == "auto" {
+			scheme = v
+		}
+	}
+	if s.Appearance != nil && s.Appearance.Scheme != "" && s.Appearance.Scheme != "inherit" {
+		scheme = s.Appearance.Scheme
+	}
 	doc := map[string]any{
 		"title": firstNonEmpty(s.Title, h.SiteName), "logo": s.Logo, "show_globe": s.ShowGlobe, "beat_seconds": s.BeatSeconds,
 		"layout": s.Layout, "public_sections": s.PublicSections,
-		"appearance": s.Appearance,
-		"visibility": s.Visibility, "carrier_ping": s.CarrierPing, "now": now.Unix(), "nodes": out, "staff": staff,
+		"appearance":        s.Appearance,
+		"appearance_scheme": scheme,
+		"visibility":        s.Visibility, "carrier_ping": s.CarrierPing, "now": now.Unix(), "nodes": out, "staff": staff,
 	}
 	b, _ := json.Marshal(doc)
 	if !staff {
@@ -354,7 +411,7 @@ func (rt *Router) Wrap(next http.Handler) http.Handler {
 				http.Error(w, http.StatusText(code), code)
 				return
 			}
-			h.Page.ServeHTTP(w, r)
+			h.page(s).ServeHTTP(w, r)
 			return
 		}
 		if s.PageOn() && s.Path != "" && s.Path != "/" {
@@ -370,7 +427,7 @@ func (rt *Router) Wrap(next http.Handler) http.Handler {
 				}
 				r2 := r.Clone(r.Context())
 				r2.URL.Path = strings.TrimPrefix(path, p)
-				h.Page.ServeHTTP(w, r2)
+				h.page(s).ServeHTTP(w, r2)
 				return
 			}
 		}
@@ -383,4 +440,11 @@ func optQuery(r *http.Request) string {
 		return "?" + r.URL.RawQuery
 	}
 	return ""
+}
+
+func (h *handlers) page(s store.ProbeSettings) http.Handler {
+	if s.Appearance != nil && s.Appearance.Preset == "glass" && h.GlassPage != nil {
+		return h.GlassPage
+	}
+	return h.Page
 }

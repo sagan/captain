@@ -74,7 +74,8 @@ type OIDCProvider struct {
 	// email_verified claim (fine for a provider you run yourself).
 	TrustEmail bool `json:"trust_email"`
 	// AutoRegister creates accounts for unknown users even when password
-	// registration is closed.
+	// registration is closed, unless the runtime registration master switch
+	// explicitly disallows signup.
 	AutoRegister bool `json:"auto_register"`
 }
 

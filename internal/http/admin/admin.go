@@ -44,10 +44,11 @@ type Deps struct {
 	// drops its cache so nodes see edits at once.
 	State *service.AgentState
 	// Metrics serves the Prometheus exposition at GET /api/admin/metrics.
-	Metrics  http.Handler
-	Log      *slog.Logger
-	Sessions SessionStore
-	Version  string
+	Metrics      http.Handler
+	Log          *slog.Logger
+	Sessions     SessionStore
+	Version      string
+	Registration bool // deployment default; runtime settings can override it
 	// Updater checks/applies Captain's own releases; BosunReleases only
 	// looks up the latest bosun tag for the node list. Either may be nil.
 	Updater       *selfupdate.Client

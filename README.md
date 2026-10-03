@@ -94,7 +94,7 @@ rules on `/sub`, daily `VACUUM INTO` backups uploaded to WebDAV/S3 encrypted
 with age and carrying the config file, a panel self-check on the dashboard, self-update for the panel and every node, Telegram bot and event webhooks,
 and an MCP server so an agent can answer "which node is down" for you.
 
-Resource monitoring adds per-NIC selection, filesystem/inode and disk I/O detail, logical CPUs and managed-process usage in node details, with a separate public-page switch (bosun ≥ 0.56). Network quality adds failure reasons, P50/P95, jitter and DNS/connect/TLS/response timing, with history counted by actual attempts. The monitoring workspace adds grouping, filtering, four-node comparison and per-device average/peak history; the six-language public page has configurable sections and compact layout. Persistent incidents, acknowledgement/recovery, maintenance/silence windows and contact availability with coverage complete the alert workspace. Node details also provide on-demand DNS, service, download and MTR/traceroute diagnostics with bounded execution and recent results. Optional NVIDIA/AMD GPU readings have private, deduplicated history; the public page offers Aurora/Paper/Terminal presets and light/dark/system modes. See [monitoring](docs/MONITORING.md#resource-detail-captain-17--bosun-056).
+Resource monitoring adds per-NIC selection, filesystem/inode and disk I/O detail, logical CPUs and managed-process usage in node details, with a separate public-page switch (bosun ≥ 0.56). Network quality adds failure reasons, P50/P95, jitter and DNS/connect/TLS/response timing, with history counted by actual attempts. The monitoring workspace adds grouping, filtering, four-node comparison and per-device average/peak history; the six-language public page has configurable sections and compact layout. Persistent incidents, acknowledgement/recovery, maintenance/silence windows and contact availability with coverage complete the alert workspace. Node details also provide on-demand DNS, service, download and MTR/traceroute diagnostics with bounded execution and recent results. Optional NVIDIA/AMD GPU readings have private, deduplicated history; the public page offers Aurora/Paper/Terminal/Glassmorphism presets and light/dark/system modes. Glassmorphism embeds the original Komari public UI, including cards/list, latency and loss bars, detail charts and an optional local globe. See [monitoring](docs/MONITORING.md#resource-detail-captain-17--bosun-056).
 
 
 **Six languages** in both interfaces — 简体中文, 繁體中文, English, 日本語,
@@ -132,6 +132,10 @@ keeping subscriptions, credentials and account history intact.
 Settings → Reset site clears business data and console settings, retaining the
 current administrator's login and deployment files. See [reset scope and node
 cleanup](docs/ADMIN.md#reset-site) before using it.
+
+Control public signup in Users → More → Registration and trials → Registration limits.
+The registration master switch takes effect immediately and also blocks OIDC
+automatic account creation when off; existing users can still sign in.
 
 The installer asks for the panel domain and an admin account, picks Docker
 when Docker is present and a systemd service otherwise, obtains a

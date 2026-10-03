@@ -30,6 +30,9 @@ var probeFS embed.FS
 // dedicated host or strips its path prefix first.
 func Probe() http.Handler { return spa(probeFS, "probe/dist", "/", "status page") }
 
+// ProbeGlass serves the embedded Glassmorphism frontend at the same public mount.
+func ProbeGlass() http.Handler { return spa(probeFS, "probe/dist/glass", "/", "status page") }
+
 // Injector returns operator HTML to add before </head> and </body>.
 type Injector func(r *http.Request) (head, body string)
 

@@ -71,7 +71,7 @@ func (s *Store) ResetSite(ctx context.Context, adminID int64) (*domain.User, err
 	if _, err := tx.ExecContext(ctx, `DELETE FROM sqlite_sequence WHERE name <> 'goose_db_version'`); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO account_sequences (name, value) VALUES ('agent', 0)`); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO account_sequences (name, value) VALUES ('agent', 0), ('user', 0)`); err != nil {
 		return nil, err
 	}
 	at := now()

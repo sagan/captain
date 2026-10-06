@@ -1,11 +1,14 @@
 package admin
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
+	"github.com/zeptop-dev/bosun/pkg/spec"
 	"github.com/zeptop-dev/captain/internal/domain"
 	"github.com/zeptop-dev/captain/internal/store"
 )
@@ -32,6 +35,8 @@ type ingressInput struct {
 	Name, Kind, BindIP, LineIP, EntryHost, EntryDomain string
 	PortFrom, PortTo, PortOffset                       int
 	ReservedPorts                                      []int
+	PortMappings                                       *[]spec.PortMapping
+	RequireIngress                                     *bool
 }
 
 func (in *ingressInput) apply(g *store.Ingress) string {
@@ -39,7 +44,21 @@ func (in *ingressInput) apply(g *store.Ingress) string {
 	if g.Name == "" {
 		return "name is required"
 	}
-	g.Kind = "mapped"
+	if in.Kind != "" {
+		g.Kind = in.Kind
+	}
+	if g.Kind == "" {
+		g.Kind = "mapped"
+	}
+	if g.Kind != "mapped" && g.Kind != "nat" && g.Kind != "iplc" {
+		return "kind must be nat, iplc or mapped"
+	}
+	if in.PortMappings != nil {
+		g.PortMappings = append([]spec.PortMapping{}, (*in.PortMappings)...)
+	}
+	if in.RequireIngress != nil {
+		g.RequireIngress = *in.RequireIngress
+	}
 	g.BindIP = strings.TrimSpace(in.BindIP)
 	if g.BindIP != "" && net.ParseIP(g.BindIP) == nil {
 		return "bind address must be an IP on this node"
@@ -49,7 +68,7 @@ func (in *ingressInput) apply(g *store.Ingress) string {
 		return "line address must be an IP"
 	}
 	g.EntryHost = strings.ToLower(strings.TrimSpace(in.EntryHost))
-	if strings.ContainsAny(g.EntryHost, " /:") {
+	if g.EntryHost != "" && net.ParseIP(g.EntryHost) == nil && strings.ContainsAny(g.EntryHost, " /:[]") {
 		return "entry host must be a host name or IP without a port"
 	}
 	g.EntryDomain = strings.ToLower(strings.TrimSpace(in.EntryDomain))
@@ -62,21 +81,21 @@ func (in *ingressInput) apply(g *store.Ingress) string {
 	if g.LineIP == "" && g.EntryHost == "" {
 		return "give the line's far-end address, its public entry, or both"
 	}
-	if (in.PortFrom == 0) != (in.PortTo == 0) || in.PortFrom < 0 || in.PortTo > 65535 || in.PortFrom > in.PortTo {
-		return "port range must be from-to within 1-65535, or empty"
-	}
 	g.PortFrom, g.PortTo, g.PortOffset = in.PortFrom, in.PortTo, in.PortOffset
-	g.ReservedPorts = []int{}
-	for _, p := range in.ReservedPorts {
-		if p < 1 || p > 65535 {
-			return "reserved ports must be within 1-65535"
-		}
-		g.ReservedPorts = append(g.ReservedPorts, p)
+	g.ReservedPorts = append([]int{}, in.ReservedPorts...)
+	if err := g.Ports().Validate(); err != nil {
+		return err.Error()
 	}
+	if g.Kind == "nat" && g.EntryHost == "" {
+		return "NAT ingress requires a public entry address"
+	}
+
 	return ""
 }
 
 func (h *handlers) createIngress(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	var in ingressInput
 	if !readJSON(w, r, &in) {
 		return
@@ -90,6 +109,13 @@ func (h *handlers) createIngress(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, msg)
 		return
 	}
+	if msg, err := h.checkIngressChange(r.Context(), g, false); err != nil {
+		serverErr(w, err)
+		return
+	} else if msg != "" {
+		fail(w, http.StatusConflict, msg)
+		return
+	}
 	if err := h.Store.CreateIngress(r.Context(), g); err != nil {
 		serverErr(w, err)
 		return
@@ -98,6 +124,8 @@ func (h *handlers) createIngress(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) updateIngress(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	var in ingressInput
 	if !readJSON(w, r, &in) {
 		return
@@ -111,6 +139,13 @@ func (h *handlers) updateIngress(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, msg)
 		return
 	}
+	if msg, err := h.checkIngressChange(r.Context(), g, false); err != nil {
+		serverErr(w, err)
+		return
+	} else if msg != "" {
+		fail(w, http.StatusConflict, msg)
+		return
+	}
 	if err := h.Store.UpdateIngress(r.Context(), g); err != nil {
 		serverErr(w, err)
 		return
@@ -119,6 +154,20 @@ func (h *handlers) updateIngress(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) deleteIngress(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
+	g, err := h.Store.IngressByID(r.Context(), idOf(r))
+	if err != nil {
+		fail(w, http.StatusNotFound, "ingress not found")
+		return
+	}
+	if msg, err := h.checkIngressChange(r.Context(), g, true); err != nil {
+		serverErr(w, err)
+		return
+	} else if msg != "" {
+		fail(w, http.StatusConflict, msg)
+		return
+	}
 	if err := h.Store.DeleteIngress(r.Context(), idOf(r)); err != nil {
 		serverErr(w, err)
 		return
@@ -126,23 +175,109 @@ func (h *handlers) deleteIngress(w http.ResponseWriter, r *http.Request) {
 	ok(w, map[string]bool{"ok": true})
 }
 
-// checkIngress validates an inbound's ingress reference: same node, port
-// inside the line's range.
+// checkIngress is also run for direct listeners, so require_ingress cannot
+// be bypassed by leaving the reference empty.
 func (h *handlers) checkIngress(r *http.Request, ib *domain.Inbound) string {
-	if ib.IngressID == nil {
-		return ""
+	gs, err := h.Store.IngressesByNode(r.Context(), ib.NodeID)
+	if err != nil {
+		return "could not read ingress configuration"
 	}
-	g, err := h.Store.IngressByID(r.Context(), *ib.IngressID)
-	if err != nil || g.NodeID != ib.NodeID {
-		return "ingress not found on this node"
+	id := ""
+	if ib.IngressID != nil {
+		id = strconv.FormatInt(*ib.IngressID, 10)
 	}
-	if !g.AllowsPort(ib.Port) {
-		for _, r := range g.ReservedPorts {
-			if r == ib.Port {
-				return fmt.Sprintf("port %d is reserved on the %s line (SSH or provider use)", ib.Port, g.Name)
+	if msg := checkIngressListener(gs, id, ib.Listen, ib.Port); msg != "" {
+		return msg
+	}
+	if id != "" {
+		for _, g := range gs {
+			if strconv.FormatInt(g.ID, 10) == id {
+				if err := g.Ports().CheckInbound(ib.Spec()); err != nil {
+					return err.Error()
+				}
 			}
 		}
-		return fmt.Sprintf("port %d is outside the %s line's range %d-%d", ib.Port, g.Name, g.PortFrom, g.PortTo)
 	}
 	return ""
+}
+
+func checkIngressListener(gs []store.Ingress, id, listen string, port int) string {
+	for _, g := range gs {
+		if id == "" && g.RequireIngress {
+			return "this node requires an ingress for every inbound and forward"
+		}
+		if id != "" && strconv.FormatInt(g.ID, 10) == id {
+			if err := g.Ports().Check(port); err != nil {
+				return fmt.Sprintf("%s: %v", g.Name, err)
+			}
+			if err := spec.CheckIngressListen(g.BindIP, listen); err != nil {
+				return err.Error()
+			}
+			return ""
+		}
+	}
+	if id != "" {
+		return "ingress not found on this node"
+	}
+	return ""
+}
+
+func (h *handlers) checkIngressChange(ctx context.Context, g *store.Ingress, removing bool) (string, error) {
+	gs, err := h.Store.IngressesByNode(ctx, g.NodeID)
+	if err != nil {
+		return "", err
+	}
+	next := []store.Ingress{}
+	for _, old := range gs {
+		if old.ID != g.ID {
+			next = append(next, old)
+		}
+	}
+	if !removing {
+		next = append(next, *g)
+	}
+	ibs, err := h.Store.AllInboundsByNode(ctx, g.NodeID)
+	if err != nil {
+		return "", err
+	}
+	for _, ib := range ibs {
+		id := ""
+		if ib.IngressID != nil {
+			id = strconv.FormatInt(*ib.IngressID, 10)
+		}
+		if msg := checkIngressListener(next, id, ib.Listen, ib.Port); msg != "" {
+			return "inbound " + ib.Tag + ": " + msg, nil
+		}
+		if ib.IngressID != nil && *ib.IngressID == g.ID && !removing {
+			if err := g.Ports().CheckInbound(ib.Spec()); err != nil {
+				return "inbound " + ib.Tag + ": " + err.Error(), nil
+			}
+		}
+	}
+	fs, err := h.Store.NodeForwards(ctx, g.NodeID)
+	if err != nil {
+		return "", err
+	}
+	for _, f := range fs {
+		if msg := checkIngressListener(next, f.IngressID, f.Listen, f.Port); msg != "" {
+			return "forward " + f.Tag + ": " + msg, nil
+		}
+	}
+	return "", nil
+}
+
+func (h *handlers) ingressListen(ctx context.Context, id *int64, listen string) string {
+	if listen == "" && id != nil {
+		if g, err := h.Store.IngressByID(ctx, *id); err == nil {
+			return g.BindIP
+		}
+	}
+	return listen
+}
+func (h *handlers) forwardIngressListen(ctx context.Context, f store.NodeForward) string {
+	id, err := strconv.ParseInt(f.IngressID, 10, 64)
+	if err != nil {
+		return f.Listen
+	}
+	return h.ingressListen(ctx, &id, f.Listen)
 }

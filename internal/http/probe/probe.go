@@ -104,6 +104,8 @@ type nodeView struct {
 	Traffic   struct {
 		Used, Limit, PrevUsed int64  `json:"-"`
 		UsedB                 int64  `json:"used"`
+		UsedUpB               int64  `json:"used_up"`
+		UsedDownB             int64  `json:"used_down"`
 		LimitB                int64  `json:"limit"`
 		PrevB                 int64  `json:"prev"`
 		Mode                  string `json:"mode"`
@@ -162,7 +164,11 @@ func (h *handlers) snapshot(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	probes, _ := h.Store.ListNodeProbes(r.Context())
+	probes, err := h.Store.ListNodeProbes(r.Context())
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	var tasks []store.PingTask
 	if s.PublicShows("latency") {
 		tasks, err = h.Store.ListPingTasks(r.Context())
@@ -219,6 +225,7 @@ func (h *handlers) snapshot(w http.ResponseWriter, r *http.Request) {
 		if np != nil {
 			v.Info = np.Info
 			v.Traffic.UsedB, v.Traffic.LimitB, v.Traffic.PrevB, v.Traffic.Mode, v.Traffic.ResetDay = np.Billed(), np.LimitBytes, np.PrevUsed, np.Mode, np.ResetDay
+			v.Traffic.UsedUpB, v.Traffic.UsedDownB = np.UsedUp, np.UsedDown
 			if !np.PeriodStart.IsZero() {
 				v.Traffic.PeriodStart = np.PeriodStart.Unix()
 			}
@@ -231,6 +238,8 @@ func (h *handlers) snapshot(w http.ResponseWriter, r *http.Request) {
 		}
 		if !s.PublicShows("traffic") {
 			v.Traffic.UsedB = 0
+			v.Traffic.UsedUpB = 0
+			v.Traffic.UsedDownB = 0
 			v.Traffic.LimitB = 0
 			v.Traffic.PrevB = 0
 			v.Traffic.Mode = ""

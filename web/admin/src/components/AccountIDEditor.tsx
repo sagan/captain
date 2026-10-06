@@ -1,8 +1,9 @@
 import { Button, Group, NumberInput, Stack, Text } from '@mantine/core'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { api } from '../lib/api'
+import { api, ApiError } from '../lib/api'
 import { toast } from '../lib/notify'
 
 export function AccountIDEditor({ id, endpoint, onChanged }: { id: number; endpoint: string; onChanged: () => void }) {
@@ -11,8 +12,14 @@ export function AccountIDEditor({ id, endpoint, onChanged }: { id: number; endpo
   const [value, setValue] = useState<number | string>(id)
   const change = useMutation({
     mutationFn: () => api.put(endpoint, { id: Number(value) }),
-    onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries(); onChanged() },
-    onError: toast.err,
+    onSuccess: () => {
+      toast.ok(t('common.saved'))
+      // Unmount the old ID's detail queries before invalidation refetches
+      // active queries; that account no longer exists at the old URL.
+      flushSync(onChanged)
+      qc.invalidateQueries()
+    },
+    onError: (error) => toast.err(error instanceof ApiError && error.status === 409 ? t('accountID.inUse') : error),
   })
   return <Stack gap={4}>
     <Group align="flex-end" wrap="nowrap">

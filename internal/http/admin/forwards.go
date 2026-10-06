@@ -29,6 +29,8 @@ func (h *handlers) getNodeForwards(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) putNodeForwards(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	id := idOf(r)
 	var in struct{ Forwards []store.NodeForward }
 	if !readJSON(w, r, &in) {
@@ -41,6 +43,11 @@ func (h *handlers) putNodeForwards(w http.ResponseWriter, r *http.Request) {
 	// Every socket the node already opens, apart from the forwards this
 	// call replaces: the same model the inbound side checks against, so
 	// the two cannot disagree about who owns a port.
+	gs, err := h.Store.IngressesByNode(r.Context(), id)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
 	used := h.nodeBinds(r.Context(), id, 0, true)
 	tags := map[string]bool{}
 	clean := make([]store.NodeForward, 0, len(in.Forwards))
@@ -131,14 +138,26 @@ func (h *handlers) putNodeForwards(w http.ResponseWriter, r *http.Request) {
 			fail(w, http.StatusBadRequest, fmt.Sprintf("rule %d: listen must be an IP or empty", i+1))
 			return
 		}
+		if msg := checkIngressListener(gs, f.IngressID, f.Listen, f.Port); msg != "" {
+			fail(w, http.StatusBadRequest, msg)
+			return
+		}
+		effectiveListen := f.Listen
+		if effectiveListen == "" {
+			for _, g := range gs {
+				if strconv.FormatInt(g.ID, 10) == f.IngressID {
+					effectiveListen = g.BindIP
+				}
+			}
+		}
 		for _, l := range forwardListeners(f) {
 			for _, b := range used {
-				if b.listener == l && listenOverlap(b.listen, f.Listen) {
+				if b.listener == l && listenOverlap(b.listen, effectiveListen) {
 					fail(w, http.StatusBadRequest, fmt.Sprintf("%s port %d is already used by %s", l.proto, l.port, b.owner))
 					return
 				}
 			}
-			used = append(used, bind{l, f.Listen, "forward " + f.Tag})
+			used = append(used, bind{l, effectiveListen, "forward " + f.Tag})
 		}
 		clean = append(clean, f)
 	}

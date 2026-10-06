@@ -30,8 +30,11 @@ Captain adaptations:
   Custom non-carrier labels are not presented as Chinese operators.
 - CPU/resource validity, monthly monitoring traffic, section visibility and
   unavailable financial data follow Captain semantics. An unknown price does
-  not mean free; cost/value cards show a dash. OS counters remain independent
-  of monthly monitoring traffic. GPU details remain private.
+  not mean free; cost/value cards show a dash. All traffic totals and quota bars
+  use persisted period counters (`traffic.used_up/used_down`), independently of
+  live network rates. The overview adds each selected node’s current period;
+  nodes may have different reset days. Restarts preserve recorded usage. Missing
+  counters stay unknown rather than falling back to OS counters. GPU details remain private.
 - Hash routes retain arbitrary status page mounts and dedicated host support.
   The snapshot's additive `appearance_scheme` resolves inherited site colours
   without needing `/api/site` on a dedicated status hostname.

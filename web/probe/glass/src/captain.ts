@@ -8,6 +8,12 @@ import type { Client, NodeStatus, StatusRecord, MetricQueryParams, MetricQueryRe
 
 export const snapshot = shallowRef<Snapshot | null>(null)
 export const shows = (section: string) => snapshot.value?.public_sections == null || snapshot.value.public_sections.includes(section)
+// These totals survive node/agent restarts. Never fall back to OS lifetime
+// counters on older snapshots: that would silently change the period again.
+export function periodTraffic(n: Node) {
+  const count = (v: unknown) => shows('traffic') && typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : Number.NaN
+  return { up: count(n.traffic.used_up), down: count(n.traffic.used_down), used: count(n.traffic.used) }
+}
 const iso = (seconds: number) => new Date(seconds * 1000).toISOString()
 const metric = (host: Host | null, section: string, validity: keyof Validity, key: keyof Host): number =>
   !shows(section) || !host || host.valid?.[validity] === false ? Number.NaN : Number(host[key] ?? 0)
@@ -36,6 +42,7 @@ export function clientFor(n: Node, weight: number): Client {
 
 export function statusFor(n: Node): NodeStatus {
   const h = n.host
+  const traffic = periodTraffic(n)
   return {
     client: String(n.id), time: n.last_seen ?? '', online: n.online,
     cpu: metric(h, 'cpu', 'cpu', 'cpu_percent'), gpu: Number.NaN, temp: Number.NaN,
@@ -44,8 +51,10 @@ export function statusFor(n: Node): NodeStatus {
     disk: metric(h, 'disk', 'disk', 'disk_used'), disk_total: metric(h, 'disk', 'disk', 'disk_total'),
     load: metric(h, 'system', 'load', 'load1'), load5: metric(h, 'system', 'load', 'load5'), load15: metric(h, 'system', 'load', 'load15'),
     net_in: metric(h, 'network', 'network', 'net_down'), net_out: metric(h, 'network', 'network', 'net_up'),
-    net_total_up: metric(h, 'network', 'network', 'net_total_up'), net_total_down: metric(h, 'network', 'network', 'net_total_down'),
-    // Monthly monitoring traffic is a single aggregate in Captain. Keep it separate from OS counters.
+    // The original UI's total fields now consistently mean persisted period
+    // traffic; the Captain API's host.net_total_* fields retain their OS meaning.
+    net_total_up: traffic.up, net_total_down: traffic.down,
+    traffic_up: traffic.up, traffic_down: traffic.down,
     process: metric(h, 'system', 'processes', 'processes'), connections: metric(h, 'system', 'connections', 'tcp'),
     connections_udp: metric(h, 'system', 'connections', 'udp'), uptime: shows('system') && h ? h.uptime ?? 0 : Number.NaN,
   }

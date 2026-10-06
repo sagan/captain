@@ -48,7 +48,7 @@ export function NodeProbeCard({ nodeID, reportedHost }: { nodeID: number; report
         <Stack gap={4} mb="sm">
           <Group justify="space-between"><Text size="sm">{t('nodeProbe.used')}: <b>{bytes(used)}</b>{p.limit_bytes > 0 && <> / {bytes(p.limit_bytes)}</>}</Text><Text size="xs" c="dimmed">{t('nodeProbe.prev')}: {bytes(p.prev_used)}</Text></Group>
           {p.limit_bytes > 0 && <Progress value={pct} color={pct > 90 ? 'red' : pct > 70 ? 'orange' : 'teal'} />}
-          <Text size="xs" c="dimmed">↑ {bytes(p.used_up)} · ↓ {bytes(p.used_down)} · {t('nodeProbe.since')} {p.period_start ? new Date(p.period_start).toLocaleDateString() : '—'}</Text>
+          <Text size="xs" c="dimmed">{t('nodeProbe.outbound')} {bytes(p.used_up)} · {t('nodeProbe.inbound')} {bytes(p.used_down)} · {t('nodeProbe.since')} {p.period_start ? new Date(p.period_start).toLocaleDateString() : '—'}</Text>
         </Stack>
       )}
       <form onSubmit={form.onSubmit((v) => save.mutate(v))}><Stack gap="sm">
@@ -56,10 +56,10 @@ export function NodeProbeCard({ nodeID, reportedHost }: { nodeID: number; report
         <SimpleGrid cols={{ base: 1, sm: 3 }}>
           <NumberInput label={t('nodeProbe.limit')} description={t('nodeProbe.limitHint')} min={0} {...form.getInputProps('LimitGB')} />
           <NumberInput label={t('nodeProbe.resetDay')} min={1} max={28} {...form.getInputProps('ResetDay')} />
-          <Select label={t('nodeProbe.mode')} data={[{ value: 'sum', label: t('nodeProbe.modes.sum') }, { value: 'up', label: t('nodeProbe.modes.up') }, { value: 'down', label: t('nodeProbe.modes.down') }, { value: 'max', label: t('nodeProbe.modes.max') }]} allowDeselect={false} {...form.getInputProps('Mode')} />
+          <Select label={t('nodeProbe.mode')} description={t('nodeProbe.modeHint')} data={[{ value: 'sum', label: t('nodeProbe.modes.sum') }, { value: 'up', label: t('nodeProbe.modes.up') }, { value: 'down', label: t('nodeProbe.modes.down') }, { value: 'max', label: t('nodeProbe.modes.max') }]} allowDeselect={false} {...form.getInputProps('Mode')} />
         </SimpleGrid>
         <SimpleGrid cols={{ base: 1, sm: 3 }}>
-          <TextInput label={t('nodeProbe.region')} placeholder="JP" maxLength={2} {...form.getInputProps('region')} />
+          <TextInput label={t('nodeProbe.region')} description={t('nodeProbe.regionHint')} inputWrapperOrder={['label', 'input', 'description', 'error']} placeholder="JP" maxLength={2} {...form.getInputProps('region')} />
           <TextInput label={t('nodeProbe.provider')} placeholder="Vultr" {...form.getInputProps('provider')} />
           <TextInput label={t('nodeProbe.providerURL')} placeholder="https://…" {...form.getInputProps('provider_url')} />
           <TextInput label={t('nodeProbe.price')} placeholder="$5 / mo" {...form.getInputProps('price')} />

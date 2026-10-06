@@ -48,7 +48,7 @@ export function getRealtimePeakSpeed(node: Pick<NodeData, 'net_in' | 'net_out'>)
 }
 
 export function getTotalTraffic(node: Pick<NodeData, 'net_total_up' | 'net_total_down'>): number {
-  return (node.net_total_up || 0) + (node.net_total_down || 0)
+  return node.net_total_up + node.net_total_down
 }
 
 export function getConnectionCount(node: Pick<NodeData, 'connections' | 'connections_udp'>): number {

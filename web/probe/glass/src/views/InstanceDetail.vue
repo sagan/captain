@@ -364,8 +364,8 @@ function getDetailMetricCard(key: DetailMetricCardKey): MetricCard {
       return { key, label: t('实时下行'), value: speed.value, unit: speed.unit, icon: 'tabler:chevrons-down' }
     }
     case 'totalTraffic': {
-      const traffic = splitMeasurement(formatBytes((node?.net_total_up ?? 0) + (node?.net_total_down ?? 0)))
-      return { key, label: t('累计流量'), value: traffic.value, unit: traffic.unit, icon: 'tabler:arrows-transfer-up-down', tooltip: `↑ ${formatBytes(node?.net_total_up ?? 0)} / ↓ ${formatBytes(node?.net_total_down ?? 0)}` }
+      const traffic = splitMeasurement(formatBytes((node?.net_total_up ?? Number.NaN) + (node?.net_total_down ?? Number.NaN)))
+      return { key, label: t('累计流量'), value: traffic.value, unit: traffic.unit, icon: 'tabler:arrows-transfer-up-down', tooltip: `${t('本周期出站')} ${formatBytes(node?.net_total_up ?? Number.NaN)} / ${t('本周期入站')} ${formatBytes(node?.net_total_down ?? Number.NaN)}\n${t('周期流量说明')}` }
     }
     case 'trafficQuota':
       return {
@@ -432,9 +432,7 @@ const trafficUsedPercentage = computed(() => {
 })
 
 const trafficUsageText = computed(() => {
-  if (!hasTrafficLimit.value)
-    return '无限流量'
-  return `${formatBytes(trafficUsed.value)} / ${formatBytes(data.value?.traffic_limit ?? 0)}`
+  return `${formatBytes(trafficUsed.value)} / ${hasTrafficLimit.value ? formatBytes(data.value?.traffic_limit ?? 0) : '∞'}`
 })
 
 const trafficProgressStyle = computed(() => ({
@@ -451,7 +449,7 @@ const trafficProgressClass = computed(() => {
   return 'bg-emerald-500/20'
 })
 
-const metricCards = computed<MetricCard[]>(() => appStore.detailMetricCardOrder.filter(key => shows(({cpuUsage:'cpu',memoryUsage:'memory',swapUsage:'memory',diskUsage:'disk',uploadSpeed:'network',downloadSpeed:'network',totalTraffic:'network',trafficQuota:'traffic',connections:'system',processes:'system',uptime:'system',load:'system',remainingTime:'system',nodePrice:'system',monthlyCost:'system',remainingValue:'system'} as Record<string,string>)[key] ?? 'system')).map(getDetailMetricCard))
+const metricCards = computed<MetricCard[]>(() => appStore.detailMetricCardOrder.filter(key => shows(({cpuUsage:'cpu',memoryUsage:'memory',swapUsage:'memory',diskUsage:'disk',uploadSpeed:'network',downloadSpeed:'network',totalTraffic:'traffic',trafficQuota:'traffic',connections:'system',processes:'system',uptime:'system',load:'system',remainingTime:'system',nodePrice:'system',monthlyCost:'system',remainingValue:'system'} as Record<string,string>)[key] ?? 'system')).map(getDetailMetricCard))
 </script>
 
 <template>
@@ -475,7 +473,7 @@ const metricCards = computed<MetricCard[]>(() => appStore.detailMetricCardOrder.
           <Icon icon="tabler:arrow-left" :width="16" :height="16" />
         </Button>
         <div class="min-w-0 text-lg font-bold flex gap-2 items-center">
-          <img :src="`./images/flags/${getRegionCode(data.region)}.svg`" :alt="getRegionAltText(data.region)" class="size-6">
+          <img v-if="data.region?.trim()" :src="`./images/flags/${getRegionCode(data.region)}.svg`" :alt="getRegionAltText(data.region)" class="size-6">
           <span class="truncate">{{ data.name }}</span>
         </div>
         <Badge :variant="data.online ? 'default' : 'destructive'" class="text-xs !rounded">
@@ -685,12 +683,12 @@ const metricCards = computed<MetricCard[]>(() => appStore.detailMetricCardOrder.
         </CardX>
 
         <CardX
-          v-if="shows('network')" :title="t('网络信息')" size="small"
+          v-if="shows('network') || shows('traffic')" :title="t('网络信息')" size="small"
           class="group h-full bg-background/50 border-none hover:bg-background transition-all rounded-md"
           content-class="pt-0"
         >
           <div class="gap-3 grid grid-cols-2">
-            <div class="relative min-w-0 overflow-hidden rounded-sm bg-slate-500/5 p-2">
+            <div v-if="shows('traffic')" :title="t('周期流量说明')" class="relative min-w-0 overflow-hidden rounded-sm bg-slate-500/5 p-2">
               <div
                 v-if="hasTrafficLimit"
                 class="absolute inset-y-0 left-0 rounded-sm pointer-events-none transition-[width,background-color] duration-300 ease-out"
@@ -700,7 +698,7 @@ const metricCards = computed<MetricCard[]>(() => appStore.detailMetricCardOrder.
               <div class="relative flex flex-col gap-1.5">
                 <div class="flex gap-1 items-center text-muted-foreground">
                   <Icon icon="icon-park-outline:transfer-data" :width="14" :height="14" />
-                  <span class="text-xs sm:text-sm">{{ t('总流量') }}</span>
+                  <span class="text-xs sm:text-sm">{{ t('流量配额') }}</span>
                   <Badge
                     v-for="proto in ipSupport" :key="proto" variant="outline"
                     class="!text-[10px] rounded text-emerald-600 border-emerald-600/25 px-1 py-0 leading-none"
@@ -709,11 +707,11 @@ const metricCards = computed<MetricCard[]>(() => appStore.detailMetricCardOrder.
                   </Badge>
                   <div class="flex-1" />
                   <span class="hidden sm:block text-[11px] font-medium text-foreground/70">
-                    {{ formatBytes(data?.net_total_up ?? 0) }} / {{ formatBytes(data?.net_total_down ?? 0) }}
+                    {{ formatBytes(data?.net_total_up ?? Number.NaN) }} / {{ formatBytes(data?.net_total_down ?? Number.NaN) }}
                   </span>
                 </div>
                 <span class="text-xs sm:text-sm break-all">{{ trafficUsageText }}</span>
-                <span v-if="hasPeak" class="text-[10px] text-muted-foreground/80 flex items-center gap-2 leading-none">
+                <span v-if="shows('network') && hasPeak" class="text-[10px] text-muted-foreground/80 flex items-center gap-2 leading-none">
                   <span>近一天峰值</span>
                   <span class="text-green-600 flex items-center gap-0.5">
                     <Icon icon="tabler:chevron-up" width="10" height="10" />{{ formatBytesPerSecond(peakNetOut) }}
@@ -724,7 +722,7 @@ const metricCards = computed<MetricCard[]>(() => appStore.detailMetricCardOrder.
                 </span>
               </div>
             </div>
-            <div class="min-w-0 flex flex-col gap-1 rounded-sm bg-slate-500/5 p-2">
+            <div v-if="shows('network')" class="min-w-0 flex flex-col gap-1 rounded-sm bg-slate-500/5 p-2">
               <div class="flex gap-1 items-center text-muted-foreground">
                 <Icon icon="icon-park-outline:dashboard-one" :width="14" :height="14" />
                 <span class="text-xs sm:text-sm">{{ t('网络速率') }}</span>

@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { snapshot, clientFor, statusFor, captainCall, clearHistoryCache, pingMetrics } from './captain.ts'
+import { snapshot, clientFor, statusFor, captainCall, clearHistoryCache, pingMetrics, periodTraffic } from './captain.ts'
 import { summarizePings } from './ping-summary.ts'
 import { selectPings, selectedHistory } from './ping-selection.ts'
 const now = Math.floor(Date.now() / 60000) * 60
@@ -83,4 +83,37 @@ test('first task remains stable when its samples are missing, stale or reordered
  assert.equal(selectPings({...node,ping_tasks:[]},false).first,null)
  assert.equal(selectPings({ping_tasks:[{id:0,name:'Custom'}]},true).threeNetwork,false)
  assert.equal(selectPings({ping_tasks:[{id:0,name:'Custom'}]},true).first.name,'Custom')
+})
+
+test('period totals survive OS counter resets, offline nodes and unavailable live metrics', () => {
+ const before={...node,traffic:{...node.traffic,used_up:300,used_down:500,used:800},host:{...node.host,net_total_up:1000300,net_total_down:2000500,net_up:7,net_down:11}}
+ const restarted={...before,host:{...before.host,net_total_up:10,net_total_down:20,net_up:1,net_down:2}}
+ for(const n of [before,restarted,{...restarted,online:false,host:null},{...restarted,host:{valid:{network:false}}}]) {
+  assert.equal(statusFor(n).net_total_up,300);assert.equal(statusFor(n).net_total_down,500)
+  assert.equal(statusFor(n).traffic_up,300);assert.equal(statusFor(n).traffic_down,500)
+  assert.equal(periodTraffic(n).used,800)
+ }
+ assert.equal(statusFor(before).net_out,7);assert.equal(statusFor(restarted).net_out,1)
+ assert.equal(statusFor(before).net_in,11);assert.equal(statusFor(restarted).net_in,2)
+ const reset={...before,traffic:{...before.traffic,used:0,used_up:0,used_down:0}}
+ assert.equal(statusFor(reset).net_total_up,0);assert.equal(statusFor(reset).net_total_down,0)
+ for(const [mode,used] of Object.entries({sum:800,up:300,down:500,max:500})) {
+  const n={...before,traffic:{...before.traffic,mode,used}}
+  assert.equal(periodTraffic(n).used,used)
+  assert.equal(statusFor(n).net_total_up+statusFor(n).net_total_down,800)
+ }
+})
+test('period counters and live rates obey independent visibility, missing counters never use OS totals', () => {
+ const n={...node,traffic:{...node.traffic,used_up:0,used_down:500},host:{...node.host,net_total_up:999,net_total_down:999,net_up:7,net_down:11}}
+ snapshot.value.public_sections=['traffic']
+ assert.equal(statusFor(n).net_total_up,0);assert.equal(statusFor(n).net_total_down,500)
+ assert(Number.isNaN(statusFor(n).net_out))
+ snapshot.value.public_sections=['network']
+ assert(Number.isNaN(statusFor(n).net_total_up));assert(Number.isNaN(statusFor(n).net_total_down))
+ assert(Number.isNaN(periodTraffic(n).used));assert.equal(statusFor(n).net_out,7)
+ snapshot.value.public_sections=['network','traffic']
+ assert(Number.isNaN(statusFor({...n,traffic:{used:100}}).net_total_up))
+ for(const value of [undefined,null,-1,Infinity,'123']) {
+  assert(Number.isNaN(statusFor({...n,traffic:{...n.traffic,used_up:value}}).net_total_up))
+ }
 })

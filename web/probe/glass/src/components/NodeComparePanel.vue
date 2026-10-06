@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { t } from '@/i18n'
+import { shows } from '@/captain'
 import type { NodeData } from '@/stores/nodes'
 import { Icon } from '@iconify/vue'
 import { useStorageAsync } from '@vueuse/core'
@@ -67,7 +68,7 @@ const compareMetrics = computed<CompareMetric[]>(() => {
     { key: 'memory', label: t('内存'), value: node => `${formatBytes(node.ram || 0)} / ${formatBytes(node.mem_total || 0)}`, percentage: getMemoryPercentage },
     { key: 'disk', label: t('磁盘'), value: node => `${formatBytes(node.disk || 0)} / ${formatBytes(node.disk_total || 0)}`, percentage: getDiskPercentage },
     { key: 'network', label: t('实时网络'), value: node => `↑ ${formatSpeed(node.net_out || 0)}  ↓ ${formatSpeed(node.net_in || 0)}` },
-    { key: 'traffic', label: t('累计流量'), value: node => `${formatBytes(node.net_total_up || 0)} ↑ / ${formatBytes(node.net_total_down || 0)} ↓` },
+    { key: 'traffic', label: t('累计流量'), value: node => `${formatBytes(node.net_total_up ?? Number.NaN)} ↑ / ${formatBytes(node.net_total_down ?? Number.NaN)} ↓` },
     {
       key: 'trafficQuota',
       label: t('流量配额'),
@@ -86,7 +87,7 @@ const compareMetrics = computed<CompareMetric[]>(() => {
         : '-',
     })
   }
-  return metrics
+  return metrics.filter(metric => !['traffic', 'trafficQuota'].includes(metric.key) || shows('traffic'))
 })
 
 function isSelected(uuid: string): boolean {

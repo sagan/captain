@@ -12,7 +12,7 @@ const object = (v: unknown): Record<string, unknown> => v !== null && typeof v =
 // private keys, which must never enter URLs or TanStack Query's cache keys.
 function probe(ib: Record<string, unknown>): string {
   return new URLSearchParams({
-    protocol: String(ib.protocol || ''), transport: String(object(ib.transport).type || 'tcp'), cipher: String(ib.cipher || ''),
+    reverse: String(!!ib.reverse), protocol: String(ib.protocol || ''), transport: String(object(ib.transport).type || 'tcp'), cipher: String(ib.cipher || ''),
     reality: String(object(ib.tls).mode === 2), shadow_tls: String(!!ib.shadow_tls), fallbacks: String(Array.isArray(ib.fallbacks) && ib.fallbacks.length > 0),
     proxy_protocol: String(ib.accept_proxy_protocol === true), snell_multi_user: String(ib.snell_multi_user === true), snell_obfs: String(ib.snell_obfs || ''),
   }).toString()

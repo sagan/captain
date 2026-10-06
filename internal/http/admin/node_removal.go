@@ -12,6 +12,8 @@ import (
 )
 
 func (h *handlers) startNodeRemoval(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	if !userFrom(r).IsAdmin() {
 		fail(w, 403, "admin only")
 		return
@@ -37,6 +39,17 @@ func (h *handlers) startNodeRemoval(w http.ResponseWriter, r *http.Request) {
 	if !n.Paired || n.LastSeenAt == nil || time.Since(*n.LastSeenAt) >= 3*time.Minute {
 		fail(w, 409, "node must be paired and online")
 		return
+	}
+	if in.Mode == "standalone" {
+		links, err := h.Store.ReverseLinks(r.Context(), id)
+		if err != nil {
+			serverErr(w, err)
+			return
+		}
+		if len(links) > 0 {
+			fail(w, 409, "remove managed reverse connections before switching to standalone mode")
+			return
+		}
 	}
 	if n.Version != "v0.55.0" && !selfupdate.Newer(n.Version, "v0.55.0") {
 		fail(w, 409, "remote removal requires bosun v0.55.0 or newer")

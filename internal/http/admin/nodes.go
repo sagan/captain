@@ -165,6 +165,8 @@ func (h *handlers) updateNode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) deleteNode(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	id, okID := pathID(r)
 	if !okID {
 		fail(w, http.StatusBadRequest, "bad id")
@@ -222,6 +224,8 @@ func checkInboundFields(ib *domain.Inbound) string {
 }
 
 func (h *handlers) createInbound(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	nodeID, okID := pathID(r)
 	var ib domain.Inbound
 	if !okID || !decode(r, &ib) || ib.Tag == "" || ib.Protocol == "" || ib.Port == 0 {
@@ -229,6 +233,10 @@ func (h *handlers) createInbound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ib.NodeID = nodeID
+	if ib.Settings.Reverse != nil {
+		fail(w, 400, "use the reverse connection wizard")
+		return
+	}
 	ib.Enabled = true
 	fillInboundSecrets(&ib)
 	if msg := checkInboundFields(&ib); msg != "" {
@@ -255,6 +263,8 @@ func (h *handlers) createInbound(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) updateInbound(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	id, okID := pathID(r)
 	cur, err := h.Store.InboundByID(r.Context(), id)
 	if !okID || err != nil {
@@ -262,11 +272,19 @@ func (h *handlers) updateInbound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ib := *cur
+	if h.Store.ReverseOwnedInbound(r.Context(), id) {
+		fail(w, 409, "edit this inbound in its exit node's reverse connections")
+		return
+	}
 	if !decode(r, &ib) || ib.Tag == "" || ib.Protocol == "" || ib.Port == 0 {
 		fail(w, http.StatusBadRequest, "tag, protocol and port are required")
 		return
 	}
 	ib.ID, ib.NodeID = cur.ID, cur.NodeID
+	if ib.Settings.Reverse != nil {
+		fail(w, 400, "use the reverse connection wizard")
+		return
+	}
 	fillInboundSecrets(&ib)
 	if msg := checkInboundFields(&ib); msg != "" {
 		fail(w, http.StatusBadRequest, msg)
@@ -292,7 +310,13 @@ func (h *handlers) updateInbound(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) deleteInbound(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	id, okID := pathID(r)
+	if h.Store.ReverseOwnedInbound(r.Context(), id) {
+		fail(w, 409, "remove this inbound through its reverse connection")
+		return
+	}
 	if !okID {
 		fail(w, http.StatusBadRequest, "bad id")
 		return
@@ -423,14 +447,14 @@ func (h *handlers) nodeBinds(ctx context.Context, nodeID, skipInbound int64, ski
 			continue
 		}
 		for _, l := range inboundListeners(o) {
-			out = append(out, bind{l, o.Listen, "inbound " + o.Tag})
+			out = append(out, bind{l, h.ingressListen(ctx, o.IngressID, o.Listen), "inbound " + o.Tag})
 		}
 	}
 	if !skipForwards {
 		fws, _ := h.Store.NodeForwards(ctx, nodeID)
 		for _, f := range fws {
 			for _, l := range forwardListeners(f) {
-				out = append(out, bind{l, f.Listen, "forward " + f.Tag})
+				out = append(out, bind{l, h.forwardIngressListen(ctx, f), "forward " + f.Tag})
 			}
 		}
 	}
@@ -453,7 +477,7 @@ func (h *handlers) checkPortConflict(ctx context.Context, ib *domain.Inbound) st
 	}
 	for _, l := range inboundListeners(ib) {
 		for _, b := range h.nodeBinds(ctx, ib.NodeID, ib.ID, false) {
-			if b.listener == l && listenOverlap(b.listen, ib.Listen) {
+			if b.listener == l && listenOverlap(b.listen, h.ingressListen(ctx, ib.IngressID, ib.Listen)) {
 				return fmt.Sprintf("%s port %d is already used by %s", strings.ToUpper(l.proto), l.port, b.owner)
 			}
 		}

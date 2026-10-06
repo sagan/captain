@@ -275,9 +275,9 @@ const onlineStats = computed<OnlineStats>(() => {
 const totalSpeed = computed(() => summaryNodes.value.some(n => n.online && Number.isFinite(n.net_in)) ? onlineStats.value.totalSpeed : {up: Number.NaN, down: Number.NaN})
 
 const totalTraffic = computed(() => {
-  const up = summaryNodes.value.reduce((sum, node) => sum + (node.net_total_up || 0), 0)
-  const down = summaryNodes.value.reduce((sum, node) => sum + (node.net_total_down || 0), 0)
-  return summaryNodes.value.some(n => Number.isFinite(n.net_total_up)) ? {up, down} : {up: Number.NaN, down: Number.NaN}
+  const up = summaryNodes.value.reduce((sum, node) => sum + node.net_total_up, 0)
+  const down = summaryNodes.value.reduce((sum, node) => sum + node.net_total_down, 0)
+  return summaryNodes.value.length > 0 ? {up, down} : {up: Number.NaN, down: Number.NaN}
 })
 
 const formattedTrafficUp = computed(() => formatBytesSplit(totalTraffic.value.up, appStore.byteDecimals))
@@ -466,7 +466,7 @@ function getCardDefinition(key: GeneralCardKey): GeneralMetricCard {
         icon: 'tabler:download',
         value: totalTrafficTooltip.value.value,
         unit: totalTrafficTooltip.value.unit,
-        tooltip: `↑ ${formattedTrafficUp.value.value} ${formattedTrafficUp.value.unit}\n↓ ${formattedTrafficDown.value.value} ${formattedTrafficDown.value.unit}`,
+        tooltip: `${t('本周期出站')} ${formattedTrafficUp.value.value} ${formattedTrafficUp.value.unit}\n${t('本周期入站')} ${formattedTrafficDown.value.value} ${formattedTrafficDown.value.unit}\n${t('汇总周期流量说明')}`,
       }
     case 'uploadSpeed':
       return {

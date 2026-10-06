@@ -564,7 +564,7 @@ function buildNodeMetadataItems(node: NodeData): NodeMetadataItem[] {
                 <div
                   v-else-if="col.key === 'traffic'"
                   class="group min-w-0"
-                  :title="`↑ ${formatBytes(node.net_total_up ?? 0)}\n↓ ${formatBytes(node.net_total_down ?? 0)}`"
+                  :title="`${t('本周期出站')} ${formatBytes(node.net_total_up ?? Number.NaN)}\n${t('本周期入站')} ${formatBytes(node.net_total_down ?? Number.NaN)}\n${t('周期流量说明')}`"
                 >
                   <div class="space-y-1 w-full">
                     <div class="text-[11px] font-medium text-foreground/75 truncate">
@@ -578,10 +578,12 @@ function buildNodeMetadataItems(node: NodeData): NodeMetadataItem[] {
                       </span>
                     </div>
                     <TrafficProgress
+                      v-if="Number.isFinite(node.net_total_up) && Number.isFinite(node.net_total_down)"
                       :upload="node.net_total_up ?? 0" :download="node.net_total_down ?? 0"
                       :traffic-limit="node.traffic_limit" :traffic-limit-type="(node.traffic_limit_type || 'sum')"
                       height="4px"
                     />
+                    <ProgressThin v-else :percentage="getTrafficUsedPercentage(node)" :status="getStatus(getTrafficUsedPercentage(node))" :height="4" />
                   </div>
                 </div>
 

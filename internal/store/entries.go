@@ -43,6 +43,10 @@ func (s *Store) CreateEntry(ctx context.Context, e *domain.Entry) error {
 	return nil
 }
 
+func (s *Store) EntryByID(ctx context.Context, id int64) (*domain.Entry, error) {
+	return scanEntry(s.db.QueryRowContext(ctx, `SELECT `+entryCols+` FROM entries e WHERE e.id=?`, id))
+}
+
 // parseExtra decodes the client_extra column ("" or invalid = none).
 func parseExtra(raw string) map[string]any {
 	if strings.TrimSpace(raw) == "" {

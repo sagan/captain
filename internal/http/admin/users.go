@@ -67,8 +67,24 @@ func (h *handlers) listUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) createUser(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Email, Password string }
-	if !decode(r, &in) || in.Email == "" || len(in.Password) < 8 {
+	var in struct {
+		Email, Password string
+		ID              *int64 `json:"id"`
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	if in.ID != nil {
+		if !userFrom(r).IsAdmin() {
+			fail(w, http.StatusForbidden, "admin only")
+			return
+		}
+		if *in.ID <= 0 || *in.ID > store.MaxAccountID {
+			fail(w, http.StatusBadRequest, store.ErrAccountID.Error())
+			return
+		}
+	}
+	if in.Email == "" || len(in.Password) < 8 {
 		fail(w, http.StatusBadRequest, "email and a password of 8+ chars are required")
 		return
 	}
@@ -77,8 +93,22 @@ func (h *handlers) createUser(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	if err := h.Store.CreateUser(r.Context(), u); err != nil {
-		fail(w, http.StatusConflict, "email already exists")
+	if in.ID == nil {
+		err = h.Store.CreateUser(r.Context(), u)
+	} else {
+		err = h.Store.CreateUserWithID(r.Context(), u, *in.ID)
+	}
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrAccountID):
+			fail(w, http.StatusBadRequest, store.ErrAccountID.Error())
+		case errors.Is(err, store.ErrIDInUse):
+			fail(w, http.StatusConflict, store.ErrIDInUse.Error())
+		case errors.Is(err, store.ErrUserEmailInUse):
+			fail(w, http.StatusConflict, store.ErrUserEmailInUse.Error())
+		default:
+			serverErr(w, err)
+		}
 		return
 	}
 	ok(w, map[string]any{"id": u.ID, "email": u.Email, "uuid": u.UUID, "sub_token": u.SubToken})

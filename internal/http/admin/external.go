@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -187,9 +188,24 @@ func (h *handlers) getNodeRouting(w http.ResponseWriter, r *http.Request) {
 // putNodeRouting validates tags: every rule and the default must point at
 // a defined outbound, chains must not loop on themselves.
 func (h *handlers) putNodeRouting(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	var nr store.NodeRouting
 	if !readJSON(w, r, &nr) {
 		return
+	}
+	links, err := h.Store.ReverseLinks(r.Context(), idOf(r))
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	if len(links) > 0 {
+		for _, o := range nr.Outbounds {
+			if strings.HasPrefix(strings.TrimSpace(o.Tag), "reverse-") {
+				fail(w, 409, "reverse- outbound tags are reserved for managed connections")
+				return
+			}
+		}
 	}
 	if err := spec.ValidateRoutingReferences(nr.Outbounds, nr.Routes, nr.DefaultOutbound); err != nil {
 		fail(w, 400, err.Error())
@@ -290,6 +306,8 @@ func (h *handlers) getNodeOverrides(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) putNodeOverrides(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	id, okID := pathID(r)
 	var in map[string]string
 	if !okID {
@@ -298,6 +316,17 @@ func (h *handlers) putNodeOverrides(w http.ResponseWriter, r *http.Request) {
 	}
 	if !readJSON(w, r, &in) {
 		return
+	}
+	links, err := h.Store.ReverseLinks(r.Context(), id)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	if len(links) > 0 {
+		if err := spec.CheckReverseOverride(json.RawMessage(in["xray"])); err != nil {
+			fail(w, 409, err.Error())
+			return
+		}
 	}
 	if err := h.Store.SetNodeOverrides(r.Context(), id, in); err != nil {
 		fail(w, http.StatusBadRequest, err.Error())

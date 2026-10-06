@@ -52,6 +52,35 @@ Not covered by any promise: the admin console's internal HTTP calls beyond
 the routes above, log line wording, the MCP tool list (it follows the
 features), and anything documented as experimental.
 
+## Managed VLESS Reverse (migration 67)
+
+The new `/api/admin/nodes/{id}/reverse-connections` GET/PUT endpoints are
+restricted to full administrators. PUT replaces one exit's connection set in
+one database transaction and requires the current ID/version map. Existing
+node/inbound/entry API shapes stay unchanged; owned resources reject direct
+mutation with 409 and must be changed through the wizard.
+
+The additive wire fields are `Inbound.reverse`, `Node.reverse_clients`,
+`CoreCapabilities.vless_reverse` and `CoreStatus.reverse` (link ID → nullable
+boolean). Capability gating withholds managed inbounds from old agents. A
+reverse-only exit starts Xray without requiring a public inbound. The transport
+uses the new VLESS reverse fields supported by the pinned Xray 26.3.27; no core
+upgrade is required. Publish the bosun capability before deploying Captain
+connections. Database migration 67 owns and cascades the dedicated resources;
+no existing inbound is converted automatically.
+
+## NAT / IPLC port mappings (migration 66)
+
+Ingress APIs retain their existing routes and continuous range/offset fields.
+Explicit mappings and the node-wide requirement to select an ingress are
+additive, and existing records keep the requirement disabled. Omitted/null
+new fields on ingress updates retain their saved values. Inbounds and forwards
+share validation, and edits that invalidate existing listeners or delete a
+used ingress are rejected. Captain resolves forward ingress references to
+ordinary listen addresses before sending state, so managed nodes do not need
+an agent upgrade. The standalone editor requires the corresponding bosun
+update. See [NODES.md](NODES.md#ingresses-and-port-mappings-nat--iplc).
+
 ## Account separation (migration 52)
 
 Console and customer accounts now have independent ID namespaces in the same
@@ -80,6 +109,7 @@ features it has never heard of, which the node page shows as an orange
 
 | Captain | needs bosun | for |
 |---|---|---|
+| 1.12 | ≥ 0.60.0 | managed VLESS Reverse, reverse-only exits and per-link status (Xray enabled on both nodes); NAT/IPLC mapping restrictions are resolved by Captain and remain usable with older managed nodes |
 | 1.8.0 | >= 0.57.0 | exit diagnostics and immutable durable traffic batches; epoch receipts are additive, legacy reports remain supported. Presets and administration features do not require a node upgrade. |
 | 1.7.0 | ≥ 0.56.0 | resource detail, optional GPU, NIC selection, missing-data flags, network-quality attempt batches/timings and on-demand diagnostics; legacy summaries remain supported |
 | 1.6.0 | ≥ 0.55.0 | remote node removal: preserve as standalone or uninstall; record-only DELETE remains compatible |

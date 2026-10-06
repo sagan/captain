@@ -74,7 +74,8 @@ commissions with withdrawals, surplus credit on upgrades.
 **The fleet** ([docs](docs/NODES.md)) — one-line node install and pairing; inbounds with quick-setup
 recipes; entries that decide what each group of users sees; port forwards
 (built-in relay, nftables DNAT or realm) for relay chains with PROXY
-protocol across hops and backup or weighted extra targets; line ingresses for IPLC; egress that follows ingress;
+protocol across hops and backup or weighted extra targets; NAT / IPLC ingresses with shared inbound/forward port restrictions and range or individual mappings; egress that follows ingress;
+multi-transit VLESS Reverse connections with authentication and accounting at each transit;
 per-node speed limits; node jobs (upgrade, rollback, REALITY scan,
 speedtest) driven from the console.
 

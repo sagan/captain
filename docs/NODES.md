@@ -201,21 +201,60 @@ protocol v2 header automatically (built-in relay or realm backend), the
 landing node sees the real client, and devices are counted exactly. Direct
 connections to such an inbound fail, by design.
 
-## Line ingresses (IPLC)
+## Ingresses and port mappings (NAT / IPLC)
 
-A node behind an IPLC or a dedicated line has more than one way in. Node
-page → Line ingresses registers each line with the addresses the provider
-gives you:
+A node behind NAT, an IPLC or a dedicated line may expose only provider-assigned
+ports. Node page → Ingresses and port mappings records the provider's existing
+configuration; it does not create NAT mappings or change the provider firewall.
+Choose NAT or IPLC / dedicated line. Existing `mapped` records keep their old
+addresses, ranges and optional direct listeners after migration.
 
-- the **local NIC address** on the VPS — inbounds bind to it so replies go
+- the **local NIC address** on the VPS — inbounds and forwards bind to it so replies go
   back through the line;
 - the line's **far-end address** — what a relay must forward to; not
   reachable from the public internet;
 - the provider's **public entry**, if the service includes one (a China
   Mobile entry address, for example);
-- the usable **port range** and an optional port offset.
+- the usable **local port range** and an optional public-port offset; or
+  multiple explicit mappings, each with local start/end and public start.
 
-Inbounds pick an ingress (direct is the default, or the line on nodes with
+For example, local `20001–20099` → public `30001–30099` and local `40000` →
+public `443` can coexist in one NAT ingress. A single port has equal local
+start/end. Local and public ranges must each be non-overlapping and stay within
+1–65535. Explicit mappings replace the legacy range/offset, rather than adding
+to an unrestricted default. Mappings apply equally to TCP and UDP; check which
+protocols the provider forwards. Reserved ports are **local** ports (e.g. SSH)
+and cannot be used by an inbound or a forward.
+
+Inbounds and forwards both select an ingress. Create and update validate their
+listeners against its port policy; a nonempty listen address must match its
+bind address. Mieru BOTH also validates its second, adjacent UDP port and the
+corresponding public mapping. The relay backend does not bypass these checks.
+
+**Require an ingress on this node** prevents any inbound or forward on that
+node from choosing direct access. The new NAT form enables it by default;
+existing records default to off. Leave it off for a multihomed node that still
+needs direct public listeners. All selected ingresses enforce their own port
+policy regardless of this switch. This controls managed proxy and relay
+listeners, not SSH, the management UI, or other programs on the server.
+
+Enabling this switch or editing a port policy checks existing inbounds and
+forwards first, including disabled configurations. An incompatible edit is
+rejected without changing the saved configuration. An ingress still referenced
+by an inbound or forward cannot be deleted; reassign or remove those listeners
+first. Existing Captain subscription entries have explicit display addresses:
+review them after changing public mapping addresses or ports.
+
+The existing API routes and range/offset fields remain. New fields are
+`kind: nat|iplc|mapped`, `port_mappings` (rows with `local_from`, `local_to`,
+`public_from`) and `require_ingress`; ingress editor requests use their existing
+PascalCase equivalents. Omitting or sending null for the new mapping or switch
+fields on update preserves saved values. Forward `ingress_id` is an optional
+string containing the ingress ID. Captain resolves its bind address before
+sending state, so managed nodes do not require a new agent to use this feature.
+The bosun standalone editor implements the same policies locally.
+
+Inbounds pick an ingress (direct is the default, or the first ingress on nodes with
 no public address). Any protocol may ride a line, and a recipe applied
 while an ingress is selected takes the first free, non-reserved port of the
 range. Whether a given protocol passes is up to the provider's entry — some
@@ -224,7 +263,10 @@ advertise the public entry on the mapped port.
 
 A line **without** a public entry is served through a relay node: add a
 port forward there whose target is the far-end address (the picker fills it
-in) and use the relay's address in the entry. Direct inbounds on the same
+in) and use the relay's address in the entry. For a NAT target without a far-end
+address, the picker uses its public address and mapped public port. A relay
+itself behind NAT can select its own ingress; creating a subscription entry
+from that forward uses the relay's mapped public address. Direct inbounds on the same
 node (Hysteria2, REALITY) keep using the node's own address or domain.
 
 With the probe on, every ingress that has both a local NIC address and a
@@ -232,6 +274,60 @@ far-end address gets an automatic RTT task (bosun ≥ 0.15 binds the TCP
 connect to the NIC; even a refused port measures the line), shown under the
 ingress name on the status and speed-test pages. Lines are usually private,
 so carrier latency is not measured through them.
+
+## Node connections: VLESS Reverse
+
+Open **Nodes → exit B → Node connections · VLESS Reverse → Configure transits**.
+Select up to 32 transit nodes A in one wizard. Each connection owns two Xray
+listeners on A: a user-facing inbound (VLESS + REALITY by default), and a
+separate VLESS + REALITY receiver for B's dedicated tunnel identity. It also
+creates a subscription entry pointing at A. Users authenticate and their
+traffic is counted on A; B initiates the reverse connections and exits directly.
+B needs no public tunnel listener. Ordinary inbounds on either node remain
+independent, including ordinary A inbounds that exit locally.
+
+For each A, choose the local user and tunnel ports, optional NAT/IPLC ingress,
+user group and REALITY SNI. The wizard previews both public endpoints after
+port mapping. Both ports must be available and, for NAT, forwarded by the
+provider; Captain cannot create the provider's forwarding rules. B must be
+able to reach A's public tunnel endpoint, and A must be able to reach the
+chosen REALITY target. User protocol settings reuse the inbound editor and
+require Xray support; the transport between B and A remains VLESS + REALITY.
+
+Save the full set once. Later, reopen the same wizard to add/remove A nodes,
+change a connection or disable it. Existing connections retain their identities
+and keys. Removing a connection deletes only its owned listeners and entry;
+changing settings can restart the affected node's shared Xray process and
+interrupt other connections on that process. Saving is atomic in Captain,
+but each node applies its new state independently. Conflicting concurrent
+edits are rejected. Managed resources cannot be edited through the ordinary
+inbound/entry forms; remove connections before detaching a node to standalone.
+Deleting either node also cleans up the connection's owned resources.
+
+Both nodes need bosun v0.60.0 or later, advertising `vless_reverse` under Xray core
+capabilities and Xray enabled. Older nodes receive none of the managed reverse
+inbounds, so ignoring a new field cannot silently turn A into a direct exit.
+The wizard distinguishes upgrade required, offline, awaiting application,
+connected, disconnected and unknown. Connected means A reported an active
+tunnel identity after both nodes applied their current configuration; it is
+not an end-to-end website availability check. Xray reconnects automatically;
+use either node's self-check and diagnostics to investigate failures.
+
+Reverse user traffic is pinned to its reverse outbound. It fails closed when
+B is unavailable, without falling back to A's default exit. B still enforces
+private-destination isolation and audit blocks. Xray overrides of routing,
+outbounds and policy are refused while managed connections exist; configure
+ordinary traffic through the routing editor instead. Tags beginning `reverse-`
+are reserved on these nodes.
+
+**Limits:** this is a TCP reverse transport, not WireGuard. Xray may maintain
+multiple workers/connections; it does not promise one connection or zero CPS.
+It may help with incoming TCP connection pressure, but cannot establish an
+ISP's cause of packet loss or remove B's connections to destination websites.
+The current socket-mark-based tc per-user speed limits do not apply to the
+multiplexed reverse path. Captain aggregates usage after reports arrive; shared
+quotas across several A nodes are not an instantaneous global hard cap. Do not
+use this mode when those per-user speed guarantees are required.
 
 ## Outbounds, landing and egress
 

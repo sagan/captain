@@ -12,6 +12,45 @@ const MaxAccountID int64 = 9007199254740991
 var ErrAccountID = errors.New("ID must be a positive safe integer")
 var ErrIDInUse = errors.New("ID is already in use")
 
+// availableAccountID also checks history without foreign keys: assigning its
+// numeric owner to a new account would expose another customer's records.
+func availableAccountID(ctx context.Context, tx *sql.Tx, table string, refs []accountRef, id int64) error {
+	var exists int
+	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM `+table+` WHERE id = ?`, id).Scan(&exists); err == nil {
+		return ErrIDInUse
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	for _, ref := range refs {
+		if err := tx.QueryRowContext(ctx, `SELECT 1 FROM `+ref.table+` WHERE `+ref.column+` = ? LIMIT 1`, id).Scan(&exists); err == nil {
+			return ErrIDInUse
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+	}
+	return nil
+}
+
+// nextCustomerID advances only for automatic creation. Manual creation and
+// renumbering must not move the cursor to a large administrator-selected ID.
+func nextCustomerID(ctx context.Context, tx *sql.Tx) (int64, error) {
+	var id int64
+	if err := tx.QueryRowContext(ctx, `SELECT value FROM account_sequences WHERE name = 'user'`).Scan(&id); err != nil {
+		return 0, err
+	}
+	for id < MaxAccountID {
+		id++
+		if err := availableAccountID(ctx, tx, "users", customerRefs, id); errors.Is(err, ErrIDInUse) {
+			continue
+		} else if err != nil {
+			return 0, err
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE account_sequences SET value = ? WHERE name = 'user'`, id)
+		return id, err
+	}
+	return 0, ErrAccountID
+}
+
 type accountRef struct{ table, column string }
 
 var customerRefs = []accountRef{
@@ -48,18 +87,8 @@ func (s *Store) ChangeAccountID(ctx context.Context, oldID, newID int64, staff b
 	if oldID == newID {
 		return tx.Commit()
 	}
-	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM `+table+` WHERE id = ?`, newID).Scan(&exists); err == nil {
-		return ErrIDInUse
-	} else if !errors.Is(err, sql.ErrNoRows) {
+	if err := availableAccountID(ctx, tx, table, refs, newID); err != nil {
 		return err
-	}
-	// Non-FK history can outlive its account; never merge it into another one.
-	for _, ref := range refs {
-		if err := tx.QueryRowContext(ctx, `SELECT 1 FROM `+ref.table+` WHERE `+ref.column+` = ? LIMIT 1`, newID).Scan(&exists); err == nil {
-			return ErrIDInUse
-		} else if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
 	}
 	if _, err = tx.ExecContext(ctx, `PRAGMA defer_foreign_keys = ON`); err != nil {
 		return err

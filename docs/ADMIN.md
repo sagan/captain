@@ -91,6 +91,26 @@ are not renumbered; restore the pre-upgrade snapshot to roll back this schema.
 
 The last admin cannot be demoted, disabled or deleted.
 
+**Choose a customer ID at creation** — the full administrator can optionally
+enter an unused positive account ID in the Create user dialog. Leave it blank
+for automatic numbering. `POST /api/admin/users` accepts the optional `id`
+field (for example, `999999`); omitted or null keeps automatic allocation.
+Explicit IDs must be between 1 and 9007199254740991. Invalid IDs return 400;
+IDs already occupied by a customer or historical records return 409. Operators
+can still create automatically numbered customers, but cannot choose an ID.
+
+Migration 65 initializes an independent customer numbering cursor from the
+highest existing customer ID, without changing any accounts. From then on,
+manual creation and ID changes do not advance that cursor. Automatic creation
+advances it and skips occupied IDs and retained history; deletion does not
+rewind it. A fresh installation starts at 1, and site reset resets the cursor.
+
+A manually created testing account is an ordinary customer: its ID can be
+changed and it can be deleted under the same rules as other customers.
+Directly granting a plan does not create an order, so testing subscriptions,
+connections and traffic this way does not itself prevent deletion. A chosen
+number has no special privileges or automatic exclusion from statistics.
+
 **Delete a customer** — accounts referenced by orders, commissions or other
 users' `invited_by` links cannot be deleted, to preserve that history. Keep
 them banned instead. This also applies to disabled customer records retained

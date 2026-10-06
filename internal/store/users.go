@@ -32,8 +32,23 @@ func scanUser(row interface{ Scan(...any) error }) (*domain.User, error) {
 	return &u, nil
 }
 
-// CreateUser inserts a user and sets its ID.
+var ErrUserEmailInUse = errors.New("email already exists")
+
+// CreateUser inserts a user with an automatically allocated ID.
 func (s *Store) CreateUser(ctx context.Context, u *domain.User) error {
+	return s.createUser(ctx, u, 0)
+}
+
+// CreateUserWithID is the administrator-only choice of a visible account ID.
+// The node's accounting identity is always allocated separately.
+func (s *Store) CreateUserWithID(ctx context.Context, u *domain.User, id int64) error {
+	if id <= 0 || id > MaxAccountID {
+		return ErrAccountID
+	}
+	return s.createUser(ctx, u, id)
+}
+
+func (s *Store) createUser(ctx context.Context, u *domain.User, id int64) error {
 	if u.Role == "" {
 		u.Role = domain.RoleUser
 	}
@@ -49,28 +64,39 @@ func (s *Store) CreateUser(ctx context.Context, u *domain.User) error {
 		return err
 	}
 	defer tx.Rollback()
-	var highest int64
-	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(id),0) FROM users`).Scan(&highest); err != nil {
+	if id == 0 {
+		id, err = nextCustomerID(ctx, tx)
+	} else {
+		err = availableAccountID(ctx, tx, "users", customerRefs, id)
+	}
+	if err != nil {
 		return err
 	}
-	if highest >= MaxAccountID {
-		return ErrAccountID
+	var exists int
+	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM users WHERE email = ?`, u.Email).Scan(&exists); err == nil {
+		return ErrUserEmailInUse
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE account_sequences SET value = value + 1 WHERE name = 'agent'`); err != nil {
 		return err
 	}
-	if err = tx.QueryRowContext(ctx, `SELECT value FROM account_sequences WHERE name = 'agent'`).Scan(&u.AgentID); err != nil {
+	var agentID int64
+	if err = tx.QueryRowContext(ctx, `SELECT value FROM account_sequences WHERE name = 'agent'`).Scan(&agentID); err != nil {
 		return err
 	}
-	res, err := tx.ExecContext(ctx, `INSERT INTO users (email, password_hash, role, uuid, sub_token, group_id, balance_cents, status, created_at, updated_at, invite_code, invited_by, register_ip, agent_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.Email, u.PasswordHash, u.Role, u.UUID, u.SubToken, nullInt64(u.GroupID), u.BalanceCents, u.Status, ts, ts, u.InviteCode, nullInt64(u.InvitedBy), u.RegisterIP, u.AgentID)
+	_, err = tx.ExecContext(ctx, `INSERT INTO users (id, email, password_hash, role, uuid, sub_token, group_id, balance_cents, status, created_at, updated_at, invite_code, invited_by, register_ip, agent_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, u.Email, u.PasswordHash, u.Role, u.UUID, u.SubToken, nullInt64(u.GroupID), u.BalanceCents, u.Status, ts, ts, u.InviteCode, nullInt64(u.InvitedBy), u.RegisterIP, agentID)
 	if err != nil {
 		return err
 	}
-	u.ID, _ = res.LastInsertId()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	u.ID, u.AgentID = id, agentID
 	u.CreatedAt, u.UpdatedAt = unix(ts), unix(ts)
-	return tx.Commit()
+	return nil
 }
 
 func (s *Store) UserByEmail(ctx context.Context, email string) (*domain.User, error) {
@@ -299,9 +325,8 @@ var ErrUserHasHistory = errors.New("user has orders, commissions or invited user
 // DeleteUser removes a user and, via cascades, sessions and subscriptions.
 // Financial history and invitations from other users prevent deletion.
 // The tables the nodes fill have no foreign key (they are written on a hot
-// path), so they are cleared here: SQLite reuses row ids, and the next
-// registrant must not inherit somebody's connection log, audit hits or
-// throttle.
+// path), so they are cleared here: administrators may reuse a deleted ID,
+// and its new owner must not inherit connection logs, audit hits or throttles.
 func (s *Store) DeleteUser(ctx context.Context, id int64) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

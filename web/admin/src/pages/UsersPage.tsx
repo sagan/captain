@@ -38,12 +38,19 @@ export default function UsersPage() {
   const [view, setView] = useURLChoice('tab', canManageGroups ? ['list', 'groups', 'renewals'] : ['list'], 'list')
   const invalidate = () => qc.invalidateQueries({ queryKey: ['users'] })
 
-  const createForm = useForm({ initialValues: { Email: '', Password: '' } })
-  const create = useMutation({ mutationFn: (v: typeof createForm.values) => api.post<{ id: number }>('/api/admin/users', v), onSuccess: async (created) => {
+  const createForm = useForm({
+    initialValues: { Email: '', Password: '', ID: '' as number | string },
+    validate: { ID: (v) => v === '' || (Number.isSafeInteger(Number(v)) && Number(v) >= 1) ? null : t('accountID.invalid') },
+  })
+  const create = useMutation({ mutationFn: (v: typeof createForm.values) => api.post<{ id: number }>('/api/admin/users', { Email: v.Email, Password: v.Password, ...(me?.role === 'admin' && v.ID !== '' ? { id: Number(v.ID) } : {}) }), onSuccess: async (created) => {
     toast.ok(t('common.saved')); setCreating(false); createForm.reset(); invalidate()
     // Continue with the newly created user's plan and subscription, without searching again.
     try { open(await api.get<UserRow>(`/api/admin/users/${created.id}`)) } catch (error) { toast.err(error) }
-  }, onError: toast.err })
+  }, onError: (error) => {
+    if (error instanceof ApiError && error.status === 409 && error.message === 'ID is already in use') createForm.setFieldError('ID', t('accountID.inUse'))
+    else if (error instanceof ApiError && error.status === 409 && error.message === 'email already exists') createForm.setFieldError('Email', t('users.emailInUse'))
+    else toast.err(error)
+  } })
 
   const editForm = useForm({ initialValues: { Status: 'active', GroupID: '', Password: '' } })
   const update = useMutation({ mutationFn: (v: typeof editForm.values) => api.patch(`/api/admin/users/${sel!.id}`, { Status: v.Status, GroupID: v.GroupID ? Number(v.GroupID) : null, Password: v.Password }), onSuccess: () => { toast.ok(t('common.saved')); invalidate() }, onError: toast.err })
@@ -68,6 +75,7 @@ export default function UsersPage() {
 
       <Modal opened={creating} onClose={() => setCreating(false)} title={t('users.create')}>
         <form onSubmit={createForm.onSubmit((v) => create.mutate(v))}><Stack>
+          {me?.role === 'admin' && <NumberInput label={t('accountID.label')} description={t('users.idHint')} inputWrapperOrder={['label', 'input', 'description', 'error']} placeholder={t('users.idAuto')} min={1} max={Number.MAX_SAFE_INTEGER} allowDecimal={false} allowNegative={false} {...createForm.getInputProps('ID')} />}
           <TextInput label={t('users.email')} type="email" required {...createForm.getInputProps('Email')} />
           <PasswordInput label={t('users.password')} required minLength={8} {...createForm.getInputProps('Password')} />
           <Group justify="flex-end"><Button variant="default" onClick={() => setCreating(false)}>{t('common.cancel')}</Button><Button type="submit" loading={create.isPending}>{t('common.create')}</Button></Group>

@@ -121,6 +121,51 @@ func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*
 		return nil, err
 	}
 	node := spec.Node{ID: strconv.FormatInt(n.ID, 10)}
+	reverseCapable := a.Store.ReverseCapable(ctx, n.ID)
+	links, err := a.Store.ReverseLinks(ctx, n.ID)
+	if err != nil {
+		return nil, err
+	}
+	if reverseCapable {
+		for _, link := range links {
+			if link.ExitID != n.ID {
+				continue
+			}
+			ib, err := a.Store.InboundByID(ctx, link.ReceiverInboundID)
+			if err != nil {
+				return nil, err
+			}
+			if !ib.Enabled {
+				continue
+			}
+			transit, err := a.Store.NodeByID(ctx, link.TransitID)
+			if err != nil {
+				return nil, err
+			}
+			host := transit.Domain
+			if host == "" {
+				host = transit.PublicAddr
+			}
+			port := ib.Port
+			if ib.IngressID != nil {
+				g, err := a.Store.IngressByID(ctx, *ib.IngressID)
+				if err != nil {
+					return nil, err
+				}
+				host = g.ClientHost()
+				port = g.EntryPort(ib.Port)
+			}
+			sp := ib.Spec()
+			if sp.Reverse == nil || sp.TLS == nil || sp.TLS.Reality == nil {
+				continue
+			}
+			tls := *sp.TLS
+			reality := *tls.Reality
+			reality.PrivateKey = ""
+			tls.Reality = &reality
+			node.ReverseClients = append(node.ReverseClients, spec.ReverseClient{ID: link.ID, Host: host, Port: port, UUID: sp.Reverse.UUID, TLS: &tls})
+		}
+	}
 	if ov, err := a.Store.NodeOverrides(ctx, n.ID); err == nil {
 		for c, raw := range ov {
 			if raw != "" {
@@ -201,13 +246,21 @@ func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*
 	}
 	users := toSpecUsers(all, over, limits, speeds, quotas)
 	byGroup := map[int64][]spec.User{}
-	ingresses, _ := a.Store.IngressesByNode(ctx, n.ID)
+	ingresses, err := a.Store.IngressesByNode(ctx, n.ID)
+	if err != nil {
+		return nil, err
+	}
 	bindFor := map[int64]string{}
 	for _, g := range ingresses {
 		bindFor[g.ID] = g.BindIP
 	}
 	for _, ib := range inbounds {
 		si := ib.Spec()
+		// Old agents ignore added fields. Withhold managed endpoints entirely
+		// until the adapter advertises support, preventing accidental A egress.
+		if si.Reverse != nil && !reverseCapable {
+			continue
+		}
 		// A line ingress with its own NIC address: bind there so replies
 		// leave through the line, unless the inbound sets a listen itself.
 		if ib.IngressID != nil && si.Listen == "" {
@@ -242,6 +295,14 @@ func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*
 	st := &agentproto.State{Node: node, Users: users, Forwards: []spec.Forward{}, PullSeconds: a.PullSeconds, PushSeconds: a.PushSeconds}
 	if fwds, err := a.Store.NodeForwards(ctx, n.ID); err == nil {
 		for _, f := range fwds {
+			if f.Listen == "" && f.IngressID != "" {
+				for _, g := range ingresses {
+					if strconv.FormatInt(g.ID, 10) == f.IngressID {
+						f.Listen = g.BindIP
+					}
+				}
+			}
+			f.IngressID = ""
 			st.Forwards = append(st.Forwards, f.Forward)
 		}
 	}

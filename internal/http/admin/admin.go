@@ -127,6 +127,7 @@ func Register(mux *http.ServeMux, d Deps) {
 	h.registerCertificates(mux)
 	h.registerDomains(mux)
 	h.registerIngresses(mux)
+	h.registerReverse(mux)
 	h.registerSubTemplates(mux)
 	h.registerSubscriptionProfiles(mux)
 	h.registerConfigPresets(mux)
@@ -511,6 +512,9 @@ func allowed(role, method, path string) bool {
 	case domain.RoleAdmin:
 		return true
 	case domain.RoleOperator:
+		if strings.HasSuffix(path, "/reverse-connections") {
+			return false
+		}
 		// Audit rules reach every node's core config and the audit log is
 		// a record of what users visited: both stay with the admin, like
 		// the settings switches that turn them on.

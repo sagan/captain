@@ -1,6 +1,6 @@
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
-import { snapshot, readJSON, clientFor, statusFor, shows, clearHistoryCache } from '@/captain'
+import { snapshot, readJSON, clientFor, statusFor, periodTraffic, shows, clearHistoryCache } from '@/captain'
 import type { Snapshot } from '../../../src/lib/api'
 import type { PublicSettings } from './api'
 
@@ -34,14 +34,14 @@ async function refresh(): Promise<boolean> {
         defaultViewMode: s.layout === 'compact' ? 'list' : 'card',
         hidePriceWhenLoggedOut: true,
         // No billing/currency inference from Captain's free-form price strings.
-        generalCardKeys: [...(shows('memory') ? ['memory'] : []), ...(shows('disk') ? ['disk'] : []), ...(shows('system') ? ['remainingValue'] : ['onlineNodes']), ...(shows('network') ? ['totalTraffic', 'uploadSpeed', 'downloadSpeed'] : [])].join(','),
+        generalCardKeys: [...(shows('memory') ? ['memory'] : []), ...(shows('disk') ? ['disk'] : []), ...(shows('system') ? ['remainingValue'] : ['onlineNodes']), ...(shows('traffic') ? ['totalTraffic'] : []), ...(shows('network') ? ['uploadSpeed', 'downloadSpeed'] : [])].join(','),
       },
     } as PublicSettings
     nodes.updateNodeClients(Object.fromEntries(s.nodes.map((n, i) => [String(n.id), clientFor(n, i)])))
     nodes.updateNodeStatuses(Object.fromEntries(s.nodes.map(n => [String(n.id), statusFor(n)])))
     // Exact group labels; commas in Captain group names are not separators.
     for (const n of nodes.nodes) {
-      (n as typeof n & { captainTraffic: number }).captainTraffic = shows('traffic') ? s.nodes.find(v => String(v.id) === n.uuid)!.traffic.used : Number.NaN
+      (n as typeof n & { captainTraffic: number }).captainTraffic = periodTraffic(s.nodes.find(v => String(v.id) === n.uuid)!).used
       n.groups = s.nodes.find(v => String(v.id) === n.uuid)?.group ? [s.nodes.find(v => String(v.id) === n.uuid)!.group!] : []
     }
     app.connectionError = false

@@ -1,14 +1,15 @@
-import { ActionIcon, Badge, Button, Card, Code, Group, Modal, NumberInput, Select, Stack, Text, TextInput, Title, Tooltip, Box, Switch } from '@mantine/core'
+import { ActionIcon, Badge, Button, Card, Code, Group, Modal, NumberInput, Select, Stack, Text, TextInput, Title, Tooltip, Box, Switch, SimpleGrid } from '@mantine/core'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { IconArrowsSplit, IconLink, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type Inbound, type Ingress, type Node } from '../lib/api'
+import { firstFreeIngressPort, ingressPort, hostPort as addressPort } from '../lib/ingress'
 import { bytes } from '../lib/format'
 import { toast } from '../lib/notify'
 
 interface Hop { target: string; weight?: number }
-interface Forward { tag: string; listen?: string; port: number; protocol: string; target: string; inbound_id?: number; backend?: string; preserve_source?: boolean; proxy_protocol?: boolean; targets?: Hop[]; balance?: string; weight?: number }
+interface Forward { ingress_id?: string; tag: string; listen?: string; port: number; protocol: string; target: string; inbound_id?: number; backend?: string; preserve_source?: boolean; proxy_protocol?: boolean; targets?: Hop[]; balance?: string; weight?: number }
 interface HopStatus { target: string; up: boolean; rtt_ms: number; last_error?: string; active_conn: number; total_conn: number }
 interface Status { up: boolean; rtt_ms: number; last_error: string; active_conn: number; total_conn: number; bytes_in: number; bytes_out: number; targets?: HopStatus[] }
 interface Draft { targets: { target: string; weight: number }[]; balance: string; weight: number }
@@ -17,7 +18,7 @@ const hostPort = /^.+:\d+$/
 
 // Port forwards on one node: raw TCP/UDP relays to a landing server. Pick a
 // managed inbound as the target and an entry through this relay is one click.
-export function ForwardsCard({ node, embedded }: { node: Node; embedded?: boolean }) {
+export function ForwardsCard({ node, ingresses = [], embedded }: { node: Node; ingresses?: Ingress[]; embedded?: boolean }) {
   // Embedded inside the node page's advanced section: no card frame, no title.
   const Root = embedded ? Box : Card
   const { t } = useTranslation()
@@ -26,9 +27,13 @@ export function ForwardsCard({ node, embedded }: { node: Node; embedded?: boolea
   const nodes = useQuery({ queryKey: ['nodes'], queryFn: () => api.get<Node[]>('/api/admin/nodes') })
   const details = useQueries({ queries: (nodes.data ?? []).filter((n) => n.id !== node.id).map((n) => ({ queryKey: ['node', String(n.id)], queryFn: () => api.get<{ node: Node; inbounds: Inbound[]; ingresses?: Ingress[] }>(`/api/admin/nodes/${n.id}`) })) })
   const targets = details.flatMap((d) => (d.data ? d.data.inbounds.map((ib) => ({ ib, node: d.data!.node, ingress: (d.data!.ingresses ?? []).find((g) => g.id === ib.IngressID) })) : []))
+  const [dirty, setDirty] = useState(false)
   const [list, setList] = useState<Forward[]>([])
-  useEffect(() => { if (q.data) setList(q.data.forwards ?? []) }, [q.data])
-  const save = useMutation({ mutationFn: (v: Forward[]) => api.put(`/api/admin/nodes/${node.id}/forwards`, { Forwards: v }), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['forwards', node.id] }) }, onError: toast.err })
+  useEffect(() => { if (q.data && !dirty) setList(q.data.forwards ?? []) }, [q.data, dirty])
+  const save = useMutation({ mutationFn: (v: Forward[]) => api.put<{ forwards: Forward[] }>(`/api/admin/nodes/${node.id}/forwards`, { Forwards: v }), onSuccess: r => { toast.ok(t('common.saved')); qc.setQueryData(['forwards', node.id], { ...q.data, forwards: r.forwards }); setList(r.forwards); setDirty(false) }, onError: toast.err })
+  const [ingressID, setIngressID] = useState('')
+  const publicAddress = (f: Forward) => { const g = ingresses.find(g => String(g.id) === f.ingress_id); return { host: g ? g.entry_domain || g.entry_host : node.domain || node.public_addr, port: g ? ingressPort(g, f.port) : f.port } }
+  const targetAddress = (pick: (typeof targets)[number]) => pick.ingress ? addressPort(pick.ingress.line_ip || pick.ingress.entry_domain || pick.ingress.entry_host, pick.ingress.line_ip ? pick.ib.Port : ingressPort(pick.ingress, pick.ib.Port)) : addressPort(pick.node.domain || pick.node.public_addr, pick.ib.Port)
   const [port, setPort] = useState<number | string>('')
   const [proto, setProto] = useState('both')
   const [backend, setBackend] = useState('')
@@ -41,13 +46,13 @@ export function ForwardsCard({ node, embedded }: { node: Node; embedded?: boolea
     if (!p) return
     const pick = targets.find((x) => String(x.ib.ID) === target)
     // A line ingress is reached through its far-end address, never the node's public IP.
-    const tgt = pick ? `${pick.ingress?.line_ip || pick.node.public_addr}:${pick.ib.Port}` : manual.trim()
+    const tgt = pick ? targetAddress(pick) : manual.trim()
     if (!tgt) return
-    setList((cur) => [...cur, { tag: `fwd-${p}`, port: p, protocol: proto, target: tgt, inbound_id: pick?.ib.ID, backend: backend || undefined, preserve_source: backend === 'nft' && preserve ? true : undefined, proxy_protocol: backend !== 'nft' && proxyProto ? true : undefined }])
+    setDirty(true)
+    setList((cur) => [...cur, { ingress_id: ingressID || undefined, tag: `fwd-${p}`, port: p, protocol: proto, target: tgt, inbound_id: pick?.ib.ID, backend: backend || undefined, preserve_source: backend === 'nft' && preserve ? true : undefined, proxy_protocol: backend !== 'nft' && proxyProto ? true : undefined }])
     setPort(''); setTarget(null); setManual('')
   }
-  const mkEntry = useMutation({ mutationFn: (f: Forward) => api.post('/api/admin/entries', { Name: `${node.name} → ${targets.find((x) => x.ib.ID === f.inbound_id)?.node.name ?? f.target}`, InboundID: f.inbound_id, DisplayHost: node.public_addr, DisplayPort: f.port, Rate: 1, Enabled: true }), onSuccess: () => { toast.ok(t('forwards.entryMade')); qc.invalidateQueries({ queryKey: ['entries'] }) }, onError: toast.err })
-  const dirty = JSON.stringify(list) !== JSON.stringify(q.data?.forwards ?? [])
+  const mkEntry = useMutation({ mutationFn: (f: Forward) => api.post('/api/admin/entries', { Name: `${node.name} → ${targets.find((x) => x.ib.ID === f.inbound_id)?.node.name ?? f.target}`, InboundID: f.inbound_id, DisplayHost: publicAddress(f).host, DisplayPort: publicAddress(f).port, Rate: 1, Enabled: true }), onSuccess: () => { toast.ok(t('forwards.entryMade')); qc.invalidateQueries({ queryKey: ['entries'] }) }, onError: toast.err })
   // Further targets of one rule are edited in a dialog and land in the
   // list like any other change, saved with the card's Save button.
   const [editIdx, setEditIdx] = useState<number | null>(null)
@@ -62,6 +67,7 @@ export function ForwardsCard({ node, embedded }: { node: Node; embedded?: boolea
   const applyTargets = () => {
     if (editIdx === null) return
     const hops = draft.targets.filter((x) => x.target.trim() !== '').map((x) => ({ target: x.target.trim(), ...(roundRobin && x.weight !== 1 ? { weight: x.weight } : {}) }))
+    setDirty(true)
     setList((cur) => cur.map((f, j) => {
       if (j !== editIdx) return f
       const { targets: _t, balance: _b, weight: _w, ...rest } = f
@@ -80,8 +86,9 @@ export function ForwardsCard({ node, embedded }: { node: Node; embedded?: boolea
         {list.map((f, i) => {
           const s = q.data?.status?.[f.tag]
           return (
-            <Group key={i} justify="space-between" wrap="nowrap">
-              <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+            <Group key={i} justify="space-between" align="flex-start">
+              <Group gap="xs" style={{ minWidth: 0 }}>
+                <Select aria-label={t('inbounds.ingress')} w={180} value={f.ingress_id || ''} allowDeselect={false} data={[{ value: '', label: t('inbounds.ingressDirect'), disabled: ingresses.some(g => g.require_ingress) }, ...ingresses.map(g => ({ value: String(g.id), label: g.name }))]} onChange={v => { setDirty(true); setList(cur => cur.map((x, j) => j === i ? { ...x, ingress_id: v || undefined, listen: '' } : x)) }} />
                 <Code>{f.protocol === 'both' ? 'tcp+udp' : f.protocol} :{f.port}</Code><Text size="sm">→</Text><Code>{f.target}</Code>{(f.targets ?? []).length > 0 && <Tooltip label={(f.targets ?? []).map((x) => x.target).join(', ')}><Badge size="xs" variant="light">+{f.targets!.length} · {f.balance === 'roundrobin' ? t('forwards.roundRobinShort') : t('forwards.failoverShort')}</Badge></Tooltip>}{f.proxy_protocol && <Badge size="xs" variant="outline" color="teal">PROXY</Badge>}{f.backend === 'realm' && <Badge size="xs" variant="outline" color="indigo">realm</Badge>}{f.backend === 'nft' && <Badge size="xs" variant="outline" color="grape">nft{f.preserve_source ? ' · src' : ''}</Badge>}
                 {describe(f) && <Text size="xs" c="dimmed" truncate>{describe(f)}</Text>}
                 {s?.targets ? s.targets.map((h) => (
@@ -90,23 +97,24 @@ export function ForwardsCard({ node, embedded }: { node: Node; embedded?: boolea
               </Group>
               <Group gap={4} wrap="nowrap">
                 {f.backend !== 'nft' && <Tooltip label={t('forwards.editTargets')}><ActionIcon variant="subtle" color="gray" onClick={() => openTargets(i)}><IconArrowsSplit size={16} /></ActionIcon></Tooltip>}
-                {f.inbound_id && !dirty && <Tooltip label={t('forwards.makeEntry')}><ActionIcon variant="subtle" onClick={() => mkEntry.mutate(f)}><IconLink size={16} /></ActionIcon></Tooltip>}
-                <ActionIcon variant="subtle" color="red" onClick={() => setList((cur) => cur.filter((_, j) => j !== i))}><IconTrash size={16} /></ActionIcon>
+                {f.inbound_id && !dirty && publicAddress(f).host && publicAddress(f).port > 0 && <Tooltip label={t('forwards.makeEntry')}><ActionIcon variant="subtle" onClick={() => mkEntry.mutate(f)}><IconLink size={16} /></ActionIcon></Tooltip>}
+                <ActionIcon variant="subtle" color="red" onClick={() => { setDirty(true); setList(cur => cur.filter((_, j) => j !== i)) }}><IconTrash size={16} /></ActionIcon>
               </Group>
             </Group>
           )
         })}
-        <Group align="flex-end" wrap="nowrap">
-          <NumberInput label={t('forwards.port')} w={110} min={1} max={65535} value={port} onChange={setPort} />
-          <Select label={t('forwards.protocol')} w={110} data={[{ value: 'both', label: 'tcp+udp' }, { value: 'tcp', label: 'tcp' }, { value: 'udp', label: 'udp' }]} value={proto} onChange={(v) => setProto(v ?? 'both')} allowDeselect={false} />
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
+          <Select label={t('inbounds.ingress')} allowDeselect={false} value={ingressID} data={[{ value: '', label: t('inbounds.ingressDirect'), disabled: ingresses.some(g => g.require_ingress) }, ...ingresses.map(g => ({ value: String(g.id), label: g.name }))]} onChange={v => { setIngressID(v || ''); const g = ingresses.find(g => String(g.id) === v); if (g) setPort(firstFreeIngressPort(g, list.map(f => f.port)) || '') }} />
+          <NumberInput label={t('forwards.port')} min={1} max={65535} value={port} onChange={setPort} />
+          <Select label={t('forwards.protocol')} data={[{ value: 'both', label: 'tcp+udp' }, { value: 'tcp', label: 'tcp' }, { value: 'udp', label: 'udp' }]} value={proto} onChange={(v) => setProto(v ?? 'both')} allowDeselect={false} />
           <Select label={t('forwards.target')} style={{ flex: 2 }} searchable clearable placeholder={t('forwards.pickInbound')} data={targets.map((x) => ({ value: String(x.ib.ID), label: `${x.node.name} / ${x.ib.Tag} (${x.ib.Protocol}:${x.ib.Port})${x.ingress ? ` · ${x.ingress.name} ${x.ingress.line_ip || ''}` : ''}` }))} value={target} onChange={setTarget} />
-          {!target && <TextInput label={t('forwards.manual')} placeholder="1.2.3.4:443" style={{ flex: 2 }} value={manual} onChange={(e) => setManual(e.currentTarget.value)} />}
-          <Select label={t('forwards.backend')} w={150} data={[{ value: '', label: t('forwards.backendRelay') }, { value: 'nft', label: t('forwards.backendNft') }, { value: 'realm', label: t('forwards.backendRealm') }]} value={backend} onChange={(v) => setBackend(v ?? '')} allowDeselect={false} />
+          {!target && <TextInput label={t('forwards.manual')} placeholder="198.51.100.20:443" style={{ flex: 2 }} value={manual} onChange={(e) => setManual(e.currentTarget.value)} />}
+          <Select label={t('forwards.backend')} data={[{ value: '', label: t('forwards.backendRelay') }, { value: 'nft', label: t('forwards.backendNft') }, { value: 'realm', label: t('forwards.backendRealm') }]} value={backend} onChange={(v) => setBackend(v ?? '')} allowDeselect={false} />
           {backend === 'realm' && <Text size="xs" c="dimmed" maw={320} mb={6}>{t('forwards.backendRealmHint')}</Text>}
           {backend === 'nft' && <Switch label={t('forwards.preserve')} mb={6} checked={preserve} onChange={(e) => setPreserve(e.currentTarget.checked)} />}
           {backend !== 'nft' && <Switch label={t('forwards.proxyProtocol')} mb={6} checked={proxyProto} onChange={(e) => setProxyProto(e.currentTarget.checked)} />}
-          <Button variant="light" leftSection={<IconPlus size={14} />} onClick={add} disabled={!port || (!target && !manual.trim())}>{t('forwards.add')}</Button>
-        </Group>
+          <Button variant="light" leftSection={<IconPlus size={14} />} onClick={add} disabled={!port || (!target && !manual.trim()) || (!ingressID && ingresses.some(g => g.require_ingress)) || q.isError || !q.data}>{t('forwards.add')}</Button>
+        </SimpleGrid>
         {dirty && <Group justify="flex-end"><Button size="xs" loading={save.isPending} onClick={() => save.mutate(list)}>{t('common.save')}</Button></Group>}
       </Stack>
       <Modal opened={editing !== null} onClose={() => setEditIdx(null)} title={t('forwards.editTargets')} size="lg">
@@ -125,7 +133,7 @@ export function ForwardsCard({ node, embedded }: { node: Node; embedded?: boolea
           <Group gap="xs" wrap="nowrap">
             <Select style={{ flex: 1 }} searchable clearable placeholder={t('forwards.pickInbound')} value={null}
               data={targets.map((x) => ({ value: String(x.ib.ID), label: `${x.node.name} / ${x.ib.Tag} (${x.ib.Protocol}:${x.ib.Port})${x.ingress ? ` · ${x.ingress.name} ${x.ingress.line_ip || ''}` : ''}` }))}
-              onChange={(v) => { const pick = targets.find((x) => String(x.ib.ID) === v); if (pick) setDraft((d) => ({ ...d, targets: [...d.targets, { target: `${pick.ingress?.line_ip || pick.node.public_addr}:${pick.ib.Port}`, weight: 1 }] })) }} />
+              onChange={(v) => { const pick = targets.find((x) => String(x.ib.ID) === v); if (pick) setDraft((d) => ({ ...d, targets: [...d.targets, { target: targetAddress(pick), weight: 1 }] })) }} />
             <Button variant="light" leftSection={<IconPlus size={14} />} onClick={() => setDraft((d) => ({ ...d, targets: [...d.targets, { target: '', weight: 1 }] }))}>{t('forwards.addTarget')}</Button>
           </Group>
           {draft.targets.length > 0 && (editing.backend === 'realm'

@@ -17,7 +17,7 @@ export interface Node {
   id: number; name: string; group?: string; online: boolean; addr?: string; version?: string; last_seen: string | null
   info: { region?: string; provider?: string; provider_url?: string; price?: string; expires_at?: string; note?: string }
   host: Host | null
-  traffic: { used: number; limit: number; prev: number; mode: string; period_start: number; reset_day: number }
+  traffic: { used: number; used_up?: number; used_down?: number; limit: number; prev: number; mode: string; period_start: number; reset_day: number }
   recent: Sample[]
 }
 export interface Snapshot { appearance_scheme?: string; appearance?: ProbeAppearance | null; public_sections?: string[] | null; layout?: string; title: string; logo: string; show_globe: boolean; beat_seconds: number; visibility: string; carrier_ping: boolean; now: number; nodes: Node[]; staff: boolean }

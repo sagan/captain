@@ -309,7 +309,7 @@ function hasRegion(region: string | null | undefined): boolean {
             </div>
           </div>
 
-          <div class="flex flex-col gap-1">
+          <div v-if="shows('traffic')" class="flex flex-col gap-1">
             <div class="flex justify-between text-xs">
               <span class="inline-flex min-w-0 items-center gap-1 text-muted-foreground">
                 <Icon :icon="NODE_METRIC_ICONS.traffic" data-node-metric-icon="traffic" width="12" height="12" class="shrink-0 text-violet-500" aria-hidden="true" />
@@ -416,15 +416,15 @@ function hasRegion(region: string | null | undefined): boolean {
             </div>
           </div>
 
-          <!-- 总流量 -->
-          <div v-if="shows('network')" class="flex flex-col gap-0.5 rounded-lg bg-slate-500/5 min-w-0 overflow-hidden" :class="nodeCardMetricBoxClass">
+          <!-- Persisted period traffic -->
+          <div v-if="shows('traffic')" :title="t('周期流量说明')" class="flex flex-col gap-0.5 rounded-lg bg-slate-500/5 min-w-0 overflow-hidden" :class="nodeCardMetricBoxClass">
             <div class="text-[11px] text-muted-foreground flex items-center gap-1">
-              <Icon icon="tabler:upload" width="11" height="11" />
-              <span class="truncate min-w-0 overflow-hidden">{{ formatBytes(props.node.net_total_up ?? 0) }}</span>
+              <Icon :title="t('本周期出站')" icon="tabler:upload" width="11" height="11" />
+              <span class="truncate min-w-0 overflow-hidden">{{ formatBytes(props.node.net_total_up ?? Number.NaN) }}</span>
             </div>
             <div class="text-[11px] text-muted-foreground flex items-center gap-1">
-              <Icon icon="tabler:download" width="11" height="11" />
-              <span class="truncate min-w-0 overflow-hidden">{{ formatBytes(props.node.net_total_down ?? 0) }}</span>
+              <Icon :title="t('本周期入站')" icon="tabler:download" width="11" height="11" />
+              <span class="truncate min-w-0 overflow-hidden">{{ formatBytes(props.node.net_total_down ?? Number.NaN) }}</span>
             </div>
           </div>
 

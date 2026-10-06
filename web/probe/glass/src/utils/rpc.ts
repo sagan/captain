@@ -182,6 +182,7 @@ export interface NodeStatus {
   disk_total: number
   net_in: number
   net_out: number
+  // Captain adapter: persisted current-period totals, not OS boot counters.
   net_total_up: number
   net_total_down: number
   traffic_up?: number

@@ -30,6 +30,13 @@ page:
   grace period), sustained CPU / memory / disk over a threshold, monthly
   traffic at 80 % and 100 %.
 
+Monthly traffic directions use the **server network-interface perspective**:
+**outbound (TX)** is data sent by the selected interfaces, and **inbound (RX)**
+is data received. Choose their sum, outbound only, inbound only, or the larger
+of the two period totals. This includes all traffic on those interfaces and is
+independent of proxy-user billing. Existing API mode values `up` and `down`
+continue to mean outbound and inbound respectively.
+
 The carrier latency targets default to the CT/CU/CM probe points; Settings
 → Probe → *Latency targets* replaces the set with your own `name host:port`
 lines, and every node managed by Captain follows the panel. A node running
@@ -574,10 +581,24 @@ Captain supplies the data through its existing public probe API. No Komari
 agent or server is needed. Attribution and adaptation notes are in
 `web/probe/glass/README.md`.
 
-Monthly monitoring traffic and OS lifetime counters retain their different
-meanings. Free-form price notes cannot be converted to billing amounts, so
+Glassmorphism's overview, cards, list, comparisons and node details use
+persisted current-period traffic from `traffic.used_up/used_down`. Outbound and
+inbound are sent/received bytes on the server interfaces. The overview adds both
+directions for each selected node's current period; reset days can differ.
+Quota usage still follows each node's configured counting mode (`traffic.used`).
+All these counters survive restarts and reset on the configured day or a manual
+reset. Offline nodes retain recorded usage; unobserved restart gaps are not
+reconstructed. Missing direction fields stay
+unknown and never fall back to OS counters. Live rates remain separately gated
+by the network section; period totals follow the traffic section. The existing
+public `host.net_total_up/down` fields retain their OS-counter meaning. Free-form price notes cannot be converted to billing amounts, so
 unsupported monetary summaries display a dash. Invalid resources stay unknown;
 section and history controls apply to components and their requests.
+
+Flags use the node's saved **Region code** under **Probe & monthly traffic**
+(for example, `JP` for Japan). The grey example is a placeholder, not a saved
+value. An empty region hides the flag in both cards and details; the frontend
+does not infer it from the node name or IP address.
 
 The optional globe uses bundled textures and the node's public region for an
 approximate marker. It does not query external IP geolocation services. Icons

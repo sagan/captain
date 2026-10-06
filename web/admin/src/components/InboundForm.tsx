@@ -3,6 +3,7 @@ import { useForm } from '@mantine/form'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Group as UGroup, Inbound, Ingress } from '../lib/api'
+import { firstFreeIngressPort, ingressPortLabel } from '../lib/ingress'
 import { IngressFields, emptyIngress, type IngressValues } from './IngressesCard'
 import { RealityScan, type RealityResult } from './RealityScan'
 import { api, type NodeJob } from '../lib/api'
@@ -108,40 +109,40 @@ export function toPayload(v: InboundValues) {
   return { Tag: v.Tag, Protocol: v.Protocol, Listen: v.Listen, Port: v.Port, Core: v.Core, GroupID: v.GroupID ? Number(v.GroupID) : null, Enabled: v.Enabled, Settings: settings, IngressID: v.IngressID ? Number(v.IngressID) : null }
 }
 
-export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain, ingresses = [], usedPorts = [], lineOnly, nodeID, decoyDomain }: { initial: InboundValues; groups: UGroup[]; onSubmit: (v: InboundValues) => void; busy: boolean; onCancel: () => void; domain?: string; ingresses?: Ingress[]; usedPorts?: number[]; lineOnly?: boolean; nodeID?: number; decoyDomain?: string }) {
+export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain, ingresses = [], usedPorts = [], lineOnly, nodeID, decoyDomain, fixedCore }: { initial: InboundValues; groups: UGroup[]; onSubmit: (v: InboundValues) => void; busy: boolean; onCancel: () => void; domain?: string; ingresses?: Ingress[]; usedPorts?: number[]; lineOnly?: boolean; nodeID?: number; decoyDomain?: string; fixedCore?: string }) {
   const { t } = useTranslation()
   const form = useForm<InboundValues>({
-    initialValues: initial,
+    initialValues: { ...initial, Core: fixedCore || initial.Core },
     validate: { Tag: (v) => (v ? null : 'required'), Port: (v) => (v > 0 && v < 65536 ? null : 'port'), Settings: (v) => { try { JSON.parse(v || '{}'); return null } catch { return 'invalid JSON' } } },
   })
   let coreInbound: Record<string, unknown> | undefined
-  try { const settings = JSON.parse(form.values.Settings || '{}'); if (settings && typeof settings === 'object' && !Array.isArray(settings)) coreInbound = { ...settings, protocol: form.values.Protocol } } catch { /* JSON validation explains the error */ }
+  try { const settings = JSON.parse(form.values.Settings || '{}'); if (settings && typeof settings === 'object' && !Array.isArray(settings)) coreInbound = { ...settings, protocol: form.values.Protocol, ...(fixedCore ? { reverse: true } : {}) } } catch { /* JSON validation explains the error */ }
   const coreSelection = useCoreSelection(nodeID ? `/api/admin/nodes/${nodeID}/core-options` : '', coreInbound, form.values.Core)
   const [recipe, setRecipe] = useState<string | null>(null) // highlighted quick-setup card
   // Recipes name node.example.com; a node with a registered host name gets it instead.
-  const firstFree = (g?: { port_from: number; port_to: number; reserved_ports?: number[] }) => { if (!g || !g.port_from) return 0; for (let p = g.port_from; p <= g.port_to; p++) if (!usedPorts.includes(p) && !(g.reserved_ports ?? []).includes(p)) return p; return 0 }
+  const firstFree = (g: Ingress) => firstFreeIngressPort(g, usedPorts)
   const selectedIngress = ingresses.find((g) => String(g.id) === form.values.IngressID)
   const apply = async (r: (typeof recipes)[number]) => {
     // A recipe keeps the chosen line ingress and takes a port from its range; any protocol may ride a line.
-    const port = selectedIngress && selectedIngress.port_from ? (firstFree(selectedIngress) || r.port) : r.port
+    const port = selectedIngress ? (firstFree(selectedIngress) || r.port) : r.port
     let settings: Record<string, unknown> = r.key === 'snell' ? { ...r.settings, snell_psk: randomPSK() } : r.settings
     if (r.key === 'wireguard') { try { const k = await api.post<{ private_key: string; public_key: string }>('/api/admin/keys/wireguard'); settings = { ...settings, wg_private_key: k.private_key, wg_public_key: k.public_key } } catch { /* leave blank; the form asks for a key */ } }
     form.setValues({ Protocol: r.protocol, Port: port, Settings: JSON.stringify(settings, null, 2).replaceAll('node.example.com', domain || 'node.example.com'), Tag: form.values.Tag || r.protocol })
   }
   // A node reachable only through a line (no public address, no domain) defaults new inbounds to its first ingress.
-  useEffect(() => { if (lineOnly && !initial.IngressID && !initial.Tag && ingresses[0]) form.setValues({ IngressID: String(ingresses[0].id), Port: firstFree(ingresses[0]) || form.values.Port }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if ((lineOnly || ingresses.some(g => g.require_ingress)) && !initial.IngressID && !initial.Tag && ingresses[0]) form.setValues({ IngressID: String(ingresses[0].id), Port: firstFree(ingresses[0]) || form.values.Port }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const ingressForm = useForm<IngressValues>({ initialValues: form.values.NewIngress ?? emptyIngress })
   useEffect(() => { if (form.values.NewIngress) ingressForm.setValues(form.values.NewIngress) }, [form.values.NewIngress]) // eslint-disable-line react-hooks/exhaustive-deps
   const onIngress = (v: string | null) => {
     if (v === 'new') { form.setValues({ IngressID: '', NewIngress: { ...emptyIngress } }); return }
     const g = ingresses.find((x) => String(x.id) === v)
-    form.setValues({ IngressID: v ?? '', NewIngress: undefined, Port: g && !g.port_from ? form.values.Port : (g ? (firstFree(g) || form.values.Port) : form.values.Port) })
+    form.setValues({ IngressID: v ?? '', NewIngress: undefined, Port: g ? firstFree(g) || form.values.Port : form.values.Port })
   }
   const submit = (v: InboundValues) => { if (!coreSelection.blocked) onSubmit(v.NewIngress ? { ...v, NewIngress: ingressForm.values } : v) }
   return (
     <form onSubmit={form.onSubmit(submit)}>
       <Stack>
-        <ConfigPresets kind="inbound" current={() => ({ ...JSON.parse(form.values.Settings || '{}'), tag: form.values.Tag, protocol: form.values.Protocol, listen: form.values.Listen, port: form.values.Port, core: form.values.Core })} onLoad={value => { const v = value as Record<string, unknown>; form.setValues({ Tag: String(v.tag), Protocol: String(v.protocol), Core: String(v.core ?? ''), Settings: JSON.stringify(stripIdentity(v), null, 2) }) }} affected={form.values.Tag ? [form.values.Tag] : []} />
+        <ConfigPresets kind="inbound" current={() => ({ ...JSON.parse(form.values.Settings || '{}'), tag: form.values.Tag, protocol: form.values.Protocol, listen: form.values.Listen, port: form.values.Port, core: form.values.Core })} onLoad={value => { const v = value as Record<string, unknown>; form.setValues({ Tag: String(v.tag), Protocol: String(v.protocol), Core: fixedCore || String(v.core ?? ''), Settings: JSON.stringify(stripIdentity(v), null, 2) }) }} affected={form.values.Tag ? [form.values.Tag] : []} />
         <div>
           <Text size="sm" fw={600}>{t('inbounds.recipe')}</Text>
           <Text size="xs" c="dimmed" mb="xs">{t('inbounds.recipeHint')}</Text>
@@ -157,11 +158,11 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
           </SimpleGrid>
         </div>
         <Group grow>
-          <TextInput label={t('inbounds.tag')} required {...form.getInputProps('Tag')} />
+          <TextInput label={t('inbounds.tag')} required {...form.getInputProps('Tag')} disabled={!!fixedCore} />
           <Select label={t('inbounds.protocol')} data={protocols} required allowDeselect={false} {...form.getInputProps('Protocol')} />
         </Group>
-        <Select label={t('inbounds.ingress')} description={form.values.NewIngress ? t('inbounds.ingressNewHint') : selectedIngress ? (t('inbounds.ingressHint', { host: selectedIngress.entry_host || t('ingress.noEntry'), ports: selectedIngress.port_from ? `${selectedIngress.port_from}–${selectedIngress.port_to}` : t('ingress.anyPort') }) + (selectedIngress.bind_ip ? ' ' + t('inbounds.ingressBindHint', { ip: selectedIngress.bind_ip }) : '')) : t('inbounds.ingressDirectHint')} allowDeselect={false}
-          data={[{ value: '', label: t('inbounds.ingressDirect') }, ...ingresses.map((g) => ({ value: String(g.id), label: `${g.name} → ${g.entry_domain || g.entry_host || t('ingress.noEntry')}` })), { value: 'new', label: t('inbounds.ingressNew') }]}
+        <Select label={t('inbounds.ingress')} description={form.values.NewIngress ? t('inbounds.ingressNewHint') : selectedIngress ? (t('inbounds.ingressHint', { host: selectedIngress.entry_host || t('ingress.noEntry'), ports: ingressPortLabel(selectedIngress) || t('ingress.anyPort') }) + (selectedIngress.bind_ip ? ' ' + t('inbounds.ingressBindHint', { ip: selectedIngress.bind_ip }) : '')) : t('inbounds.ingressDirectHint')} allowDeselect={false}
+          data={[{ value: '', label: t('inbounds.ingressDirect'), disabled: ingresses.some(g => g.require_ingress) }, ...ingresses.map((g) => ({ value: String(g.id), label: `${g.name} → ${g.entry_domain || g.entry_host || t('ingress.noEntry')}` })), { value: 'new', label: t('inbounds.ingressNew'), disabled: !!fixedCore }]}
           value={form.values.NewIngress ? 'new' : form.values.IngressID} onChange={onIngress} />
         {lineOnly && !form.values.IngressID && !form.values.NewIngress && <Text size="xs" c="orange">{t('inbounds.lineOnlyHint')}</Text>}
         {form.values.NewIngress && <Stack gap="xs" p="sm" style={{ border: '1px dashed var(--mantine-color-default-border)', borderRadius: 8 }}><Text size="xs" c="dimmed">{t('inbounds.ingressNewFields')}</Text><IngressFields form={ingressForm} /></Stack>}
@@ -169,7 +170,7 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
           <TextInput label={t('inbounds.listen')} placeholder={selectedIngress?.bind_ip || '::'} {...form.getInputProps('Listen')} />
           <NumberInput label={t('inbounds.port')} min={1} max={65535} required {...form.getInputProps('Port')} />
         </Group>
-        <Select label={t('inbounds.core')} allowDeselect={false} {...form.getInputProps('Core')} {...coreSelection.selectProps} />
+        <Select label={t('inbounds.core')} allowDeselect={false} {...form.getInputProps('Core')} {...coreSelection.selectProps} disabled={!!fixedCore} value={fixedCore || form.values.Core} />
         <Group grow align="flex-end">
           <Select label={t('inbounds.group')} data={[{ value: '', label: t('inbounds.groupAll') }, ...groups.map((g) => ({ value: String(g.ID), label: g.Name }))]} allowDeselect={false} {...form.getInputProps('GroupID')} />
           {form.values.Protocol === 'mieru' && (

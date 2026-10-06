@@ -2686,12 +2686,22 @@ func TestLineIngresses(t *testing.T) {
 	if code, b, _ := ac.do("POST", "/api/admin/entries", map[string]any{"Name": "via relay", "InboundID": mieru["ID"], "DisplayHost": "relay.example.com", "DisplayPort": 17710}, nil); code != 200 {
 		t.Fatalf("explicit entry: %d %s", code, b)
 	}
-	// Deleting the ingress detaches inbounds instead of deleting them.
-	ac.do("DELETE", "/api/admin/ingresses/"+itoa(gid), nil, nil)
-	ib, err := st.InboundByID(context.Background(), int64(mieru["ID"].(float64)))
-	if err != nil || ib.IngressID != nil {
-		t.Fatalf("inbound after ingress delete: %+v %v", ib, err)
+	// Deleting a used ingress must not silently switch a listener to direct.
+	if code, b, _ := ac.do("DELETE", "/api/admin/ingresses/"+itoa(gid), nil, nil); code != 409 {
+		t.Fatalf("used ingress delete: %d %s", code, b)
 	}
+	ib, err := st.InboundByID(context.Background(), int64(mieru["ID"].(float64)))
+	if err != nil || ib.IngressID == nil {
+		t.Fatalf("inbound lost ingress: %+v %v", ib, err)
+	}
+	ib.IngressID = nil
+	if code, b, _ := ac.do("PATCH", "/api/admin/inbounds/"+itoa(ib.ID), ib, nil); code != 200 {
+		t.Fatalf("reassign: %d %s", code, b)
+	}
+	if code, b, _ := ac.do("DELETE", "/api/admin/ingresses/"+itoa(gid), nil, nil); code != 200 {
+		t.Fatalf("unused ingress delete: %d %s", code, b)
+	}
+
 }
 
 // fakeCloudflare answers the zone lookup and record list/create/update

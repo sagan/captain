@@ -110,8 +110,10 @@ func TestResetSiteAtomicAndFreshIDs(t *testing.T) {
 		}
 		want := 0
 		switch table {
-		case "staff", "account_sequences":
+		case "staff":
 			want = 1
+		case "account_sequences":
+			want = 2
 		case "goose_db_version":
 			want = migrationsBefore
 		}

@@ -9,6 +9,9 @@ import { firstFreeIngressPort, hostPort, ingressPort } from '../lib/ingress'
 import { toast } from '../lib/notify'
 import { SettingsDraftBoundary, useSettingsDirty } from '../lib/settings-draft'
 import { InboundForm, toPayload, toValues } from './InboundForm'
+import { RealityScan } from './RealityScan'
+import { scanRealityViaNode } from '../lib/reality-scan'
+import { withReverseProtocol, withReverseTarget } from '../lib/reverse-target'
 
 interface Connection {
   id: string; exit_id: number; transit_id: number; version: number; user_inbound_id: number
@@ -20,7 +23,7 @@ interface Detail { node: Node; inbounds: Inbound[]; ingresses: Ingress[] }
 
 
 export function ReverseConnections({ node }: { node: Node }) {
-  return <SettingsDraftBoundary><Connections node={node} /></SettingsDraftBoundary>
+  return <SettingsDraftBoundary key={node.id}><Connections node={node} /></SettingsDraftBoundary>
 }
 
 function Connections({ node }: { node: Node }) {
@@ -37,7 +40,7 @@ function Connections({ node }: { node: Node }) {
   const [dirty, setDirty] = useState(false)
   const [draft, setDraft] = useState<Connection[]>([])
   const [expected, setExpected] = useState<Record<string, number>>({})
-  const [sni, setSni] = useState('www.microsoft.com')
+  const [sni, setSni] = useState('')
   const [advanced, setAdvanced] = useState<number | null>(null)
   useSettingsDirty(opened && dirty)
   const details = useQueries({ queries: (nodes.data ?? []).filter(n => n.id !== node.id).map(n => ({ queryKey: ['node', String(n.id)], queryFn: () => api.get<Detail>(`/api/admin/nodes/${n.id}`), enabled: opened })) })
@@ -46,13 +49,14 @@ function Connections({ node }: { node: Node }) {
   const edit = () => {
     const current = (q.data ?? []).filter(c => c.exit_id === node.id)
     setDraft(structuredClone(current)); setExpected(Object.fromEntries(current.map(c => [c.id, c.version])))
-    setDirty(false); setOpened(true)
+    setDirty(false); setAdvanced(null); setOpened(true)
   }
   const close = () => {
     if (!dirty) { setOpened(false); return }
     modals.openConfirmModal({ title: t('workspace.unsaved'), children: <Text>{t('workspace.leaveHint')}</Text>, labels: { confirm: t('workspace.discard'), cancel: t('workspace.stay') }, onConfirm: () => { setOpened(false); setDirty(false) } })
   }
   const update = (index: number, value: Partial<Connection>) => { setDirty(true); setDraft(ds => ds.map((d, i) => i === index ? { ...d, ...value } : d)) }
+  const updateTarget = (transitID: number, target: string) => { setDirty(true); setDraft(ds => ds.map(d => d.transit_id === transitID ? withReverseTarget(d, target) : d)) }
   const save = useMutation({ mutationFn: () => api.put(url, { expected, links: draft }), onSuccess: () => {
     setDirty(false); setOpened(false); toast.ok(t('common.saved'))
     for (const key of ['reverse', 'node', 'entries']) qc.invalidateQueries({ queryKey: [key] })
@@ -69,7 +73,7 @@ function Connections({ node }: { node: Node }) {
       return { id: '', exit_id: node.id, transit_id: Number(id), version: 0, user_inbound_id: 0, name: `${name(Number(id))} → ${node.name}`, port, tunnel_port: tunnel, ingress_id: g?.id ?? null, group_id: null, server_name: sni, enabled: true, protocol: 'vless', state: 'pending', host: '', public_port: 0, public_tunnel_port: 0 }
     }))
   }
-  const a = advanced === null ? null : draft[advanced]
+  const a = draft.find(d => d.transit_id === advanced)
   return <Stack>
     <Text size="sm" c="dimmed">{t('reverse.hint')}</Text><Text size="xs" c="dimmed">{t('reverse.retryHint')}</Text>
     {q.isError && <Alert color="red">{t('reverse.loadFailed')} <Button variant="subtle" onClick={() => q.refetch()}>{t('common.refresh')}</Button></Alert>}
@@ -84,8 +88,9 @@ function Connections({ node }: { node: Node }) {
         <Alert>{t('reverse.scope')}</Alert>
         <Alert color="yellow">{t('reverse.limits')}</Alert>
         <Group align="flex-end"><TextInput label={t('reverse.defaultSNI')} value={sni} onChange={e => setSni(e.currentTarget.value)} style={{ flex: 1 }} />
-          <Button variant="light" disabled={!draft.length || !sni} onClick={() => modals.openConfirmModal({ title: t('reverse.applyCommon'), children: <Text>{t('reverse.applyHint', { count: draft.length })}</Text>, labels: { confirm: t('common.save'), cancel: t('common.cancel') }, onConfirm: () => { setDraft(ds => ds.map(d => ({ ...d, server_name: sni }))); setDirty(true) } })}>{t('reverse.applyCommon')}</Button>
+          <Button variant="light" disabled={!draft.length || !sni.trim()} onClick={() => modals.openConfirmModal({ title: t('reverse.applyCommon'), children: <Text>{t('reverse.applyHint', { count: draft.length })}</Text>, labels: { confirm: t('common.save'), cancel: t('common.cancel') }, onConfirm: () => { setDraft(ds => ds.map(d => withReverseTarget(d, sni.trim()))); setDirty(true) } })}>{t('reverse.applyCommon')}</Button>
         </Group>
+        <Text size="xs" c="dimmed">{t('reverse.sniHint')}</Text>
         <MultiSelect searchable label={t('reverse.transits')} value={draft.map(d => String(d.transit_id))} data={(nodes.data ?? []).filter(n => n.id !== node.id).map(n => ({ value: String(n.id), label: n.name, disabled: !detail(n.id) }))} onChange={select} />
         {details.some(d => d.isError) && <Alert color="red">{t('reverse.loadFailed')}</Alert>}
         {draft.map((d, i) => {
@@ -100,19 +105,23 @@ function Connections({ node }: { node: Node }) {
               <Select label={t('inbounds.ingress')} value={d.ingress_id ? String(d.ingress_id) : ''} allowDeselect={false} data={[{ value: '', label: t('inbounds.ingressDirect'), disabled: gs.some(g => g.require_ingress) }, ...gs.map(g => ({ value: String(g.id), label: g.name }))]} onChange={v => update(i, { ingress_id: v ? Number(v) : null })} />
               <Select label={t('inbounds.group')} clearable value={d.group_id ? String(d.group_id) : null} data={(groups.data ?? []).map(g => ({ value: String(g.ID), label: g.Name }))} onChange={v => update(i, { group_id: v ? Number(v) : null })} />
             </SimpleGrid>
-            <TextInput label={t('reverse.sni')} value={d.server_name} onChange={e => update(i, { server_name: e.currentTarget.value })} />
+            <TextInput required label={t('reverse.sni')} value={d.server_name} onChange={e => updateTarget(d.transit_id, e.currentTarget.value)} />
+            <Text size="xs" c="dimmed">{t('reverse.scanFrom', { node: name(d.transit_id) })}</Text>
+            {opened && advanced !== d.transit_id && <RealityScan current={d.server_name} scan={(hosts, signal) => scanRealityViaNode(d.transit_id, hosts, signal)} onPick={host => updateTarget(d.transit_id, host)} />}
             <Text size="xs" c="dimmed">{t('reverse.preview', { user: hostPort(host, g ? ingressPort(g, d.port) : d.port), tunnel: hostPort(host, g ? ingressPort(g, d.tunnel_port) : d.tunnel_port) })}</Text>
-            <Group><Badge variant="light">{d.protocol} · Xray</Badge><Button variant="subtle" size="compact-xs" onClick={() => setAdvanced(i)}>{t('reverse.protocol')}</Button></Group>
+            <Group><Badge variant="light">{d.protocol} · Xray</Badge><Button variant="subtle" size="compact-xs" onClick={() => setAdvanced(d.transit_id)}>{t('reverse.protocol')}</Button></Group>
           </Stack></Card>
         })}
         <Text size="sm" c="dimmed">{t('reverse.removal')}</Text>
-        <Group justify="flex-end"><Button variant="default" onClick={close}>{t('common.cancel')}</Button><Button disabled={!dirty || draft.some(d => !detail(d.transit_id))} loading={save.isPending} onClick={() => save.mutate()}>{t('common.save')}</Button></Group>
+        <Group justify="flex-end"><Button variant="default" onClick={close}>{t('common.cancel')}</Button><Button disabled={!dirty || draft.some(d => !detail(d.transit_id) || !d.server_name.trim())} loading={save.isPending} onClick={() => save.mutate()}>{t('common.save')}</Button></Group>
       </Stack>
     </Modal>
-    <Modal opened={a !== null} onClose={() => setAdvanced(null)} title={t('reverse.protocol')} size="xl" closeOnClickOutside={false}>
-      {a && <InboundForm fixedCore="xray" nodeID={a.transit_id} initial={toValues({ ID: a.user_inbound_id, NodeID: a.transit_id, Tag: a.id ? `rv-user-${a.id}` : 'reverse-user', Protocol: a.protocol, Listen: a.listen || '', Port: a.port, Core: 'xray', GroupID: a.group_id, Enabled: a.enabled, Sort: 0, IngressID: a.ingress_id, Settings: a.settings ?? { flow: 'xtls-rprx-vision', tls: { mode: 2, server_name: a.server_name, reality: { handshake_server: a.server_name, handshake_port: 443 } } } })} ingresses={detail(a.transit_id)?.ingresses} groups={groups.data ?? []} busy={false} onCancel={() => setAdvanced(null)} onSubmit={v => {
+    <Modal opened={opened && !!a} onClose={() => setAdvanced(null)} title={t('reverse.protocol')} size="xl" closeOnClickOutside={false}>
+      {opened && a && <InboundForm key={a.transit_id} fixedCore="xray" nodeID={a.transit_id} initial={toValues({ ID: a.user_inbound_id, NodeID: a.transit_id, Tag: a.id ? `rv-user-${a.id}` : 'reverse-user', Protocol: a.protocol, Listen: a.listen || '', Port: a.port, Core: 'xray', GroupID: a.group_id, Enabled: a.enabled, Sort: 0, IngressID: a.ingress_id, Settings: withReverseTarget(a, a.server_name).settings ?? { flow: 'xtls-rprx-vision', tls: { mode: 2, server_name: a.server_name, reality: { handshake_server: a.server_name, handshake_port: 443 } } } })} ingresses={detail(a.transit_id)?.ingresses} groups={groups.data ?? []} busy={false} onCancel={() => setAdvanced(null)} onSubmit={v => {
         if (v.NewIngress) { toast.err(new Error(t('reverse.existingIngress'))); return }
-        const p = toPayload(v); update(advanced!, { listen: p.Listen, protocol: p.Protocol, settings: p.Settings, port: p.Port, ingress_id: p.IngressID, group_id: p.GroupID }); setAdvanced(null)
+        const p = toPayload(v)
+        setDraft(ds => ds.map(d => d.transit_id === a.transit_id ? withReverseProtocol({ ...d, listen: p.Listen, protocol: p.Protocol, port: p.Port, ingress_id: p.IngressID, group_id: p.GroupID }, p.Settings) : d))
+        setDirty(true); setAdvanced(null)
       }} />}
     </Modal>
   </Stack>

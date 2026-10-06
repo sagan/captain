@@ -69,6 +69,17 @@ upgrade is required. Publish the bosun capability before deploying Captain
 connections. Database migration 67 owns and cascades the dedicated resources;
 no existing inbound is converted automatically.
 
+## REALITY target screening (Captain 1.12.1 / bosun 0.61.0)
+
+The reverse wizard uses the existing `reality_scan` job on each transit.
+There are no new Captain endpoints, migrations or configuration keys.
+The result gains optional `tls_record_bytes`, `tls_record_limit`,
+`tls_record_ok` and `reason_code` fields. Older nodes keep scanning with the
+previous checks; missing record measurements are shown as **Not checked**.
+Older Captain versions can ignore the new fields and still respect the
+existing `feasible` result. Neither the reverse wire format nor the pinned
+Xray core changes. See [target screening limitations](NODES.md#inbounds).
+
 ## NAT / IPLC port mappings (migration 66)
 
 Ingress APIs retain their existing routes and continuous range/offset fields.
@@ -109,6 +120,7 @@ features it has never heard of, which the node page shows as an orange
 
 | Captain | needs bosun | for |
 |---|---|---|
+| 1.12.1 | ≥ 0.61.0 | TLS wire record size screening in REALITY target scans; older agents retain the previous checks and show record size as not checked |
 | 1.12 | ≥ 0.60.0 | managed VLESS Reverse, reverse-only exits and per-link status (Xray enabled on both nodes); NAT/IPLC mapping restrictions are resolved by Captain and remain usable with older managed nodes |
 | 1.8.0 | >= 0.57.0 | exit diagnostics and immutable durable traffic batches; epoch receipts are additive, legacy reports remain supported. Presets and administration features do not require a node upgrade. |
 | 1.7.0 | ≥ 0.56.0 | resource detail, optional GPU, NIC selection, missing-data flags, network-quality attempt batches/timings and on-demand diagnostics; legacy summaries remain supported |

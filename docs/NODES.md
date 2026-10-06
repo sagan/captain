@@ -128,6 +128,13 @@ also reserves `port + 1`).
   X25519 / certificate checks and CDN detection, then picks one. A node can
   also serve its own HTTPS *decoy* site on loopback and use it as the
   target, so a prober sees a genuine certificate for your name.
+  With bosun v0.61.0 or later, the scanner also measures incoming TLS wire records, including headers,
+  encrypted overhead and stapled OCSP data. Records over the conservative
+  8192-byte limit used by the pinned Xray are rejected by automatic selection.
+  Older bosun versions without this check show **Not checked**, not a pass.
+  This is basic screening, not a full REALITY connection: accumulated records,
+  a different ClientHello or a different destination edge can still fail.
+  Confirm candidates with the node's actual core and client.
 - **ShadowTLS** — a Shadowsocks inbound can be wrapped in ShadowTLS v3
   (the *SS2022 + ShadowTLS* recipe, or the switch on any Shadowsocks
   inbound). The public port performs a real TLS handshake with a site you
@@ -293,6 +300,24 @@ provider; Captain cannot create the provider's forwarding rules. B must be
 able to reach A's public tunnel endpoint, and A must be able to reach the
 chosen REALITY target. User protocol settings reuse the inbound editor and
 require Xray support; the transport between B and A remains VLESS + REALITY.
+
+Each A has **Auto select** and **Probe current target** buttons. Scans run on
+that transit, not on B or Captain, so results reflect A's path to the target.
+Selecting a target updates both the tunnel SNI and the REALITY user listener;
+the advanced protocol editor and bulk SNI action keep those values consistent.
+An ordinary TLS user listener keeps its own certificate name. Editing the
+target or closing/removing the form cancels result polling and prevents stale
+results from replacing the current draft; a job already queued on A may finish.
+
+Enter a target verified with a real REALITY connection from each A; new
+connections have no preselected SNI. Avoid `www.microsoft.com` with the pinned
+Xray 26.3.27: some Microsoft responses include OCSP data that pushes the TLS
+Certificate record beyond its REALITY implementation's 8192-byte buffer.
+An ordinary TLS 1.3 handshake can succeed while REALITY fails. This is a
+[reported upstream limitation](https://github.com/XTLS/Xray-core/issues/6356),
+not a permanent SNI blacklist. The [upstream buffer fix](https://github.com/XTLS/REALITY/pull/33)
+does not change the already pinned core; a core upgrade requires separate
+compatibility testing.
 
 Save the full set once. Later, reopen the same wizard to add/remove A nodes,
 change a connection or disable it. Existing connections retain their identities

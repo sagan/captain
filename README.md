@@ -75,7 +75,8 @@ commissions with withdrawals, surplus credit on upgrades.
 recipes; entries that decide what each group of users sees; port forwards
 (built-in relay, nftables DNAT or realm) for relay chains with PROXY
 protocol across hops and backup or weighted extra targets; NAT / IPLC ingresses with shared inbound/forward port restrictions and range or individual mappings; egress that follows ingress;
-multi-transit VLESS Reverse connections with authentication and accounting at each transit;
+multi-transit VLESS Reverse connections with authentication, accounting and target scans at each transit;
+REALITY TLS record size screening with bosun v0.61.0 (older nodes show not checked);
 per-node speed limits; node jobs (upgrade, rollback, REALITY scan,
 speedtest) driven from the console.
 

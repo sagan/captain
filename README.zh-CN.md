@@ -73,7 +73,8 @@ CoinPayments、BTCPay Server 和 MGate 付款。每个回调都先验签再读�
 入口（entries）决定每组用户看到什么；端口转发（内置中转、nftables
 DNAT 或 realm）可组成中转链，在每一跳之间传递 PROXY protocol，
 还能配置备用目标或按权重分摊的多个目标；
-VLESS Reverse 向导一次配置多台中转（中转鉴权计费、落地主动连接）；
+VLESS Reverse 向导一次配置多台中转（中转鉴权计费、逐中转检测 SNI、落地主动连接）；
+bosun v0.61.0 起支持 REALITY 的 TLS 记录长度筛查，旧节点显示未检测；
 NAT / IPLC 入口与端口映射（入站、转发统一校验，支持多段和单端口映射）；出口跟随入口；按节点限速；节点任务（升级、
 回滚、REALITY 扫描、测速）全部从后台下发。
 

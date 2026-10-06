@@ -5,8 +5,9 @@ import { useTranslation } from 'react-i18next'
 import type { Group as UGroup, Inbound, Ingress } from '../lib/api'
 import { firstFreeIngressPort, ingressPortLabel } from '../lib/ingress'
 import { IngressFields, emptyIngress, type IngressValues } from './IngressesCard'
-import { RealityScan, type RealityResult } from './RealityScan'
-import { api, type NodeJob } from '../lib/api'
+import { RealityScan } from './RealityScan'
+import { scanRealityViaNode } from '../lib/reality-scan'
+import { api } from '../lib/api'
 import { ConfigPresets } from './ConfigPresets'
 import { useCoreSelection } from '../lib/coreSelection'
 
@@ -25,18 +26,6 @@ function patchReality(settings: string, patch: { server_name?: string; handshake
   tls.reality = reality; s.tls = tls
   return JSON.stringify(s, null, 2)
 }
-// scanViaNode queues a reality_scan job on the node and polls until it answers.
-async function scanViaNode(nodeID: number, hosts: string[]): Promise<RealityResult[]> {
-  const { id } = await api.post<{ id: string }>(`/api/admin/nodes/${nodeID}/jobs`, { kind: 'reality_scan', params: { hosts } })
-  const started = Date.now()
-  while (Date.now() - started < 150_000) {
-    await new Promise((r) => setTimeout(r, 2000))
-    const j = await api.get<NodeJob>(`/api/admin/nodes/${nodeID}/jobs/${id}`)
-    if (j.done_at) { if (j.error) throw new Error(j.error); return (j.result as RealityResult[]) ?? [] }
-  }
-  throw new Error('node did not answer in time')
-}
-
 const protocols = ['vless', 'vmess', 'trojan', 'shadowsocks', 'hysteria2', 'tuic', 'anytls', 'mieru', 'snell', 'socks', 'http', 'naive', 'wireguard']
 
 // Snell's PSK: 32 random bytes, base64 (any string works, this is the convention).
@@ -242,7 +231,7 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
             <Card p="sm">
               <Text size="sm" fw={600} mb={4}>{t('inbounds.realityTarget')}</Text>
               <Text size="xs" c="dimmed" mb="xs">{t('inbounds.realityTargetHint', { host: current || '—' })}</Text>
-              {nodeID ? <RealityScan current={current} scan={(hosts) => scanViaNode(nodeID, hosts)} onPick={(host) => form.setFieldValue('Settings', patchReality(form.values.Settings, { server_name: host, handshake_server: host, handshake_port: 443 }))} /> : <Text size="xs" c="dimmed">{t('inbounds.realityNeedsNode')}</Text>}
+              {nodeID ? <RealityScan key={nodeID} current={current} scan={(hosts, signal) => scanRealityViaNode(nodeID, hosts, signal)} onPick={(host) => form.setFieldValue('Settings', patchReality(form.values.Settings, { server_name: host, handshake_server: host, handshake_port: 443 }))} /> : <Text size="xs" c="dimmed">{t('inbounds.realityNeedsNode')}</Text>}
               {decoyDomain && <Group gap="xs" mt="xs"><Button size="xs" variant="light" color="teal" onClick={() => form.setFieldValue('Settings', patchReality(form.values.Settings, { server_name: decoyDomain, handshake_server: '127.0.0.1', handshake_port: 4443 }))}>{t('inbounds.useDecoy', { domain: decoyDomain })}</Button><Text size="xs" c="dimmed">{t('inbounds.useDecoyHint')}</Text></Group>}
               <Group grow align="flex-end" mt="sm">
                 <Switch label={t('inbounds.fallbackLimit')} mb={7} checked={!fl?.off} onChange={(e) => form.setFieldValue('Settings', patchReality(form.values.Settings, { fallback_limit: e.currentTarget.checked ? null : { off: true } }))} />

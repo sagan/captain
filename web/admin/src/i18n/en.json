@@ -222,10 +222,15 @@
     "realityAuto": "Pick automatically",
     "realityProbe": "Probe current target",
     "realityScanning": "Handshaking from the node…",
-    "realityScanHint": "Real TLS handshakes from the node: TLS 1.3, h2, X25519, certificate, and no public CDN.",
+    "realityScanHint": "Node-side TLS 1.3, h2, X25519, certificate, wire-record size and CDN screening. This does not verify a complete REALITY connection.",
     "handshakeServer": "Handshake target",
     "realityLatency": "Latency",
     "realityCert": "Cert",
+    "realityRecord": "TLS record",
+    "realityRecordHint": "Observed record limit: {{limit}} B. Basic screening only; a complete REALITY connection is still required.",
+    "realityRecordUnknown": "Not checked",
+    "realityRecordUnknownHint": "The node did not report a completed record check. Older bosun versions do not measure it.",
+    "realityRecordTooLarge": "Observed TLS record is too large: {{bytes}} B > {{limit}} B. Choose another target.",
     "realityUse": "Use",
     "realityBlocked": "Unusable",
     "realityNoCdn": "self-hosted",
@@ -2071,6 +2076,7 @@
     "manageExit": "Manage on exit node",
     "transits": "Transit nodes",
     "defaultSNI": "SNI for new connections",
+    "sniHint": "Enter a REALITY target verified from each transit. TCP/TLS reachability alone is insufficient. Avoid www.microsoft.com with the current pinned core: oversized certificate records can prevent the handshake.",
     "applyCommon": "Apply SNI to all",
     "applyHint": "Update tunnel and REALITY user SNI on all {{count}} selected connections. Other per-node settings are preserved.",
     "userPort": "User port (local)",
@@ -2089,6 +2095,7 @@
     "unknown": "Connectivity unknown",
     "disabled": "Disabled",
     "managed": "Managed in node connections",
-    "retryHint": "Disconnected tunnels reconnect automatically; offline nodes apply changes when they return. Open the transit or exit node to inspect diagnostics."
+    "retryHint": "Disconnected tunnels reconnect automatically; offline nodes apply changes when they return. Open the transit or exit node to inspect diagnostics.",
+    "scanFrom": "Detection runs from transit {{node}}. A selected target updates its tunnel and REALITY user listener."
   }
 }

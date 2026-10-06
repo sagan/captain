@@ -7,12 +7,13 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, {
     method,
     headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
     credentials: 'same-origin',
+    signal,
   })
   const text = await res.text()
   const data = text ? JSON.parse(text) : null
@@ -21,8 +22,8 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 }
 
 export const api = {
-  get: <T>(url: string) => request<T>('GET', url),
-  post: <T>(url: string, body?: unknown) => request<T>('POST', url, body ?? {}),
+  get: <T>(url: string, signal?: AbortSignal) => request<T>('GET', url, undefined, signal),
+  post: <T>(url: string, body?: unknown, signal?: AbortSignal) => request<T>('POST', url, body ?? {}, signal),
   patch: <T>(url: string, body: unknown) => request<T>('PATCH', url, body),
   put: <T>(url: string, body: unknown) => request<T>('PUT', url, body),
   del: <T>(url: string, body?: unknown) => request<T>('DELETE', url, body),
@@ -34,12 +35,20 @@ export interface Node {
   version: string; platform: string; hostname: string; last_seen_at: string | null; online: boolean; paired: boolean
   pair_code?: string; traffic_today_bytes: number; inbounds: number; upgrade_to?: string; outdated: boolean; cert_problem: boolean; doctor_fail?: boolean; mita_quotas?: boolean; egress_by_ingress?: boolean }
 // runNodeJob queues a one-off job on the node and polls until it answers.
-export async function runNodeJob<T>(nodeID: number, kind: string, params: unknown, timeoutMs = 150_000): Promise<T> {
-  const { id } = await api.post<{ id: string }>(`/api/admin/nodes/${nodeID}/jobs`, { kind, params })
+export async function runNodeJob<T>(nodeID: number, kind: string, params: unknown, timeoutMs = 150_000, signal?: AbortSignal): Promise<T> {
+  signal?.throwIfAborted()
+  const { id } = await api.post<{ id: string }>(`/api/admin/nodes/${nodeID}/jobs`, { kind, params }, signal)
   const started = Date.now()
   while (Date.now() - started < timeoutMs) {
-    await new Promise((r) => setTimeout(r, 2000))
-    const j = await api.get<NodeJob>(`/api/admin/nodes/${nodeID}/jobs/${id}`)
+    signal?.throwIfAborted()
+    await new Promise<void>((resolve, reject) => {
+      const abort = () => { clearTimeout(timer); reject(signal?.reason) }
+      const timer = setTimeout(() => { signal?.removeEventListener('abort', abort); resolve() }, 2000)
+      signal?.addEventListener('abort', abort, { once: true })
+    })
+    signal?.throwIfAborted()
+    const j = await api.get<NodeJob>(`/api/admin/nodes/${nodeID}/jobs/${id}`, signal)
+    signal?.throwIfAborted()
     if (j.done_at) { if (j.error) throw new Error(j.error); return j.result as T }
   }
   throw new Error('node did not answer in time')

@@ -193,10 +193,15 @@
     "realityAuto": "自動選択",
     "realityProbe": "現在の対象を検査",
     "realityScanning": "ノードからハンドシェイク中…",
-    "realityScanHint": "ノードから実際に TLS ハンドシェイクを行い、TLS 1.3・h2・X25519・証明書を確認し、CDN 上のサイトを除外します。",
+    "realityScanHint": "ノードから TLS 1.3、h2、X25519、証明書、通信レコード長、CDN を確認します。完全な REALITY 接続を保証する検査ではありません。",
     "handshakeServer": "ハンドシェイク先",
     "realityLatency": "遅延",
     "realityCert": "証明書",
+    "realityRecord": "TLS レコード",
+    "realityRecordHint": "観測レコードの上限：{{limit}} B。基本チェックのみです。完全な REALITY 接続の確認も必要です。",
+    "realityRecordUnknown": "未確認",
+    "realityRecordUnknownHint": "ノードからレコード検査の完了結果が届いていません。旧バージョンの bosun はこの測定に対応していません。",
+    "realityRecordTooLarge": "TLS レコードが大きすぎます：{{bytes}} B > {{limit}} B。別の接続先を選んでください。",
     "realityUse": "使用",
     "realityBlocked": "不可",
     "realityNoCdn": "自社",
@@ -2071,6 +2076,7 @@
     "manageExit": "出口ノードで管理",
     "transits": "中継ノード",
     "defaultSNI": "新規接続の SNI",
+    "sniHint": "各中継ノードで REALITY 接続を確認した接続先を入力してください。TCP/TLS の疎通だけでは不十分です。現在の固定コアでは、証明書レコードが大きすぎてハンドシェイクに失敗するため、www.microsoft.com は避けてください。",
     "applyCommon": "全接続に SNI を適用",
     "applyHint": "選択した {{count}} 接続のトンネルと REALITY の SNI を更新します。他の個別設定は保持します。",
     "userPort": "ユーザーポート（ローカル）",
@@ -2089,6 +2095,7 @@
     "unknown": "接続状態不明",
     "disabled": "無効",
     "managed": "ノード接続で管理",
-    "retryHint": "切断後は自動で再接続し、オフラインのノードには復帰時に設定を適用します。中継または出口ノードで診断を確認できます。"
+    "retryHint": "切断後は自動で再接続し、オフラインのノードには復帰時に設定を適用します。中継または出口ノードで診断を確認できます。",
+    "scanFrom": "中継 {{node}} から検査します。選択した接続先は、この中継のトンネルと REALITY ユーザー入口に反映されます。"
   }
 }

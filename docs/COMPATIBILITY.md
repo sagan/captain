@@ -120,6 +120,7 @@ features it has never heard of, which the node page shows as an orange
 
 | Captain | needs bosun | for |
 |---|---|---|
+| 1.14.0 | ≥ 0.63.0 | Per-inbound private destination access on supported Linux nft sing-box/Xray nodes; runtime capabilities gate both save and state delivery, including individual managed reverse exits. Ordinary inbounds remain compatible with older nodes. |
 | 1.12.1 | ≥ 0.61.0 | TLS wire record size screening in REALITY target scans; older agents retain the previous checks and show record size as not checked |
 | 1.13.0 | ≥ 0.62.0 | IPv6 nft forwarding, transport-aware forwarding health and node upstream exceptions. Older TCP reports remain readable; old UDP/mixed reports display unknown health. Existing routes, protocols and counters are retained. |
 | 1.12 | ≥ 0.60.0 | managed VLESS Reverse, reverse-only exits and per-link status (Xray enabled on both nodes); NAT/IPLC mapping restrictions are resolved by Captain and remain usable with older managed nodes |
@@ -292,13 +293,12 @@ renumbering and survives node removal. Site reset clears every new table.
 See [administration workflows](ADMIN_WORKFLOWS.md) before rolling back or
 changing the configured Passkey origin.
 
-## Unreleased per-inbound private access
+## Per-inbound private access (Captain 1.14 / bosun 0.63)
 
 This adds `Inbound.private_access`, `ReverseClient.private_access` and the
 runtime core capability `private_access`; existing fields and paths stay intact.
-Captain v1.13.0 / bosun v0.62.0 do not implement this capability. Development
-builds require both repositories' matching changes; the minimum released
-version will be recorded when published. Ordinary configurations remain usable
+The feature requires Captain v1.14.0 and bosun v0.63.0 or newer; upgrade
+bosun first. Ordinary configurations remain usable
 with old nodes. Enabled private policies require a recent supporting node
 report when saving and are withheld at state delivery if support disappears.
 Existing JSON storage carries the field without a schema migration. Omitted

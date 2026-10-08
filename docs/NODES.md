@@ -441,7 +441,7 @@ narrow and authenticate the upstream. Per-inbound private access is not part
 of this feature. Disabling host `cores.egress_guard` no longer leaves stale
 rules after restart, and root-only control APIs remain protected.
 
-### Per-inbound private access (unreleased)
+### Per-inbound private access (Captain 1.14 / bosun 0.63)
 
 In the inbound editor, use **Private access** (under **Advanced** in the
 standalone editor and reverse wizard). The default is
@@ -463,7 +463,7 @@ the corresponding reverse client on B enforces its own policy, independently
 of other transits. A continues tunnelling to B. Authentication and accounting
 remain on A; the existing reverse-path per-user tc limitation is unchanged.
 
-This requires an updated bosun advertising `private_access`, Linux nftables,
+This requires bosun ≥ 0.63.0 advertising `private_access`, Linux nftables,
 a non-root core account, enabled egress protection and sing-box or Xray.
 Capabilities reflect the node's runtime prerequisites. Native Hysteria, mita
 and snell-server, WireGuard inbounds, shared-key Snell and Xray SOCKS/HTTP

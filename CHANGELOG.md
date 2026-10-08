@@ -6,6 +6,9 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
+- **Unreleased** — Fix IPv6 forwarding and protocol-specific health reporting (#9–#10): preserve bracketed primary/additional IPv6 targets, infer UDP when selecting Hysteria2/TUIC, distinguish unknown UDP health from TCP probe failure, and persist additive health metadata (migration 68).
+  - Add an administrator-only node upstream-exception editor alongside routing, with literal IP/CIDR, protocol and port validation, independent storage, old-agent capability checks and six-language labels (#11–#12). Exceptions require bosun v0.62.0; they do not enable per-inbound private access or bypass core control-API protection. The same migration stores the new node policy; existing routing API writes preserve it.
+
 - **v1.12.1** (2026-10-06) — Complete REALITY target detection in the reverse wizard: each transit can probe its current target or automatically select a candidate from that transit's network. Keep the tunnel and REALITY user-listener SNI synchronized across the wizard, bulk edits and advanced protocol settings so saving no longer restores an old target. Cancel stale result polling when a target changes or its editor closes.
   - Remove the unsuitable Microsoft default for new connections and require a target. Show measured TLS record sizes from bosun v0.61.0, reject oversized candidates and label older-agent measurements as not checked. This remains basic screening, not a complete REALITY handshake test; the pinned Xray version is unchanged.
   - Preserve ordinary TLS certificate names, existing keys and connection identities. Add frontend regression tests to CI/release and update all six languages. No database migration or configuration-key change.

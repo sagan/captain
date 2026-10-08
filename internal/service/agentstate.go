@@ -121,6 +121,10 @@ func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*
 		return nil, err
 	}
 	node := spec.Node{ID: strconv.FormatInt(n.ID, 10)}
+	node.EgressUpstreams, err = a.Store.NodeEgressUpstreams(ctx, n.ID)
+	if err != nil {
+		return nil, err
+	}
 	reverseCapable := a.Store.ReverseCapable(ctx, n.ID)
 	links, err := a.Store.ReverseLinks(ctx, n.ID)
 	if err != nil {

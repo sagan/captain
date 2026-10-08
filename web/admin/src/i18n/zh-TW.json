@@ -872,7 +872,7 @@
     "backendRelay": "內建轉發",
     "backendNft": "nftables 核心轉發",
     "preserve": "保留來源 IP",
-    "nftHint": "nftables 後端走核心 DNAT，節點需要 nft 指令，目標必須是 IPv4；保留來源 IP 時目標伺服器的回包路由必須經過本機。",
+    "nftHint": "核心 DNAT 支援同位址族 IPv4/IPv6（IPv6 需要 bosun ≥ 0.62），節點需安裝 nft。保留來源 IP 時，目標須經本節點回傳；跨位址族請用內建轉送或 realm。",
     "proxyProtocol": "傳送 PROXY protocol",
     "moreTargetsHint": "同一規則的其他下一跳：備用線路，或用來分攤連線的更多線路。健康檢測為每 30 秒一次 TCP 連線。",
     "addTarget": "新增目標",
@@ -887,7 +887,11 @@
     "failoverShort": "故障切換",
     "roundRobinShort": "輪詢",
     "editTargets": "目標與故障切換",
-    "firstTarget": "第一個目標"
+    "firstTarget": "第一個目標",
+    "unknown": "未檢測",
+    "udpUntested": "TCP 連線成功或建立 UDP 通訊端都不能證明 UDP 服務健康。",
+    "tcpProbe": "僅檢測 TCP 連線，不代表代理全鏈路可用。",
+    "backendFailed": "轉送後端失敗"
   },
   "ingress": {
     "derive": "按尾號派生",
@@ -2097,5 +2101,16 @@
     "managed": "由節點連線管理",
     "retryHint": "斷線後會自動重連，離線節點恢復後自動套用設定。可開啟中轉或落地節點查看自我檢查。",
     "scanFrom": "從中轉 {{node}} 執行檢測。選用目標會同步更新其隧道與 REALITY 使用者入口。"
+  },
+  "egress": {
+    "title": "私網上游例外",
+    "hint": "按 IP/CIDR、協定與連接埠允許核心連至指定上游，不變更使用者目的地限制。套用至本節點所有核心；控制 API 仍受保護。",
+    "loadFailed": "策略載入失敗。",
+    "retry": "重試",
+    "requiresVersion": "請升級至 bosun {{version}} 或更新版本後設定例外。",
+    "address": "上游 IP / CIDR",
+    "port": "連接埠",
+    "add": "新增例外",
+    "applyHint": "儲存後請在節點檢查中核對防護實際狀態。節點設定檔的例外也會生效；無需重新啟動。"
   }
 }

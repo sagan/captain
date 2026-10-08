@@ -872,7 +872,7 @@
     "backendRelay": "内蔵転送",
     "backendNft": "nftables（カーネル DNAT）",
     "preserve": "送信元 IP を保持",
-    "nftHint": "nftables バックエンドはカーネル DNAT を使います。ノードに nft コマンドが必要で、転送先は IPv4 のみ。送信元 IP を保持する場合、転送先の戻りパケットはこのノードを経由する必要があります。",
+    "nftHint": "カーネル DNAT は同一アドレスファミリの IPv4/IPv6 に対応します（IPv6 は bosun ≥ 0.62）。nft が必要です。送信元を保持する場合、応答はこのノードを経由させてください。異なるファミリ間は内蔵転送または realm を使用します。",
     "proxyProtocol": "PROXY protocol を送信",
     "moreTargetsHint": "同じルールの別の転送先：予備回線、または接続を分散する追加の回線。ヘルスチェックは 30 秒ごとの TCP 接続です。",
     "addTarget": "ターゲットを追加",
@@ -887,7 +887,11 @@
     "failoverShort": "フェイルオーバー",
     "roundRobinShort": "ラウンドロビン",
     "editTargets": "ターゲットとフェイルオーバー",
-    "firstTarget": "最初のターゲット"
+    "firstTarget": "最初のターゲット",
+    "unknown": "未確認",
+    "udpUntested": "TCP 接続や UDP ソケットの作成では UDP サービスの正常性を確認できません。",
+    "tcpProbe": "TCP 接続のみの検査であり、プロキシ全体の動作確認ではありません。",
+    "backendFailed": "転送バックエンド失敗"
   },
   "ingress": {
     "derive": "末尾から派生",
@@ -2097,5 +2101,16 @@
     "managed": "ノード接続で管理",
     "retryHint": "切断後は自動で再接続し、オフラインのノードには復帰時に設定を適用します。中継または出口ノードで診断を確認できます。",
     "scanFrom": "中継 {{node}} から検査します。選択した接続先は、この中継のトンネルと REALITY ユーザー入口に反映されます。"
+  },
+  "egress": {
+    "title": "プライベート上流の例外",
+    "hint": "IP/CIDR・プロトコル・ポートを指定してコアから上流への接続を許可します。ユーザーの宛先制限は変更されません。このノードの全コアに適用され、制御 API は保護されます。",
+    "loadFailed": "ポリシーを読み込めません。",
+    "retry": "再試行",
+    "requiresVersion": "例外を設定するには bosun {{version}} 以降に更新してください。",
+    "address": "上流 IP / CIDR",
+    "port": "ポート",
+    "add": "例外を追加",
+    "applyHint": "保存後、ノード診断で適用状態を確認してください。ホスト設定の例外も有効です。再起動は不要です。"
   }
 }

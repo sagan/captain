@@ -179,7 +179,7 @@ A rule's backend is one of:
 | Backend | What it is | Trade-off |
 |---|---|---|
 | built-in relay | bosun's own userspace relay | connection and byte counters, PROXY protocol support |
-| `nft` | nftables kernel DNAT (bosun ≥ 0.18) | fastest, IPv4 target, optional source preservation when replies route back through the node; no counters |
+| `nft` | nftables kernel DNAT (bosun ≥ 0.18) | IPv4/IPv6 target (IPv6 needs bosun ≥ 0.62), same address family as the listen address, optional source preservation when replies route back through the node; no counters |
 | `realm` | bosun installs and runs [realm](https://github.com/zhboner/realm) | high throughput, hostname targets, UDP; no counters |
 
 **Several targets.** A rule can have further targets (the split-arrows
@@ -192,7 +192,12 @@ health, RTT and connection count shows next to the rule. Built-in relay:
 both modes; realm: round-robin only (it does not retry another target);
 nft: one target. A connection always uses one target, so this keeps a
 relay up and spreads load across lines — it does not make one download
-faster. Needs bosun ≥ 0.49.
+faster. Needs bosun ≥ 0.49. With bosun ≥ 0.62, the displayed measurement
+explicitly says TCP; UDP is untested, not offline on a refused TCP connection.
+Mixed rules show the two separately. UDP hop selection is independent of TCP
+probe health. Selecting Hysteria2/TUIC for a new forward defaults to UDP;
+existing/manual protocol choices remain configurable. Older UDP health reports
+are shown as unknown because their probe transport was not recorded.
 
 Ports are checked against the node's own inbounds. Xray-style domain/IP
 splitting inside a tunnel is deliberately not offered: use the landing
@@ -410,3 +415,28 @@ the zone, which the DNS-01 token already has.
 ## Additions in 1.8.0
 
 Inbound and routing editors support typed named presets with a draft diff and impact preview. Node detail also links to administrator-only supplier/asset costs. See [administration workflows](ADMIN_WORKFLOWS.md).
+
+## Private upstream exceptions (bosun ≥ 0.62)
+
+Full administrators can edit **Node → Routing → Private upstream exceptions**.
+Enter an IP/CIDR, TCP/UDP and one port per row. Use this for an authenticated
+SOCKS upstream reachable over a private WireGuard/BGP network, for example
+`10.10.0.2/32`, TCP, 1080. The endpoint remains an ordinary outbound in Routing;
+this policy only permits the core's network socket through the OS guard.
+
+`GET/PUT /api/admin/settings/nodes/{id}/egress` reads/writes
+`{"upstreams":[{"cidr":"10.10.0.2/32","protocol":"tcp","port":1080}]}`.
+Only administrators (including appropriately scoped administrator tokens) may
+access it; old nodes reject nonempty updates. GET reports `supported` and
+`minimum_version`. PUT requires the list: omission/null is rejected, `[]`
+explicitly clears it. The new column is separate from routing, so older
+routing clients cannot erase the policy. Updates use the topology lock.
+Check the node self-check after saving: a saved policy alone is not proof that
+Linux/nft installed it. Local YAML exceptions also apply.
+
+Exceptions cover all cores on the node, not one inbound/outbound. They do not
+add user direct routes; cores without destination filtering, or unresolved
+hostnames, may also let users reach an excepted endpoint. Keep the exception
+narrow and authenticate the upstream. Per-inbound private access is not part
+of this feature. Disabling host `cores.egress_guard` no longer leaves stale
+rules after restart, and root-only control APIs remain protected.

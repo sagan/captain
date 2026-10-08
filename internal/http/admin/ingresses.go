@@ -259,6 +259,17 @@ func (h *handlers) checkIngressChange(ctx context.Context, g *store.Ingress, rem
 		return "", err
 	}
 	for _, f := range fs {
+		effective := f.Forward
+		if effective.Listen == "" {
+			for _, ng := range next {
+				if strconv.FormatInt(ng.ID, 10) == f.IngressID {
+					effective.Listen = ng.BindIP
+				}
+			}
+		}
+		if err := effective.ValidateTargets(); err != nil {
+			return "forward " + f.Tag + ": " + err.Error(), nil
+		}
 		if msg := checkIngressListener(next, f.IngressID, f.Listen, f.Port); msg != "" {
 			return "forward " + f.Tag + ": " + msg, nil
 		}

@@ -4,14 +4,15 @@ import { IconArrowsSplit, IconLink, IconPlus, IconTrash } from '@tabler/icons-re
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type Inbound, type Ingress, type Node } from '../lib/api'
-import { firstFreeIngressPort, ingressPort, hostPort as addressPort } from '../lib/ingress'
-import { bytes } from '../lib/format'
+import { firstFreeIngressPort, ingressPort, forwardTargetAddress, forwardTargetProtocol } from '../lib/ingress'
+import { ForwardHealth } from './ForwardHealth'
+import type { ForwardHealthStatus } from '../lib/forward-health'
 import { toast } from '../lib/notify'
 
 interface Hop { target: string; weight?: number }
 interface Forward { ingress_id?: string; tag: string; listen?: string; port: number; protocol: string; target: string; inbound_id?: number; backend?: string; preserve_source?: boolean; proxy_protocol?: boolean; targets?: Hop[]; balance?: string; weight?: number }
-interface HopStatus { target: string; up: boolean; rtt_ms: number; last_error?: string; active_conn: number; total_conn: number }
-interface Status { up: boolean; rtt_ms: number; last_error: string; active_conn: number; total_conn: number; bytes_in: number; bytes_out: number; targets?: HopStatus[] }
+interface HopStatus extends ForwardHealthStatus { target: string; up: boolean; rtt_ms: number; last_error?: string; active_conn: number; total_conn: number }
+interface Status extends ForwardHealthStatus { up: boolean; rtt_ms: number; last_error: string; active_conn: number; total_conn: number; bytes_in: number; bytes_out: number; targets?: HopStatus[] }
 interface Draft { targets: { target: string; weight: number }[]; balance: string; weight: number }
 
 const hostPort = /^.+:\d+$/
@@ -33,7 +34,7 @@ export function ForwardsCard({ node, ingresses = [], embedded }: { node: Node; i
   const save = useMutation({ mutationFn: (v: Forward[]) => api.put<{ forwards: Forward[] }>(`/api/admin/nodes/${node.id}/forwards`, { Forwards: v }), onSuccess: r => { toast.ok(t('common.saved')); qc.setQueryData(['forwards', node.id], { ...q.data, forwards: r.forwards }); setList(r.forwards); setDirty(false) }, onError: toast.err })
   const [ingressID, setIngressID] = useState('')
   const publicAddress = (f: Forward) => { const g = ingresses.find(g => String(g.id) === f.ingress_id); return { host: g ? g.entry_domain || g.entry_host : node.domain || node.public_addr, port: g ? ingressPort(g, f.port) : f.port } }
-  const targetAddress = (pick: (typeof targets)[number]) => pick.ingress ? addressPort(pick.ingress.line_ip || pick.ingress.entry_domain || pick.ingress.entry_host, pick.ingress.line_ip ? pick.ib.Port : ingressPort(pick.ingress, pick.ib.Port)) : addressPort(pick.node.domain || pick.node.public_addr, pick.ib.Port)
+
   const [port, setPort] = useState<number | string>('')
   const [proto, setProto] = useState('both')
   const [backend, setBackend] = useState('')
@@ -46,7 +47,7 @@ export function ForwardsCard({ node, ingresses = [], embedded }: { node: Node; i
     if (!p) return
     const pick = targets.find((x) => String(x.ib.ID) === target)
     // A line ingress is reached through its far-end address, never the node's public IP.
-    const tgt = pick ? targetAddress(pick) : manual.trim()
+    const tgt = pick ? forwardTargetAddress(pick) : manual.trim()
     if (!tgt) return
     setDirty(true)
     setList((cur) => [...cur, { ingress_id: ingressID || undefined, tag: `fwd-${p}`, port: p, protocol: proto, target: tgt, inbound_id: pick?.ib.ID, backend: backend || undefined, preserve_source: backend === 'nft' && preserve ? true : undefined, proxy_protocol: backend !== 'nft' && proxyProto ? true : undefined }])
@@ -91,9 +92,7 @@ export function ForwardsCard({ node, ingresses = [], embedded }: { node: Node; i
                 <Select aria-label={t('inbounds.ingress')} w={180} value={f.ingress_id || ''} allowDeselect={false} data={[{ value: '', label: t('inbounds.ingressDirect'), disabled: ingresses.some(g => g.require_ingress) }, ...ingresses.map(g => ({ value: String(g.id), label: g.name }))]} onChange={v => { setDirty(true); setList(cur => cur.map((x, j) => j === i ? { ...x, ingress_id: v || undefined, listen: '' } : x)) }} />
                 <Code>{f.protocol === 'both' ? 'tcp+udp' : f.protocol} :{f.port}</Code><Text size="sm">→</Text><Code>{f.target}</Code>{(f.targets ?? []).length > 0 && <Tooltip label={(f.targets ?? []).map((x) => x.target).join(', ')}><Badge size="xs" variant="light">+{f.targets!.length} · {f.balance === 'roundrobin' ? t('forwards.roundRobinShort') : t('forwards.failoverShort')}</Badge></Tooltip>}{f.proxy_protocol && <Badge size="xs" variant="outline" color="teal">PROXY</Badge>}{f.backend === 'realm' && <Badge size="xs" variant="outline" color="indigo">realm</Badge>}{f.backend === 'nft' && <Badge size="xs" variant="outline" color="grape">nft{f.preserve_source ? ' · src' : ''}</Badge>}
                 {describe(f) && <Text size="xs" c="dimmed" truncate>{describe(f)}</Text>}
-                {s?.targets ? s.targets.map((h) => (
-                  <Tooltip key={h.target} label={`${h.target} · ${h.last_error || `${h.active_conn} / ${h.total_conn} conn`}`}><Badge size="xs" color={h.up ? 'teal' : 'red'} variant="light">{h.up ? `${h.rtt_ms} ms` : t('forwards.down')}</Badge></Tooltip>
-                )) : s && <Tooltip label={s.last_error || `${s.active_conn} / ${s.total_conn} conn · ${bytes(s.bytes_in)} in · ${bytes(s.bytes_out)} out`}><Badge size="xs" color={s.up ? 'teal' : 'red'} variant="light">{s.up ? `${s.rtt_ms} ms` : t('forwards.down')}</Badge></Tooltip>}
+                {s?.targets ? s.targets.map(h => <Box key={h.target} title={h.target}><ForwardHealth status={h} protocol={f.protocol} /></Box>) : s && <ForwardHealth status={s} protocol={f.protocol} />}
               </Group>
               <Group gap={4} wrap="nowrap">
                 {f.backend !== 'nft' && <Tooltip label={t('forwards.editTargets')}><ActionIcon variant="subtle" color="gray" onClick={() => openTargets(i)}><IconArrowsSplit size={16} /></ActionIcon></Tooltip>}
@@ -107,7 +106,7 @@ export function ForwardsCard({ node, ingresses = [], embedded }: { node: Node; i
           <Select label={t('inbounds.ingress')} allowDeselect={false} value={ingressID} data={[{ value: '', label: t('inbounds.ingressDirect'), disabled: ingresses.some(g => g.require_ingress) }, ...ingresses.map(g => ({ value: String(g.id), label: g.name }))]} onChange={v => { setIngressID(v || ''); const g = ingresses.find(g => String(g.id) === v); if (g) setPort(firstFreeIngressPort(g, list.map(f => f.port)) || '') }} />
           <NumberInput label={t('forwards.port')} min={1} max={65535} value={port} onChange={setPort} />
           <Select label={t('forwards.protocol')} data={[{ value: 'both', label: 'tcp+udp' }, { value: 'tcp', label: 'tcp' }, { value: 'udp', label: 'udp' }]} value={proto} onChange={(v) => setProto(v ?? 'both')} allowDeselect={false} />
-          <Select label={t('forwards.target')} style={{ flex: 2 }} searchable clearable placeholder={t('forwards.pickInbound')} data={targets.map((x) => ({ value: String(x.ib.ID), label: `${x.node.name} / ${x.ib.Tag} (${x.ib.Protocol}:${x.ib.Port})${x.ingress ? ` · ${x.ingress.name} ${x.ingress.line_ip || ''}` : ''}` }))} value={target} onChange={setTarget} />
+          <Select label={t('forwards.target')} style={{ flex: 2 }} searchable clearable placeholder={t('forwards.pickInbound')} data={targets.map((x) => ({ value: String(x.ib.ID), label: `${x.node.name} / ${x.ib.Tag} (${x.ib.Protocol}:${x.ib.Port})${x.ingress ? ` · ${x.ingress.name} ${x.ingress.line_ip || ''}` : ''}` }))} value={target} onChange={v => { setTarget(v); const pick = targets.find(x => String(x.ib.ID) === v); if (pick) { const protocol = forwardTargetProtocol(pick.ib.Protocol); setProto(protocol); if (protocol === 'udp') setProxyProto(false) } }} />
           {!target && <TextInput label={t('forwards.manual')} placeholder="198.51.100.20:443" style={{ flex: 2 }} value={manual} onChange={(e) => setManual(e.currentTarget.value)} />}
           <Select label={t('forwards.backend')} data={[{ value: '', label: t('forwards.backendRelay') }, { value: 'nft', label: t('forwards.backendNft') }, { value: 'realm', label: t('forwards.backendRealm') }]} value={backend} onChange={(v) => setBackend(v ?? '')} allowDeselect={false} />
           {backend === 'realm' && <Text size="xs" c="dimmed" maw={320} mb={6}>{t('forwards.backendRealmHint')}</Text>}
@@ -133,7 +132,7 @@ export function ForwardsCard({ node, ingresses = [], embedded }: { node: Node; i
           <Group gap="xs" wrap="nowrap">
             <Select style={{ flex: 1 }} searchable clearable placeholder={t('forwards.pickInbound')} value={null}
               data={targets.map((x) => ({ value: String(x.ib.ID), label: `${x.node.name} / ${x.ib.Tag} (${x.ib.Protocol}:${x.ib.Port})${x.ingress ? ` · ${x.ingress.name} ${x.ingress.line_ip || ''}` : ''}` }))}
-              onChange={(v) => { const pick = targets.find((x) => String(x.ib.ID) === v); if (pick) setDraft((d) => ({ ...d, targets: [...d.targets, { target: targetAddress(pick), weight: 1 }] })) }} />
+              onChange={(v) => { const pick = targets.find((x) => String(x.ib.ID) === v); if (pick) setDraft((d) => ({ ...d, targets: [...d.targets, { target: forwardTargetAddress(pick), weight: 1 }] })) }} />
             <Button variant="light" leftSection={<IconPlus size={14} />} onClick={() => setDraft((d) => ({ ...d, targets: [...d.targets, { target: '', weight: 1 }] }))}>{t('forwards.addTarget')}</Button>
           </Group>
           {draft.targets.length > 0 && (editing.backend === 'realm'

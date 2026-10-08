@@ -19,6 +19,7 @@ import { InboundForm, toPayload, toValues, type InboundValues } from '../compone
 import { NodeStatus, PairCodeBox } from './NodesPage'
 import { NodeProbeCard } from '../components/NodeProbeCard'
 import { NodeWorkflow } from '../components/NodeWorkflow'
+import { EgressUpstreams } from '../components/EgressUpstreams'
 import { RoutingCard } from '../components/RoutingCard'
 import { ForwardsCard } from '../components/ForwardsCard'
 import { IngressesCard, ingressPayload } from '../components/IngressesCard'
@@ -144,7 +145,7 @@ export default function NodePage() {
         <Accordion multiple chevronPosition="right" variant="default">
           <Accordion.Item value="ingress"><Accordion.Control><Text size="sm" fw={600}>{t('ingress.title')}</Text><Text size="xs" c="dimmed">{(d.ingresses ?? []).length > 0 ? t('nodes.advIngressCount', { count: (d.ingresses ?? []).length }) : t('nodes.advIngressHint')}</Text></Accordion.Control><Accordion.Panel><IngressesCard embedded nodeID={n.id} ingresses={d.ingresses ?? []} inbounds={d.inbounds} /></Accordion.Panel></Accordion.Item>
           {me?.role === 'admin' && <Accordion.Item value="reverse"><Accordion.Control><Text size="sm" fw={600}>{t('reverse.title')}</Text></Accordion.Control><Accordion.Panel><ReverseConnections key={n.id} node={n} /></Accordion.Panel></Accordion.Item>}
-          <Accordion.Item value="routing"><Accordion.Control><Text size="sm" fw={600}>{t('routing.title')}</Text><Text size="xs" c="dimmed">{t('nodes.advRoutingHint')}</Text></Accordion.Control><Accordion.Panel><RoutingCard embedded nodeID={n.id} inboundTags={d.inbounds.map((ib) => ib.Tag)} /></Accordion.Panel></Accordion.Item>
+          <Accordion.Item value="routing"><Accordion.Control><Text size="sm" fw={600}>{t('routing.title')}</Text><Text size="xs" c="dimmed">{t('nodes.advRoutingHint')}</Text></Accordion.Control><Accordion.Panel><RoutingCard embedded nodeID={n.id} inboundTags={d.inbounds.map((ib) => ib.Tag)} />{me?.role === 'admin' && <EgressUpstreams key={n.id} endpoint={`/api/admin/settings/nodes/${n.id}/egress`} />}</Accordion.Panel></Accordion.Item>
           <Accordion.Item value="overrides"><Accordion.Control><Text size="sm" fw={600}>{t('overrides.title')}</Text><Text size="xs" c="dimmed">{t('nodes.advOverridesHint')}</Text></Accordion.Control><Accordion.Panel><OverridesCard queryKey={['overrides', n.id]} load={() => api.get<Record<string, string>>(`/api/admin/nodes/${n.id}/overrides`)} save={(v) => api.put(`/api/admin/nodes/${n.id}/overrides`, v)} /></Accordion.Panel></Accordion.Item>
           <Accordion.Item value="forwards"><Accordion.Control><Text size="sm" fw={600}>{t('forwards.title')}</Text><Text size="xs" c="dimmed">{t('nodes.advForwardsHint')}</Text></Accordion.Control><Accordion.Panel><ForwardsCard key={n.id} embedded node={n} ingresses={d.ingresses ?? []} /></Accordion.Panel></Accordion.Item>
         </Accordion>

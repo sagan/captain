@@ -971,7 +971,7 @@
     "backendRelay": "内置转发",
     "backendNft": "nftables 内核转发",
     "preserve": "保留源 IP",
-    "nftHint": "nftables 后端走内核 DNAT，节点需要 nft 命令，目标必须是 IPv4；保留源 IP 时目标服务器的回包路由必须经过本机。",
+    "nftHint": "内核 DNAT 支持同地址族 IPv4/IPv6（IPv6 需要 bosun ≥ 0.62），节点需安装 nft。保留源 IP 时，目标须经本节点返回；跨地址族请用内置转发或 realm。",
     "backendRealm": "Realm（独立进程）",
     "backendRealmHint": "由 bosun 安装并运行 zhboner/realm 中转，吞吐高，支持域名目标和 UDP；没有连接数和流量统计。",
     "proxyProtocol": "发送 PROXY protocol",
@@ -988,7 +988,11 @@
     "failoverShort": "故障切换",
     "roundRobinShort": "轮询",
     "editTargets": "目标与故障切换",
-    "firstTarget": "第一个目标"
+    "firstTarget": "第一个目标",
+    "unknown": "未检测",
+    "udpUntested": "TCP 连接成功或创建 UDP 套接字都不能证明 UDP 服务健康。",
+    "tcpProbe": "仅检测 TCP 连接，不代表代理全链路可用。",
+    "backendFailed": "转发后端失败"
   },
   "backup": {
     "title": "数据库备份",
@@ -2097,5 +2101,16 @@
     "managed": "由节点连接管理",
     "retryHint": "断线后会自动重连，离线节点恢复后自动套用配置。可打开中转或落地节点查看自检。",
     "scanFrom": "从中转 {{node}} 执行检测。选用目标会同步更新它的隧道和 REALITY 用户入口。"
+  },
+  "egress": {
+    "title": "私网上游例外",
+    "hint": "按 IP/CIDR、协议和端口放行内核到指定上游的连接，不改变用户访问目标的限制。作用于本节点全部内核；控制 API 仍受保护。",
+    "loadFailed": "策略加载失败。",
+    "retry": "重试",
+    "requiresVersion": "请升级到 bosun {{version}} 或更新版本后配置例外。",
+    "address": "上游 IP / CIDR",
+    "port": "端口",
+    "add": "添加例外",
+    "applyHint": "保存后请在节点体检中核对防护的实际状态。节点配置文件中的例外也会生效；无需重启。"
   }
 }

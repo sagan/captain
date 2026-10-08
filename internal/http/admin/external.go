@@ -13,6 +13,8 @@ import (
 )
 
 func (h *handlers) registerExternal(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/admin/settings/nodes/{id}/egress", h.requireAdmin(h.getNodeEgress))
+	mux.HandleFunc("PUT /api/admin/settings/nodes/{id}/egress", h.requireAdmin(h.putNodeEgress))
 	mux.HandleFunc("GET /api/admin/external/sources", h.requireAdmin(h.listExternalSources))
 	mux.HandleFunc("POST /api/admin/external/sources", h.requireAdmin(h.saveExternalSource))
 	mux.HandleFunc("PATCH /api/admin/external/sources/{id}", h.requireAdmin(h.saveExternalSource))

@@ -19,15 +19,18 @@ type NodeForward struct {
 
 // ForwardStatus is what the node last reported for one rule.
 type ForwardStatus struct {
-	Tag        string    `json:"tag"`
-	Up         bool      `json:"up"`
-	RTTMillis  int64     `json:"rtt_ms"`
-	LastError  string    `json:"last_error"`
-	ActiveConn int64     `json:"active_conn"`
-	TotalConn  int64     `json:"total_conn"`
-	BytesIn    int64     `json:"bytes_in"`
-	BytesOut   int64     `json:"bytes_out"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	// Health describes only ProbeProtocol (tcp, none, or backend on apply failure).
+	Health        string    `json:"health,omitempty"`
+	ProbeProtocol string    `json:"probe_protocol,omitempty"`
+	Tag           string    `json:"tag"`
+	Up            bool      `json:"up"`
+	RTTMillis     int64     `json:"rtt_ms"`
+	LastError     string    `json:"last_error"`
+	ActiveConn    int64     `json:"active_conn"`
+	TotalConn     int64     `json:"total_conn"`
+	BytesIn       int64     `json:"bytes_in"`
+	BytesOut      int64     `json:"bytes_out"`
+	UpdatedAt     time.Time `json:"updated_at"`
 	// Targets is per-hop health of a rule with several targets.
 	Targets []agentproto.ForwardTargetStatus `json:"targets,omitempty"`
 }
@@ -72,7 +75,7 @@ func (s *Store) SetNodeForwards(ctx context.Context, nodeID int64, list []NodeFo
 }
 
 func (s *Store) ForwardStatuses(ctx context.Context, nodeID int64) (map[string]ForwardStatus, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT tag, up, rtt_ms, last_error, active_conn, total_conn, bytes_in, bytes_out, updated_at, targets_json FROM forward_status WHERE node_id = ?`, nodeID)
+	rows, err := s.db.QueryContext(ctx, `SELECT tag, up, rtt_ms, last_error, active_conn, total_conn, bytes_in, bytes_out, updated_at, targets_json, health, probe_protocol FROM forward_status WHERE node_id = ?`, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +86,7 @@ func (s *Store) ForwardStatuses(ctx context.Context, nodeID int64) (map[string]F
 		var up int
 		var at int64
 		var targets string
-		if err := rows.Scan(&f.Tag, &up, &f.RTTMillis, &f.LastError, &f.ActiveConn, &f.TotalConn, &f.BytesIn, &f.BytesOut, &at, &targets); err != nil {
+		if err := rows.Scan(&f.Tag, &up, &f.RTTMillis, &f.LastError, &f.ActiveConn, &f.TotalConn, &f.BytesIn, &f.BytesOut, &at, &targets, &f.Health, &f.ProbeProtocol); err != nil {
 			return nil, err
 		}
 		f.Up, f.UpdatedAt = up == 1, unix(at)

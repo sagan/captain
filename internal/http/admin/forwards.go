@@ -150,6 +150,12 @@ func (h *handlers) putNodeForwards(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+		effective := f.Forward
+		effective.Listen = effectiveListen
+		if err := effective.ValidateTargets(); err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
 		for _, l := range forwardListeners(f) {
 			for _, b := range used {
 				if b.listener == l && listenOverlap(b.listen, effectiveListen) {

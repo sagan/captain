@@ -971,7 +971,7 @@
     "backendRelay": "built-in relay",
     "backendNft": "nftables (kernel DNAT)",
     "preserve": "Preserve source IP",
-    "nftHint": "The nftables backend does kernel DNAT: the node needs the nft binary and an IPv4 target; with source preserved the target must route replies back through this node.",
+    "nftHint": "Kernel DNAT supports same-family IPv4/IPv6 (bosun ≥ 0.62 for IPv6) and requires nft. Preserving the source requires the target to route replies through this node. Use relay/realm for cross-family forwarding.",
     "backendRealm": "Realm (separate process)",
     "backendRealmHint": "bosun installs and runs a zhboner/realm relay: high throughput, hostname targets and UDP; no connection or traffic counters.",
     "proxyProtocol": "Send PROXY protocol",
@@ -988,7 +988,11 @@
     "failoverShort": "failover",
     "roundRobinShort": "round-robin",
     "editTargets": "Targets and failover",
-    "firstTarget": "First target"
+    "firstTarget": "First target",
+    "unknown": "Not checked",
+    "udpUntested": "UDP health is not measured by a TCP connect or an open UDP socket.",
+    "tcpProbe": "TCP connection test only; not an end-to-end proxy check.",
+    "backendFailed": "Backend failed"
   },
   "backup": {
     "title": "Database backups",
@@ -2097,5 +2101,16 @@
     "managed": "Managed in node connections",
     "retryHint": "Disconnected tunnels reconnect automatically; offline nodes apply changes when they return. Open the transit or exit node to inspect diagnostics.",
     "scanFrom": "Detection runs from transit {{node}}. A selected target updates its tunnel and REALITY user listener."
+  },
+  "egress": {
+    "title": "Private upstream exceptions",
+    "hint": "Allow the cores to connect to a specific upstream IP/CIDR, protocol and port. Subscriber destination restrictions stay unchanged. This applies to all cores on this node; control APIs remain protected.",
+    "loadFailed": "Could not load the policy.",
+    "retry": "Retry",
+    "requiresVersion": "Upgrade bosun to {{version}} or later to configure these exceptions.",
+    "address": "Upstream IP / CIDR",
+    "port": "Port",
+    "add": "Add exception",
+    "applyHint": "After saving, check the node self-check for the applied guard status. Host configuration exceptions also apply; no restart is required."
   }
 }

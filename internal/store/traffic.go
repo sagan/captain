@@ -135,12 +135,12 @@ func (s *Store) UpsertForwardStatus(ctx context.Context, nodeID int64, f agentpr
 		b, _ := json.Marshal(f.Targets)
 		targets = string(b)
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO forward_status (node_id, tag, up, rtt_ms, last_error, active_conn, total_conn, bytes_in, bytes_out, updated_at, targets_json)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO forward_status (node_id, tag, up, rtt_ms, last_error, active_conn, total_conn, bytes_in, bytes_out, updated_at, targets_json, health, probe_protocol)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(node_id, tag) DO UPDATE SET up = excluded.up, rtt_ms = excluded.rtt_ms, last_error = excluded.last_error,
 		active_conn = excluded.active_conn, total_conn = excluded.total_conn, bytes_in = excluded.bytes_in, bytes_out = excluded.bytes_out,
-		updated_at = excluded.updated_at, targets_json = excluded.targets_json`,
-		nodeID, f.Tag, boolInt(f.Up), f.RTTMillis, f.LastError, f.ActiveConn, f.TotalConn, f.BytesIn, f.BytesOut, now(), targets)
+		updated_at = excluded.updated_at, targets_json = excluded.targets_json, health = excluded.health, probe_protocol = excluded.probe_protocol`,
+		nodeID, f.Tag, boolInt(f.Up), f.RTTMillis, f.LastError, f.ActiveConn, f.TotalConn, f.BytesIn, f.BytesOut, now(), targets, f.Health, f.ProbeProtocol)
 	return err
 }
 

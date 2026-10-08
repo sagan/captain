@@ -22,8 +22,11 @@ Captain adaptations:
   latency/loss bars. Null gaps, weighted attempts and successful latency are
   preserved. The metric adapter does not invent raw attempts or quantiles.
 - `ping-selection.ts` selects the configured data source. With carrier monitoring
-  enabled and CT/CU/CM configured, both card and list show the original three
-  rows for latency and loss. Missing samples leave the corresponding row empty.
+  enabled and CT/CU/CM configured, cards show the original two panels with three
+  carrier rows. The list uses three compact pairs of twenty-segment bars with
+  carrier dots and tooltips, fitting the upstream 64px row and its virtual-scroll
+  spacing; card-sized panels must not be placed in the narrow uptime cell.
+  Missing samples leave the corresponding row empty.
   Otherwise the first enabled, node-assigned task by ID supplies both bars.
   `ping_tasks` in the public node snapshot contains only IDs and labels, never
   destinations. Selection never jumps to another task because samples are absent.
@@ -43,6 +46,9 @@ Captain adaptations:
   The production bundle includes the theme and icon licence texts under `licenses/`.
   External visitor audit/fingerprinting, IP geolocation, exchange-rate fetches
   and Komari administrative operations are disabled.
+- The search container expands along with its focused input, so the toolbar
+  reserves its full width and wraps on narrow screens. Upstream's absolute input
+  expanded outside its icon-sized container and could extend beyond the viewport.
 - Core public labels have six-language dictionaries. Language follows Captain's
   saved `i18nextLng` preference, then the browser language.
 

@@ -442,7 +442,7 @@ const nodeCardGridClass = computed(() => {
       <div class="nodes min-w-0">
         <Tabs v-model="appStore.nodeSelectedGroup" class="w-full flex-col gap-4">
           <div class="flex flex-col gap-2 xl:flex-row xl:items-center">
-            <div class="home-controls-scroll min-w-0 overflow-x-auto overscroll-x-contain rounded-sm pointer-events-auto touch-pan-x">
+            <div class="home-controls-scroll min-w-0 overflow-x-auto overscroll-x-contain rounded-sm pointer-events-auto touch-pan-x xl:flex-1">
               <div class="flex w-max gap-2">
                 <TabsList class="w-max h-8 bg-background/50 backdrop-blur-xl rounded-md pointer-events-auto">
                   <TabsTrigger
@@ -475,7 +475,7 @@ const nodeCardGridClass = computed(() => {
                 </div>
               </div>
             </div>
-            <div class="search flex min-w-0 flex-wrap gap-2 items-center justify-end pointer-events-auto max-sm:justify-start xl:ml-auto">
+            <div class="search flex min-w-0 max-w-full flex-wrap gap-2 items-center justify-end pointer-events-auto max-sm:justify-start xl:ml-auto xl:shrink-0">
               <div v-if="homeTools.length && appStore.homeAdvancedToolsVisible" class="flex h-8 items-center gap-1 rounded-md bg-background/50 p-0.5 backdrop-blur-xs">
                 <Button
                   v-for="tool in homeTools" :key="tool.key"
@@ -507,13 +507,13 @@ const nodeCardGridClass = computed(() => {
               >
                 <Icon icon="tabler:table" :width="14" :height="14" />
               </Button>
-              <div class="relative z-1 h-8" :class="searchText ? 'w-full sm:w-60' : 'w-8'">
-                <div class="absolute top-0 right-0 w-full">
+              <div class="relative z-1 h-8 max-w-full shrink-0" :class="searchText ? 'w-52 sm:w-60' : 'w-8 focus-within:w-52 sm:focus-within:w-60'">
+                <div class="relative h-full w-full">
                   <Input
                     v-model="searchText" placeholder="搜索名称、地区、IP、CPU"
                     :aria-label="t('搜索节点')"
                     class="transition-all border-none shadow-none h-8 bg-background/50 backdrop-blur-xs rounded-md hover:!bg-background/60 focus:!pl-7.5 focus:placeholder:!text-muted-foreground focus:!bg-background/80 focus:!ring-slate-500/10"
-                    :class="searchText ? '!w-full sm:!w-60 !pl-7.5 pr-7 placeholder:!text-muted-foreground' : 'w-8 placeholder:text-transparent focus:!w-52 sm:focus:!w-60'"
+                    :class="searchText ? '!w-full !pl-7.5 pr-7 placeholder:!text-muted-foreground' : '!w-full placeholder:text-transparent'"
                     @keydown.esc.prevent="clearSearch"
                   />
                   <Icon

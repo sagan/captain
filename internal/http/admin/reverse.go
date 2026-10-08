@@ -244,7 +244,11 @@ func (h *handlers) saveReverse(w http.ResponseWriter, r *http.Request) {
 			x.Receiver = domain.Inbound{Tag: "rv-control-" + x.Link.ID, Protocol: spec.VLESS, Settings: spec.Inbound{TLS: tls(), Reverse: &spec.ReverseInbound{ID: x.Link.ID, Receiver: true, UUID: auth.UUID()}}}
 		}
 		if v.Settings != nil {
+			policy := x.User.Settings.PrivateAccess
 			x.User.Settings = *v.Settings
+			if x.User.Settings.PrivateAccess == nil {
+				x.User.Settings.PrivateAccess = policy
+			}
 		}
 		if v.Protocol != "" {
 			x.User.Protocol = v.Protocol
@@ -279,6 +283,27 @@ func (h *handlers) saveReverse(w http.ResponseWriter, r *http.Request) {
 			}
 			if msg := h.checkPortConflict(r.Context(), ib); msg != "" {
 				fail(w, 409, msg)
+				return
+			}
+		}
+		if x.User.Settings.PrivateAccess.Enabled() {
+			if msg := h.checkInboundCore(r.Context(), &x.User); msg != "" {
+				fail(w, 400, msg)
+				return
+			}
+			if msg := h.checkPrivateAccess(r.Context(), v.TransitID, &x.User); msg != "" {
+				fail(w, 400, msg)
+				return
+			}
+			exitInbound := x.User
+			exitInbound.NodeID = exitID
+			exitInbound.ID = 0
+			if msg := h.checkInboundCore(r.Context(), &exitInbound); msg != "" {
+				fail(w, 400, msg)
+				return
+			}
+			if msg := h.checkPrivateAccess(r.Context(), exitID, &exitInbound); msg != "" {
+				fail(w, 400, msg)
 				return
 			}
 		}

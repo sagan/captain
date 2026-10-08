@@ -233,6 +233,10 @@ func (h *handlers) createInbound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ib.NodeID = nodeID
+	if ib.Settings.PrivateAccess.Enabled() && !userFrom(r).IsAdmin() {
+		fail(w, 403, "only administrators can grant private access")
+		return
+	}
 	if ib.Settings.Reverse != nil {
 		fail(w, 400, "use the reverse connection wizard")
 		return
@@ -241,6 +245,10 @@ func (h *handlers) createInbound(w http.ResponseWriter, r *http.Request) {
 	fillInboundSecrets(&ib)
 	if msg := checkInboundFields(&ib); msg != "" {
 		fail(w, http.StatusBadRequest, msg)
+		return
+	}
+	if msg := h.checkPrivateAccess(r.Context(), ib.NodeID, &ib); msg != "" {
+		fail(w, 400, msg)
 		return
 	}
 	if msg := h.checkInboundCore(r.Context(), &ib); msg != "" {
@@ -271,7 +279,15 @@ func (h *handlers) updateInbound(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, "inbound not found")
 		return
 	}
+	if cur.Settings.PrivateAccess.Enabled() && !userFrom(r).IsAdmin() {
+		fail(w, 403, "only administrators can edit an inbound granting private access")
+		return
+	}
 	ib := *cur
+	if cur.Settings.PrivateAccess != nil {
+		policy := *cur.Settings.PrivateAccess
+		ib.Settings.PrivateAccess = &policy
+	}
 	if h.Store.ReverseOwnedInbound(r.Context(), id) {
 		fail(w, 409, "edit this inbound in its exit node's reverse connections")
 		return
@@ -281,6 +297,13 @@ func (h *handlers) updateInbound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ib.ID, ib.NodeID = cur.ID, cur.NodeID
+	if ib.Settings.PrivateAccess == nil {
+		ib.Settings.PrivateAccess = cur.Settings.PrivateAccess
+	}
+	if !samePrivateAccess(cur.Settings.PrivateAccess, ib.Settings.PrivateAccess) && !userFrom(r).IsAdmin() {
+		fail(w, 403, "only administrators can change private access")
+		return
+	}
 	if ib.Settings.Reverse != nil {
 		fail(w, 400, "use the reverse connection wizard")
 		return
@@ -288,6 +311,10 @@ func (h *handlers) updateInbound(w http.ResponseWriter, r *http.Request) {
 	fillInboundSecrets(&ib)
 	if msg := checkInboundFields(&ib); msg != "" {
 		fail(w, http.StatusBadRequest, msg)
+		return
+	}
+	if msg := h.checkPrivateAccess(r.Context(), ib.NodeID, &ib); msg != "" {
+		fail(w, 400, msg)
 		return
 	}
 	if msg := h.checkInboundCore(r.Context(), &ib); msg != "" {

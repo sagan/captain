@@ -43,14 +43,18 @@ func (h *handlers) coreOptions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) checkInboundCore(ctx context.Context, ib *domain.Inbound) string {
-	if !ib.Enabled {
+	if !ib.Enabled && !ib.Settings.PrivateAccess.Enabled() {
 		return ""
 	}
 	n, err := h.Store.NodeByID(ctx, ib.NodeID)
 	if err != nil {
 		return "node not found"
 	}
-	if candidates := h.nodeCoreCandidates(ctx, n); candidates != nil {
+	candidates := h.nodeCoreCandidates(ctx, n)
+	if ib.Settings.PrivateAccess.Enabled() && candidates == nil {
+		return "private access requires a recent supported node capability report"
+	}
+	if candidates != nil {
 		if _, err := spec.SelectCore(ib.Spec(), candidates); err != nil {
 			return err.Error()
 		}

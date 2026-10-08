@@ -284,6 +284,16 @@ func (h *handlers) putNodeRouting(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "default outbound must be one of the defined outbounds")
 		return
 	}
+	policyNode, err := h.privateAccessNode(r.Context(), idOf(r), nil)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	policyNode.Routes, policyNode.Outbounds, policyNode.DefaultOutbound, policyNode.DNS = nr.Routes, nr.Outbounds, nr.DefaultOutbound, nr.DNS
+	if err := policyNode.ValidatePrivateAccessNode(); err != nil {
+		fail(w, 400, err.Error())
+		return
+	}
 	if err := h.Store.SetNodeRouting(r.Context(), idOf(r), &nr); err != nil {
 		serverErr(w, err)
 		return
@@ -329,6 +339,19 @@ func (h *handlers) putNodeOverrides(w http.ResponseWriter, r *http.Request) {
 			fail(w, 409, err.Error())
 			return
 		}
+	}
+	policyNode, err := h.privateAccessNode(r.Context(), id, nil)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	policyNode.Overrides = map[string]json.RawMessage{}
+	for key, value := range in {
+		policyNode.Overrides[key] = json.RawMessage(value)
+	}
+	if err := policyNode.ValidatePrivateAccessNode(); err != nil {
+		fail(w, 400, err.Error())
+		return
 	}
 	if err := h.Store.SetNodeOverrides(r.Context(), id, in); err != nil {
 		fail(w, http.StatusBadRequest, err.Error())

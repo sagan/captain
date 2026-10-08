@@ -291,3 +291,15 @@ customer identities to reject reused IDs. Infrastructure history follows staff
 renumbering and survives node removal. Site reset clears every new table.
 See [administration workflows](ADMIN_WORKFLOWS.md) before rolling back or
 changing the configured Passkey origin.
+
+## Unreleased per-inbound private access
+
+This adds `Inbound.private_access`, `ReverseClient.private_access` and the
+runtime core capability `private_access`; existing fields and paths stay intact.
+Captain v1.13.0 / bosun v0.62.0 do not implement this capability. Development
+builds require both repositories' matching changes; the minimum released
+version will be recorded when published. Ordinary configurations remain usable
+with old nodes. Enabled private policies require a recent supporting node
+report when saving and are withheld at state delivery if support disappears.
+Existing JSON storage carries the field without a schema migration. Omitted
+or null policy updates preserve permissions; explicit `mode: off` revokes them.

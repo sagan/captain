@@ -167,7 +167,14 @@ func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*
 			reality := *tls.Reality
 			reality.PrivateKey = ""
 			tls.Reality = &reality
-			node.ReverseClients = append(node.ReverseClients, spec.ReverseClient{ID: link.ID, Host: host, Port: port, UUID: sp.Reverse.UUID, TLS: &tls})
+			userInbound, err := a.Store.InboundByID(ctx, link.UserInboundID)
+			if err != nil {
+				return nil, err
+			}
+			if !a.Store.PrivateAccessCapable(ctx, n.ID, userInbound.Spec()) {
+				continue
+			}
+			node.ReverseClients = append(node.ReverseClients, spec.ReverseClient{PrivateAccess: userInbound.Settings.PrivateAccess, ID: link.ID, Host: host, Port: port, UUID: sp.Reverse.UUID, TLS: &tls})
 		}
 	}
 	if ov, err := a.Store.NodeOverrides(ctx, n.ID); err == nil {
@@ -260,6 +267,9 @@ func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*
 	}
 	for _, ib := range inbounds {
 		si := ib.Spec()
+		if !a.Store.PrivateAccessCapable(ctx, n.ID, si) {
+			continue
+		}
 		// Old agents ignore added fields. Withhold managed endpoints entirely
 		// until the adapter advertises support, preventing accidental A egress.
 		if si.Reverse != nil && !reverseCapable {

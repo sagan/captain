@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/zeptop-dev/bosun/pkg/agentproto"
+	"github.com/zeptop-dev/bosun/pkg/spec"
 	"github.com/zeptop-dev/captain/internal/domain"
 )
 
@@ -162,4 +163,26 @@ func saveReverseInbound(ctx context.Context, tx *sql.Tx, ib *domain.Inbound) err
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE inbounds SET node_id=?,tag=?,protocol=?,listen=?,port=?,core=?,settings_json=?,group_id=?,enabled=?,ingress_id=?,updated_at=? WHERE id=?`, append(args, ib.ID)...)
 	return err
+}
+
+// PrivateAccessCapable is also used at state delivery: a downgraded node must
+// not receive an enabled policy it would silently ignore.
+func (s *Store) PrivateAccessCapable(ctx context.Context, nodeID int64, ib spec.Inbound) bool {
+	if !ib.PrivateAccess.Enabled() {
+		return true
+	}
+	st, err := s.NodeStatus(ctx, nodeID)
+	if err != nil {
+		return false
+	}
+	var cs map[string]agentproto.CoreStatus
+	if json.Unmarshal(st.Cores, &cs) != nil {
+		return false
+	}
+	candidates := agentproto.CoreCandidates(cs)
+	if candidates == nil {
+		return false
+	}
+	_, err = spec.SelectCore(ib, candidates)
+	return err == nil
 }

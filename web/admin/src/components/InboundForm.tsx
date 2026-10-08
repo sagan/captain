@@ -9,6 +9,8 @@ import { RealityScan } from './RealityScan'
 import { scanRealityViaNode } from '../lib/reality-scan'
 import { api } from '../lib/api'
 import { ConfigPresets } from './ConfigPresets'
+import { PrivateAccessFields } from './PrivateAccessFields'
+import { useAuth } from '../lib/auth'
 import { useCoreSelection } from '../lib/coreSelection'
 
 // REALITY helpers over the settings JSON.
@@ -100,6 +102,7 @@ export function toPayload(v: InboundValues) {
 
 export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain, ingresses = [], usedPorts = [], lineOnly, nodeID, decoyDomain, fixedCore }: { initial: InboundValues; groups: UGroup[]; onSubmit: (v: InboundValues) => void; busy: boolean; onCancel: () => void; domain?: string; ingresses?: Ingress[]; usedPorts?: number[]; lineOnly?: boolean; nodeID?: number; decoyDomain?: string; fixedCore?: string }) {
   const { t } = useTranslation()
+  const { me } = useAuth()
   const form = useForm<InboundValues>({
     initialValues: { ...initial, Core: fixedCore || initial.Core },
     validate: { Tag: (v) => (v ? null : 'required'), Port: (v) => (v > 0 && v < 65536 ? null : 'port'), Settings: (v) => { try { JSON.parse(v || '{}'); return null } catch { return 'invalid JSON' } } },
@@ -116,7 +119,7 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
     const port = selectedIngress ? (firstFree(selectedIngress) || r.port) : r.port
     let settings: Record<string, unknown> = r.key === 'snell' ? { ...r.settings, snell_psk: randomPSK() } : r.settings
     if (r.key === 'wireguard') { try { const k = await api.post<{ private_key: string; public_key: string }>('/api/admin/keys/wireguard'); settings = { ...settings, wg_private_key: k.private_key, wg_public_key: k.public_key } } catch { /* leave blank; the form asks for a key */ } }
-    form.setValues({ Protocol: r.protocol, Port: port, Settings: JSON.stringify(settings, null, 2).replaceAll('node.example.com', domain || 'node.example.com'), Tag: form.values.Tag || r.protocol })
+    form.setValues({ Protocol: r.protocol, Port: port, Settings: JSON.stringify({ ...settings, private_access: settingOf(form.values.Settings, 'private_access') }, null, 2).replaceAll('node.example.com', domain || 'node.example.com'), Tag: form.values.Tag || r.protocol })
   }
   // A node reachable only through a line (no public address, no domain) defaults new inbounds to its first ingress.
   useEffect(() => { if ((lineOnly || ingresses.some(g => g.require_ingress)) && !initial.IngressID && !initial.Tag && ingresses[0]) form.setValues({ IngressID: String(ingresses[0].id), Port: firstFree(ingresses[0]) || form.values.Port }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -242,6 +245,7 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
             </Card>
           )
         })()}
+        <PrivateAccessFields json={form.values.Settings} onChange={(s) => form.setFieldValue('Settings', s)} disabled={me?.role !== 'admin'} />
         <JsonInput label={t('inbounds.settings')} description={t('inbounds.settingsHint')} autosize minRows={4} maxRows={16} formatOnBlur {...form.getInputProps('Settings')} />
         <Group justify="flex-end"><Button variant="default" onClick={onCancel}>{t('common.cancel')}</Button><Button type="submit" loading={busy} disabled={coreSelection.blocked}>{t('common.save')}</Button></Group>
       </Stack>

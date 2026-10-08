@@ -6,6 +6,8 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
+- **Unreleased** — Add administrator-controlled per-inbound private destination policies in the inbound and reverse editors, including scoped CIDR/protocol/port rules, runtime core capability checks, safe older-client updates and six-language forms. Reverse policies are delivered to their individual exit clients; unsupported/downgraded nodes do not receive enabled policies. No database migration.
+
 - **v1.13.0** (2026-10-07) — Fix IPv6 forwarding and protocol-specific health reporting (#9–#10): preserve bracketed primary/additional IPv6 targets, infer UDP when selecting Hysteria2/TUIC, distinguish unknown UDP health from TCP probe failure, and persist additive health metadata (migration 68).
   - Add an administrator-only node upstream-exception editor alongside routing, with literal IP/CIDR, protocol and port validation, independent storage, old-agent capability checks and six-language labels (#11–#12). Exceptions require bosun v0.62.0; they do not enable per-inbound private access or bypass core control-API protection. The same migration stores the new node policy; existing routing API writes preserve it.
   - Fix Glassmorphism list clipping with compact three-carrier latency/loss bars that fit the original 64px rows. Reserve space for the expanded search input on desktop and mobile, and prevent keyboard activation of monitoring controls from also opening node details. Preserve the original globe, six overview cards and card layouts.

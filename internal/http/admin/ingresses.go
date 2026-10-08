@@ -178,6 +178,9 @@ func (h *handlers) deleteIngress(w http.ResponseWriter, r *http.Request) {
 // checkIngress is also run for direct listeners, so require_ingress cannot
 // be bypassed by leaving the reference empty.
 func (h *handlers) checkIngress(r *http.Request, ib *domain.Inbound) string {
+	if err := ib.Spec().CheckCoreListen(""); err != nil {
+		return err.Error()
+	}
 	gs, err := h.Store.IngressesByNode(r.Context(), ib.NodeID)
 	if err != nil {
 		return "could not read ingress configuration"
@@ -192,6 +195,9 @@ func (h *handlers) checkIngress(r *http.Request, ib *domain.Inbound) string {
 	if id != "" {
 		for _, g := range gs {
 			if strconv.FormatInt(g.ID, 10) == id {
+				if err := ib.Spec().CheckCoreListen(g.BindIP); err != nil {
+					return err.Error()
+				}
 				if err := g.Ports().CheckInbound(ib.Spec()); err != nil {
 					return err.Error()
 				}
@@ -249,6 +255,9 @@ func (h *handlers) checkIngressChange(ctx context.Context, g *store.Ingress, rem
 			return "inbound " + ib.Tag + ": " + msg, nil
 		}
 		if ib.IngressID != nil && *ib.IngressID == g.ID && !removing {
+			if err := ib.Spec().CheckCoreListen(g.BindIP); err != nil {
+				return "inbound " + ib.Tag + ": " + err.Error(), nil
+			}
 			if err := g.Ports().CheckInbound(ib.Spec()); err != nil {
 				return "inbound " + ib.Tag + ": " + err.Error(), nil
 			}

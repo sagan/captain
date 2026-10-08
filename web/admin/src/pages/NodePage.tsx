@@ -1,3 +1,4 @@
+import { CoreManagementCard, type CoreInventory } from '../components/CoreManagementCard'
 import { ReverseConnections } from '../components/ReverseConnections'
 import type { ResourceHost } from '../lib/resources'
 import { coreName } from '../lib/coreSelection'
@@ -10,7 +11,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { api, type DoctorReport, type Ingress, type CertStatus, type Group as UGroup, type Inbound, type Node } from '../lib/api'
+import { api, runNodeJob, type DoctorReport, type Ingress, type CertStatus, type Group as UGroup, type Inbound, type Node } from '../lib/api'
 import { ago, bytes, when } from '../lib/format'
 import { dnsToast, toast, type DNSResult } from '../lib/notify'
 import { PageHeader } from '../components/PageHeader'
@@ -27,7 +28,7 @@ import { OverridesCard } from '../components/OverridesCard'
 import { MetadataEditor } from '../components/MetadataEditor'
 import { DeleteNodeModal } from '../components/DeleteNodeModal'
 
-interface Detail { traffic?: Record<string, { today: number; total: number }>; node: Node; inbounds: Inbound[]; ingresses?: Ingress[]; status: { host: ResourceHost | null; cores: Record<string, { running: boolean; inbounds?: string[] }> | null; certs: CertStatus[] | null; doctor?: DoctorReport | null } | null }
+interface Detail { traffic?: Record<string, { today: number; total: number }>; node: Node; inbounds: Inbound[]; ingresses?: Ingress[]; status: { core_inventory?: CoreInventory | null; host: ResourceHost | null; cores: Record<string, { running: boolean; inbounds?: string[] }> | null; certs: CertStatus[] | null; doctor?: DoctorReport | null } | null }
 
 export default function NodePage() {
   const { id } = useParams()
@@ -71,6 +72,12 @@ export default function NodePage() {
         <Button color="red" variant="light" size="xs" leftSection={<IconTrash size={14} />} onClick={() => setDeletingNode(true)}>{t('common.delete')}</Button>
       </>} />
 
+      {me?.role === 'admin' && <CoreManagementCard inventory={d.status?.core_inventory} online={n.online} canWrite inbounds={d.inbounds.filter(ib => ib.Enabled).map(ib => ib.Tag)} onAction={async request => {
+        const result = await runNodeJob<CoreInventory>(n.id, 'core_manage', request, 920_000)
+        qc.setQueryData<Detail>(['node', id], old => old?.status ? { ...old, status: { ...old.status, core_inventory: result } } : old)
+        invalidate()
+        qc.invalidateQueries({ queryKey: ['core-options'] })
+      }} />}
       <NodeWorkflow node={n} inbounds={d.inbounds} cores={d.status?.cores} />
       {!n.paired && n.pair_code && <Card mb="lg"><Title order={5} mb="sm">{t('nodes.pairTitle')}</Title><PairCodeBox code={n.pair_code} /></Card>}
       {n.paired && <NodeProbeCard key={n.id} nodeID={n.id} reportedHost={host} />}

@@ -217,11 +217,12 @@ func (s *Store) DeleteNode(ctx context.Context, id int64) error {
 
 // NodeStatus is the last reported host/core state.
 type NodeStatus struct {
-	Host   json.RawMessage `json:"host"`
-	Cores  json.RawMessage `json:"cores"`
-	Certs  json.RawMessage `json:"certs"`
-	Doctor json.RawMessage `json:"doctor"` // last agentproto.DoctorReport, or null
-	WARP   json.RawMessage `json:"warp"`   // public part of the node's WARP account, or null
+	CoreInventory json.RawMessage `json:"core_inventory"`
+	Host          json.RawMessage `json:"host"`
+	Cores         json.RawMessage `json:"cores"`
+	Certs         json.RawMessage `json:"certs"`
+	Doctor        json.RawMessage `json:"doctor"` // last agentproto.DoctorReport, or null
+	WARP          json.RawMessage `json:"warp"`   // public part of the node's WARP account, or null
 }
 
 // SetNodeWARP stores the public part of the node's registered WARP account.
@@ -264,8 +265,8 @@ func (s *Store) DoctorFails(ctx context.Context) (map[int64]bool, error) {
 }
 
 func (s *Store) NodeStatus(ctx context.Context, id int64) (*NodeStatus, error) {
-	var host, cores, certs, doctor, warp string
-	if err := s.db.QueryRowContext(ctx, `SELECT host_status_json, cores_json, certs_json, doctor_json, warp_json FROM nodes WHERE id = ?`, id).Scan(&host, &cores, &certs, &doctor, &warp); err != nil {
+	var host, cores, certs, doctor, warp, inventory string
+	if err := s.db.QueryRowContext(ctx, `SELECT host_status_json, cores_json, certs_json, doctor_json, warp_json, core_inventory_json FROM nodes WHERE id = ?`, id).Scan(&host, &cores, &certs, &doctor, &warp, &inventory); err != nil {
 		return nil, wrapNotFound(err)
 	}
 	if warp == "" {
@@ -277,7 +278,7 @@ func (s *Store) NodeStatus(ctx context.Context, id int64) (*NodeStatus, error) {
 	if doctor == "" {
 		doctor = "null"
 	}
-	return &NodeStatus{Host: json.RawMessage(host), Cores: json.RawMessage(cores), Certs: json.RawMessage(certs), Doctor: json.RawMessage(doctor), WARP: json.RawMessage(warp)}, nil
+	return &NodeStatus{CoreInventory: json.RawMessage(inventory), Host: json.RawMessage(host), Cores: json.RawMessage(cores), Certs: json.RawMessage(certs), Doctor: json.RawMessage(doctor), WARP: json.RawMessage(warp)}, nil
 }
 
 // AllInboundsByNode lists inbounds of a node including disabled ones.

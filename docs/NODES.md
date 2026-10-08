@@ -493,3 +493,13 @@ Use `{"mode":"internal"}` for the preset and `{"mode":"off"}` to disable.
 Older API clients that omit or send null for this field preserve an existing
 policy. Templates do not export private permissions; applying a preset retains
 the destination inbound's current permission. No database migration is needed.
+
+## Managing node core packages
+
+Open a node's details and expand **Core management**. Full administrators can download a catalog version, then explicitly activate or switch it. Downloading does not change running services. The node serializes the change with apply/report, rejects incompatible or stale requests, checks readiness and restores the prior instance if the replacement fails. Connections served by the switched distribution are interrupted.
+
+Update bosun first: the page requires its new `core_inventory` report and `core_manage` job support. The management API remains `POST /api/admin/nodes/{id}/jobs` with `kind: "core_manage"`; parameters are `action` (`download` or `activate`), `distribution`, `version`, and the reported `revision`. Captain adds the execution deadline and allows only one pending operation per node. Older nodes retain their existing behavior and cannot be assigned the new SSH/Extended features without a current capability report.
+
+Official sing-box and `singbox-extended` can coexist. Core package/version selection is separate from each inbound's protocol and `Core` choice. Extended Mieru must be selected explicitly and requires clients to refresh subscriptions after switching from mita; it does not support specific listen-IP/ingress binds or mita native rolling quotas. SSH is a TCP proxy with subscriber passwords and a generated host-key pin, not system SSH login or a shell. Only supported subscription formats expose it.
+
+See [bosun core management](https://github.com/zeptop-dev/bosun/blob/master/docs/CORE_MANAGEMENT.md) for persistence, release sources, supported combinations and recovery behavior.

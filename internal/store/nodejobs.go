@@ -33,6 +33,9 @@ func (s *Store) CreateNodeJob(ctx context.Context, id string, nodeID int64, kind
 
 // PendingNodeJobs lists jobs the node has not answered yet.
 func (s *Store) PendingNodeJobs(ctx context.Context, nodeID int64) ([]NodeJob, error) {
+	if err := s.expireCoreOperations(ctx, nodeID); err != nil {
+		return nil, err
+	}
 	if err := s.expireNetworkDiagnostics(ctx, nodeID); err != nil {
 		return nil, err
 	}
@@ -54,6 +57,9 @@ func (s *Store) PendingNodeJobs(ctx context.Context, nodeID int64) ([]NodeJob, e
 
 // NodeJob returns one job of a node.
 func (s *Store) NodeJob(ctx context.Context, nodeID int64, id string) (*NodeJob, error) {
+	if err := s.expireCoreOperations(ctx, nodeID); err != nil {
+		return nil, err
+	}
 	if err := s.expireNetworkDiagnostics(ctx, nodeID); err != nil {
 		return nil, err
 	}

@@ -39,6 +39,7 @@ in lockstep with the panel.
 
 ## Features
 
+- Download reviewed core packages and activate a version from node details (bosun ≥ 0.64). Official and Extended sing-box can coexist; SSH TCP proxy subscriptions use persistent host-key pins. [Core management and limitations](docs/NODES.md#managing-node-core-packages).
 - Administrators can grant private destinations per inbound, with explicit CIDR/protocol/port scopes and default isolation elsewhere. Managed Reverse policies are enforced separately at the exit; requires bosun ≥ 0.63 and a supported Linux nft sing-box/Xray configuration. [Usage and boundaries](docs/NODES.md#per-inbound-private-access-captain-114--bosun-063).
 - Node routing includes administrator-only, port/protocol-scoped private upstream exceptions (bosun ≥ 0.62). Forwarding distinguishes TCP probe health from untested UDP, and nft supports same-family IPv6 targets.
 - Direct common-page navigation with secondary tools under More; a dashboard that puts node issues and daily tasks first and links to filtered lists. Searchable settings categories, independent editors, protected drafts, responsive forms, and direct user-to-subscription and node-to-entry workflows. [Console navigation](docs/ADMIN.md#finding-a-task).
@@ -51,10 +52,10 @@ data retention, or only remove the panel record. Remote actions need bosun
 
 **Protocols and cores** ([docs](docs/NODES.md#inbounds)) — VLESS (+ REALITY, with a decoy site and a target
 scanner), VMess, Trojan, Shadowsocks (incl. 2022 ciphers and ShadowTLS v3),
-Hysteria2, TUIC, AnyTLS, mieru, Snell, SOCKS, HTTP, NaiveProxy and
+Hysteria2, TUIC, AnyTLS, mieru, Snell, SOCKS, HTTP, SSH TCP proxy, NaiveProxy and
 WireGuard. Each inbound
-picks its core; bosun installs and supervises the binaries, so there is no
-fork of anything to maintain.
+picks its core; bosun installs and supervises the reviewed binaries as
+separate processes, including the optional sing-box Extended distribution.
 Inbound core choices follow protocol and feature compatibility, with automatic previews, node availability and a separate running-core indicator.
 
 **Subscriptions that fit the client** ([docs](docs/SUBSCRIPTIONS.md)) — mihomo/Clash, Stash, sing-box,

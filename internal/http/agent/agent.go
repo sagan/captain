@@ -198,6 +198,11 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 	if err := h.Store.TouchNode(ctx, n.ID, rep.Version, rep.Revision, rep.Host, rep.Cores, rep.Certs); err != nil {
 		h.Log.Error("touch node", "err", err)
 	}
+	if err := h.Store.SetCoreInventory(ctx, n.ID, rep.CoreInventory); err != nil {
+		h.Log.Error("save core inventory", "err", err)
+		fail(w, 500, "internal error")
+		return
+	}
 	if rep.Doctor != nil {
 		_ = h.Store.SetNodeDoctor(ctx, n.ID, rep.Doctor)
 	}

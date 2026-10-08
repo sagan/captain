@@ -28,7 +28,7 @@ function patchReality(settings: string, patch: { server_name?: string; handshake
   tls.reality = reality; s.tls = tls
   return JSON.stringify(s, null, 2)
 }
-const protocols = ['vless', 'vmess', 'trojan', 'shadowsocks', 'hysteria2', 'tuic', 'anytls', 'mieru', 'snell', 'socks', 'http', 'naive', 'wireguard']
+const protocols = ['vless', 'vmess', 'trojan', 'shadowsocks', 'hysteria2', 'tuic', 'anytls', 'ssh', 'mieru', 'snell', 'socks', 'http', 'naive', 'wireguard']
 
 // Snell's PSK: 32 random bytes, base64 (any string works, this is the convention).
 function randomPSK(): string { const b = new Uint8Array(32); crypto.getRandomValues(b); return btoa(String.fromCharCode(...b)) }
@@ -108,7 +108,7 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
     validate: { Tag: (v) => (v ? null : 'required'), Port: (v) => (v > 0 && v < 65536 ? null : 'port'), Settings: (v) => { try { JSON.parse(v || '{}'); return null } catch { return 'invalid JSON' } } },
   })
   let coreInbound: Record<string, unknown> | undefined
-  try { const settings = JSON.parse(form.values.Settings || '{}'); if (settings && typeof settings === 'object' && !Array.isArray(settings)) coreInbound = { ...settings, protocol: form.values.Protocol, ...(fixedCore ? { reverse: true } : {}) } } catch { /* JSON validation explains the error */ }
+  try { const settings = JSON.parse(form.values.Settings || '{}'); if (settings && typeof settings === 'object' && !Array.isArray(settings)) coreInbound = { ...settings, protocol: form.values.Protocol, listen: ingresses.find(g => String(g.id) === form.values.IngressID)?.bind_ip || form.values.Listen, ...(fixedCore ? { reverse: true } : {}) } } catch { /* JSON validation explains the error */ }
   const coreSelection = useCoreSelection(nodeID ? `/api/admin/nodes/${nodeID}/core-options` : '', coreInbound, form.values.Core)
   const [recipe, setRecipe] = useState<string | null>(null) // highlighted quick-setup card
   // Recipes name node.example.com; a node with a registered host name gets it instead.
@@ -163,6 +163,8 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
           <NumberInput label={t('inbounds.port')} min={1} max={65535} required {...form.getInputProps('Port')} />
         </Group>
         <Select label={t('inbounds.core')} allowDeselect={false} {...form.getInputProps('Core')} {...coreSelection.selectProps} disabled={!!fixedCore} value={fixedCore || form.values.Core} />
+        {form.values.Protocol === 'ssh' && <Text size="sm" c="dimmed">{t('coreManager.sshHint')}</Text>}
+        {form.values.Protocol === 'mieru' && form.values.Core === 'singbox-extended' && <Text size="sm" c="orange">{t('coreManager.extendedHint')}</Text>}
         <Group grow align="flex-end">
           <Select label={t('inbounds.group')} data={[{ value: '', label: t('inbounds.groupAll') }, ...groups.map((g) => ({ value: String(g.ID), label: g.Name }))]} allowDeselect={false} {...form.getInputProps('GroupID')} />
           {form.values.Protocol === 'mieru' && (

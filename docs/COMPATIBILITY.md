@@ -120,6 +120,7 @@ features it has never heard of, which the node page shows as an orange
 
 | Captain | needs bosun | for |
 |---|---|---|
+| 1.15.0 | ≥ 0.64.0 | Reviewed core package inventory, download and activation jobs; sing-box Extended and SSH TCP proxy inbounds. Existing inbounds and older agents remain supported. |
 | 1.14.1 | ≥ 0.63.0 | Per-inbound private destination access on supported Linux nft sing-box/Xray nodes; runtime capabilities gate both save and state delivery, including individual managed reverse exits. Ordinary inbounds remain compatible with older nodes. |
 | 1.12.1 | ≥ 0.61.0 | TLS wire record size screening in REALITY target scans; older agents retain the previous checks and show record size as not checked |
 | 1.13.0 | ≥ 0.62.0 | IPv6 nft forwarding, transport-aware forwarding health and node upstream exceptions. Older TCP reports remain readable; old UDP/mixed reports display unknown health. Existing routes, protocols and counters are retained. |

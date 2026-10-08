@@ -16,7 +16,7 @@ import (
 // Node jobs: one-off tasks (REALITY target scans) the panel hands a node
 // through its state. The node answers in its next report; the UI polls.
 
-var jobKinds = map[string]bool{"reality_scan": true, "warp_register": true, "rollback": true, spec.NetworkDiagnosticKind: true}
+var jobKinds = map[string]bool{spec.CoreManagementKind: true, "reality_scan": true, "warp_register": true, "rollback": true, spec.NetworkDiagnosticKind: true}
 
 func (h *handlers) createNodeJob(w http.ResponseWriter, r *http.Request) {
 	id, okID := pathID(r)
@@ -38,6 +38,10 @@ func (h *handlers) createNodeJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jobID := auth.Token(12)
+	if in.Kind == spec.CoreManagementKind {
+		h.queueCoreOperation(w, r, n, jobID, in.Params)
+		return
+	}
 	if in.Kind == spec.NetworkDiagnosticKind {
 		if !userFrom(r).IsAdmin() {
 			fail(w, 403, "admin only")
@@ -97,7 +101,7 @@ func (h *handlers) getNodeJob(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	if j.Kind == spec.NetworkDiagnosticKind && !userFrom(r).IsAdmin() {
+	if (j.Kind == spec.NetworkDiagnosticKind || j.Kind == spec.CoreManagementKind) && !userFrom(r).IsAdmin() {
 		fail(w, 403, "admin only")
 		return
 	}

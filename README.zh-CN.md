@@ -38,6 +38,7 @@ mita（mieru）、Hysteria、snell-server 和 realm 作为子进程拉起来。
 
 ## 功能特性
 
+- 在节点详情下载已审核的内核包并激活指定版本（bosun ≥ 0.64）。官方与 Extended sing-box 可同时运行；SSH TCP 代理订阅带有持久主机公钥验证。[内核管理与支持范围](docs/NODES.md#managing-node-core-packages)。
 - 管理员可逐入站授权私网目的地址，限定 CIDR、协议和端口，其他入站保持默认隔离；托管 Reverse 在落地端按连接独立执行。需要 bosun ≥ 0.63 及支持此功能的 Linux nft、sing-box/Xray 配置。[使用方式与支持范围](docs/NODES.md#per-inbound-private-access-captain-114--bosun-063)。
 - 节点路由支持管理员配置限定端口、协议的私网上游例外（需要 bosun ≥ 0.62）；转发状态区分 TCP 探测与未检测的 UDP，nft 支持同地址族 IPv6 转发。
 - 后台常用页面直接显示，低频工具收进“更多”；首页优先展示节点异常和日常待办，并直达对应筛选列表。设置提供分类搜索和独立编辑页，支持草稿保护、响应式表单，以及用户到订阅、节点到入口的直接衔接。[导航与设置说明](docs/ADMIN.md#finding-a-task)。
@@ -51,9 +52,9 @@ mita（mieru）、Hysteria、snell-server 和 realm 作为子进程拉起来。
 
 **协议与内核**（[文档](docs/NODES.md#inbounds)）—— VLESS（含 REALITY，带伪装站点和 dest
 扫描器）、VMess、Trojan、Shadowsocks（含 2022 加密与 ShadowTLS v3）、Hysteria2、TUIC、
-AnyTLS、mieru、Snell、SOCKS、HTTP、NaiveProxy 和 WireGuard。每个入站
-各自选择内核；二进制由 bosun 安装并托管，因此没有任何魔改分支需要
-维护。
+AnyTLS、mieru、Snell、SOCKS、HTTP、SSH TCP 代理、NaiveProxy 和 WireGuard。每个入站
+各自选择内核；bosun 安装并以独立进程托管经过审核的内核二进制，
+也可选用 sing-box Extended 发行版。
 入站内核选项按协议和功能筛选，支持自动选择预览、节点可用性提示，并分别展示指定内核和运行内核。
 
 **贴合客户端的订阅**（[文档](docs/SUBSCRIPTIONS.md)）—— mihomo/Clash、Stash、sing-box、

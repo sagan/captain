@@ -284,10 +284,11 @@ func (h *handlers) updateInbound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ib := *cur
-	if cur.Settings.PrivateAccess != nil {
-		policy := *cur.Settings.PrivateAccess
-		ib.Settings.PrivateAccess = &policy
-	}
+	// A supplied policy replaces the complete grant. Decoding into the old
+	// pointer would retain custom rules when switching off/internal, and retain
+	// omitted protocol/port restrictions in replacement custom rules. Restore
+	// the old grant below only when the client omits it or explicitly sends null.
+	ib.Settings.PrivateAccess = nil
 	if h.Store.ReverseOwnedInbound(r.Context(), id) {
 		fail(w, 409, "edit this inbound in its exit node's reverse connections")
 		return

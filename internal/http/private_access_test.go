@@ -2,7 +2,7 @@ package http
 
 import (
 	"context"
-	"github.com/zeptop-dev/captain/internal/service"
+	"reflect"
 	"testing"
 	"time"
 
@@ -10,6 +10,7 @@ import (
 	"github.com/zeptop-dev/bosun/pkg/spec"
 	"github.com/zeptop-dev/captain/internal/domain"
 	"github.com/zeptop-dev/captain/internal/http/admin"
+	"github.com/zeptop-dev/captain/internal/service"
 )
 
 func TestInboundPrivateAccessAPI(t *testing.T) {
@@ -65,6 +66,56 @@ func TestInboundPrivateAccessAPI(t *testing.T) {
 	stored, _ := r.st.InboundByID(ctx, ib.ID)
 	if stored.Settings.PrivateAccess.Enabled() {
 		t.Fatal("explicit disable ignored")
+	}
+}
+
+func TestInboundPrivateAccessReplacesCustomPolicy(t *testing.T) {
+	r := newRig(t)
+	ctx := context.Background()
+	caps := spec.CapabilitiesForCore("xray")
+	caps.PrivateAccess = true
+	if err := r.st.TouchNode(ctx, r.nodeID, "dev", "", spec.SystemStatus{}, map[string]agentproto.CoreStatus{"xray": {Capabilities: &caps}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	original := spec.PrivateAccess{Mode: "custom", Rules: []spec.PrivateAccessRule{{CIDR: "10.10.0.2/32", Protocol: "tcp", PortStart: 8080, PortEnd: 8081}}}
+	code, body, _ := r.c.do("POST", "/api/admin/nodes/"+itoa(r.nodeID)+"/inbounds", map[string]any{"Tag": "private-replacement", "Protocol": "vless", "Port": 18444, "Core": "xray", "Settings": map[string]any{"private_access": original}}, nil)
+	if code != 200 {
+		t.Fatalf("create: %d %s", code, body)
+	}
+	ib := mustJSON[domain.Inbound](t, body)
+	path := "/api/admin/inbounds/" + itoa(ib.ID)
+	for _, tt := range []struct {
+		name   string
+		policy any
+		want   spec.PrivateAccess
+	}{
+		{"omitted", "omitted", original},
+		{"null", nil, original},
+		{"off", spec.PrivateAccess{Mode: "off"}, spec.PrivateAccess{Mode: "off"}},
+		{"internal", spec.PrivateAccess{Mode: "internal"}, spec.PrivateAccess{Mode: "internal"}},
+		{"custom clears optional fields", spec.PrivateAccess{Mode: "custom", Rules: []spec.PrivateAccessRule{{CIDR: "10.10.0.2/32"}}}, spec.PrivateAccess{Mode: "custom", Rules: []spec.PrivateAccessRule{{CIDR: "10.10.0.2/32"}}}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			code, body, _ := r.c.do("PATCH", path, map[string]any{"Settings": map[string]any{"private_access": original}}, nil)
+			if code != 200 {
+				t.Fatalf("restore: %d %s", code, body)
+			}
+			settings := map[string]any{}
+			if tt.name != "omitted" {
+				settings["private_access"] = tt.policy
+			}
+			code, body, _ = r.c.do("PATCH", path, map[string]any{"Settings": settings}, nil)
+			if code != 200 {
+				t.Fatalf("replace: %d %s", code, body)
+			}
+			stored, err := r.st.InboundByID(ctx, ib.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(stored.Settings.PrivateAccess, &tt.want) {
+				t.Fatalf("policy = %#v, want %#v", stored.Settings.PrivateAccess, tt.want)
+			}
+		})
 	}
 }
 

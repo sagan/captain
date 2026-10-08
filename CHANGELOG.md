@@ -6,6 +6,8 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
+- **v1.14.1** (2026-10-08) — Fix replacing a custom private-access policy: switching to Off or Internal networks now clears old custom rules, and replacement rules no longer inherit omitted protocol/port restrictions. Omitted or null policy fields still preserve the existing grant. Adds regression coverage for each transition; bosun remains v0.63.0.
+
 - **v1.14.0** (2026-10-08) — Add administrator-controlled per-inbound private destination policies in the inbound and reverse editors, including scoped CIDR/protocol/port rules, runtime core capability checks, safe older-client updates and six-language forms. Reverse policies are delivered to their individual exit clients; unsupported/downgraded nodes do not receive enabled policies. Requires bosun v0.63.0 for this feature; existing ordinary configurations remain compatible with older nodes. No database migration.
 
 - **v1.13.0** (2026-10-07) — Fix IPv6 forwarding and protocol-specific health reporting (#9–#10): preserve bracketed primary/additional IPv6 targets, infer UDP when selecting Hysteria2/TUIC, distinguish unknown UDP health from TCP probe failure, and persist additive health metadata (migration 68).

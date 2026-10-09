@@ -146,6 +146,7 @@ type Node struct {
 	InternalAddr string
 	V6Addr       string
 	Domain       string // host name under a registered domain, e.g. jp1.example.com
+	DomainShared bool   // shared/external DNS; never automatically point this name at a node
 	MonitorURL   string
 	// DStatusSID is this node's server id in a DStatus panel, needed only
 	// when the DStatus setting runs in active (reporting) mode.

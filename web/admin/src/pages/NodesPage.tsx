@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Code, Group, Modal, Stack, Table, Text, TextInput, Anchor, Autocomplete, ActionIcon, Tooltip, Select } from '@mantine/core'
+import { Badge, Button, Card, Code, Group, Modal, Stack, Table, Text, TextInput, Anchor, ActionIcon, Tooltip, Select } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { useDisclosure } from '@mantine/hooks'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -13,6 +13,8 @@ import { dnsToast, toast, type DNSResult } from '../lib/notify'
 import { PageHeader } from '../components/PageHeader'
 import { Copy } from '../components/Copy'
 import { useURLChoice } from '../lib/use-url-choice'
+import { NodeDomainFields } from '../components/NodeDomainFields'
+import { useNodeDomainCheck } from '../lib/use-node-domain-check'
 import { useAuth } from '../lib/auth'
 
 export function PairCodeBox({ code }: { code: string }) {
@@ -49,8 +51,8 @@ export default function NodesPage() {
   const filtered = (q.data ?? []).filter(n => status === 'all' || (status === 'offline' && n.paired && !n.online) || (status === 'unpaired' && !n.paired) || (status === 'doctor' && n.paired && n.doctor_fail))
   const [opened, { open, close }] = useDisclosure()
   const [created, setCreated] = useState<Node | null>(null)
-  const form = useForm({ initialValues: { Name: '', PublicAddr: '', InternalAddr: '', V6Addr: '', Domain: '', MonitorURL: '' } })
-  const domainList = useQuery({ queryKey: ['domains'], queryFn: () => api.get<{ domains: { name: string }[] }>('/api/admin/domains') })
+  const form = useForm({ initialValues: { Name: '', PublicAddr: '', InternalAddr: '', V6Addr: '', Domain: '', DomainShared: false, MonitorURL: '' } })
+  const domainCheck = useNodeDomainCheck(form.values.Domain, form.values.DomainShared, undefined, opened && !created)
   const sys = useQuery({ queryKey: ['update'], queryFn: () => api.get<SystemUpdate>('/api/admin/system/update'), enabled: isAdmin, staleTime: 10 * 60_000, retry: false })
   const rollback = useMutation({ mutationFn: (id: number) => api.post(`/api/admin/nodes/${id}/jobs`, { kind: 'rollback', params: {} }), onSuccess: () => { toast.ok(t('nodes.rollbackQueued')); qc.invalidateQueries({ queryKey: ['nodes'] }) }, onError: toast.err })
   const upgrade = useMutation({ mutationFn: (id: number) => api.post(`/api/admin/nodes/${id}/upgrade`, {}), onSuccess: () => { toast.ok(t('nodes.upgradeQueued')); qc.invalidateQueries({ queryKey: ['nodes'] }) }, onError: toast.err })
@@ -58,8 +60,8 @@ export default function NodesPage() {
   const outdated = (q.data ?? []).filter((n) => n.outdated && n.paired).length
   const create = useMutation({
     mutationFn: (v: typeof form.values) => api.post<Node & { dns?: DNSResult[] }>('/api/admin/nodes', v),
-    onSuccess: (n) => { setCreated(n); form.reset(); qc.invalidateQueries({ queryKey: ['nodes'] }); dnsToast(n.dns) },
-    onError: toast.err,
+    onSuccess: (n) => { setCreated(n); form.reset(); qc.invalidateQueries({ queryKey: ['nodes'] }); qc.invalidateQueries({ queryKey: ['dns-health'] }); qc.invalidateQueries({ queryKey: ['dns-history'] }); dnsToast(n.dns) },
+    onError: (e) => { toast.err(e); qc.invalidateQueries({ queryKey: ['node-domain-check'] }) },
   })
   return (
     <>
@@ -80,7 +82,7 @@ export default function NodesPage() {
                 <Table.Tr key={n.id}>
                   <Table.Td><Anchor component={Link} to={`/nodes/${n.id}`} fw={600}>{n.name}</Anchor><Text size="xs" c="dimmed">{n.hostname}</Text></Table.Td>
                   <Table.Td><Group gap={4}><NodeStatus n={n} />{n.cert_problem && <Badge color="red" size="xs" title={t('nodes.certProblem')}>TLS</Badge>}{n.doctor_fail && <Badge color="red" size="xs" variant="light" title={t('nodes.doctorFailHint')}>{t('nodes.doctor')}</Badge>}</Group></Table.Td>
-                  <Table.Td><Code>{n.public_addr || '—'}</Code></Table.Td>
+                  <Table.Td><Code>{n.public_addr || '—'}</Code><Text size="xs" c="dimmed">{n.domain}</Text>{(n.domain_shared || n.domain_conflict) && <Tooltip label={t(n.domain_shared ? 'nodes.domainSharedHint' : 'nodes.domainLegacyHint')}><Badge size="xs" color={n.domain_shared ? 'blue' : 'orange'}>{t(n.domain_shared ? 'nodes.domainExternal' : 'nodes.domainDuplicate')}</Badge></Tooltip>}</Table.Td>
                   <Table.Td>{n.inbounds}</Table.Td>
                   <Table.Td>{bytes(n.traffic_today_bytes)}</Table.Td>
                   <Table.Td>
@@ -105,12 +107,12 @@ export default function NodesPage() {
             <Stack>
               <TextInput label={t('nodes.name')} placeholder="jp-1" required {...form.getInputProps('Name')} />
               <TextInput label={t('nodes.publicAddr')} placeholder="203.0.113.5" {...form.getInputProps('PublicAddr')} />
-              <Autocomplete label={t('nodes.domain')} description={t('nodes.domainHint')} placeholder="jp1.example.com" data={(domainList.data?.domains ?? []).map((d) => (form.values.Domain.includes('.') && !form.values.Domain.endsWith('.' + d.name) ? `${form.values.Domain.split('.')[0]}.${d.name}` : d.name))} {...form.getInputProps('Domain')} />
+              <NodeDomainFields domain={form.values.Domain} shared={form.values.DomainShared} onDomainChange={v => form.setFieldValue('Domain', v)} onSharedChange={v => form.setFieldValue('DomainShared', v)} check={domainCheck} />
               <Group grow>
                 <TextInput label={t('nodes.internalAddr')} {...form.getInputProps('InternalAddr')} />
                 <TextInput label={t('nodes.v6Addr')} {...form.getInputProps('V6Addr')} />
               </Group>
-              <Group justify="flex-end"><Button variant="default" onClick={close}>{t('common.cancel')}</Button><Button type="submit" loading={create.isPending}>{t('common.create')}</Button></Group>
+              <Group justify="flex-end"><Button variant="default" onClick={close}>{t('common.cancel')}</Button><Button type="submit" disabled={domainCheck.blocked} loading={create.isPending}>{t('common.create')}</Button></Group>
             </Stack>
           </form>
         )}

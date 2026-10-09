@@ -104,6 +104,7 @@ func cmdServe(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	go web.Bot().Run(ctx)
+	go web.DNSHealth().Run(ctx)
 	for _, c := range cfg.TrustedProxies {
 		if _, n, err := net.ParseCIDR(strings.TrimSpace(c)); err == nil {
 			ratelimit.TrustedProxies = append(ratelimit.TrustedProxies, n)

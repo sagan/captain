@@ -21,7 +21,7 @@ export function IngressesCard({ nodeID, ingresses, inbounds, embedded }: { nodeI
   const qc = useQueryClient()
   const [editing, setEditing] = useState<Ingress | 'new' | null>(null)
   const form = useForm<IngressValues>({ initialValues: emptyIngress })
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ['node', String(nodeID)] }); qc.invalidateQueries({ queryKey: ['node', nodeID] }) }
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ['dns-health'] }); qc.invalidateQueries({ queryKey: ['dns-history'] }); qc.invalidateQueries({ queryKey: ['node', String(nodeID)] }); qc.invalidateQueries({ queryKey: ['node', nodeID] }) }
   const save = useMutation({ mutationFn: (v: IngressValues) => editing === 'new' ? api.post<{ dns?: DNSResult[] }>(`/api/admin/nodes/${nodeID}/ingresses`, ingressPayload(v)) : api.patch<{ dns?: DNSResult[] }>(`/api/admin/ingresses/${(editing as Ingress).id}`, ingressPayload(v)), onSuccess: (r) => { toast.ok(t('common.saved')); setEditing(null); invalidate(); dnsToast(r.dns) }, onError: toast.err })
   const del = useMutation({ mutationFn: (id: number) => api.del(`/api/admin/ingresses/${id}`), onSuccess: () => { toast.ok(t('common.deleted')); invalidate() }, onError: toast.err })
   const open = (g: Ingress | 'new') => { form.setValues(g === 'new' ? emptyIngress : ingressValues(g)); setEditing(g) }

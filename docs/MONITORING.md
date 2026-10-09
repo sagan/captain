@@ -51,6 +51,51 @@ message (cut to Telegram's 4096-character limit), so a panel-side blip that
 takes every node offline at once does not page once per node. Webhook
 events are still emitted per alert.
 
+## DNS health checks
+
+Node details → DNS health and Monitoring → DNS health show panel-side DNS
+diagnostics. No bosun upgrade is required. Captain checks configured node and
+public-entry names about every five minutes, independently of node resource
+collection. The dashboard self-check links to unresolved DNS findings. Operators
+can read and recheck; support accounts and the public status page cannot access
+these diagnostics. Automatic-write history is restricted to full administrators.
+
+- Direct names: the resolved A/AAAA address set must match configured public
+  IPv4/IPv6 addresses; missing or extra addresses are mismatches. IP literals
+  themselves do not need a DNS check.
+- NAT/dedicated-line ingress names: compare with the provider's **public entry
+  address**, never the local bind or private line IP. A domain-valued entry host
+  without a fixed expected IP is checked for resolution only.
+- Shared/external DNS: check resolution without comparing the CDN or load
+  balancer IPs with origin node IPs. Different healthy resolver answers are
+  allowed. Legacy exclusive names assigned to multiple nodes report an ownership
+  conflict until renamed or explicitly marked shared.
+- Both the panel resolver and Cloudflare's `1.1.1.1:53` are queried for A/AAAA.
+  A/AAAA queries follow aliases, but do not inspect every CNAME or delegation.
+  A timeout or unavailable resolver is **unknown**, not proof of a missing
+  record. Conflicting direct-name answers are **inconsistent**: propagation,
+  caching or geographic answers are possible, not a confirmed diagnosis.
+  These are two resolver observations from the panel, not an authoritative
+  global-DNS or proxy end-to-end check; the panel resolver may itself use
+  Cloudflare. Public resolver access must be available from the panel.
+
+Checks never modify DNS. One node has at most one check in flight, the panel
+allows four at once, queries time out after four seconds and a node's query
+budget is 25 seconds. Remaining targets are unknown when that budget expires.
+Manual requests within 30 seconds reuse the latest result. Results older than
+15 minutes or for a changed configuration are marked stale. Late results from
+renamed/deleted nodes or edited entry/shared settings are discarded.
+
+When **monitoring is enabled**, a stable DNS fault must occur in three checks
+spaced at least five minutes apart and span at least ten minutes before raising
+a DNS incident. Failure state survives panel restarts, but gaps over 15 minutes
+restart the window. DNS incidents use the existing acknowledgment, maintenance,
+silence and recovery lifecycle. Unknown or inconsistent checks cannot clear an
+incident. Editing the checked configuration retires the old incident as disabled
+instead of claiming recovery. Turning monitoring off suppresses DNS incidents;
+read-only DNS diagnostics continue. DNS health, expected addresses and change
+history are not included in the public probe APIs.
+
 ## Speed test
 
 Admin → Speed test: TCP-connect latency from the panel to every entry's

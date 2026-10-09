@@ -24,6 +24,25 @@ A node can be given a **host name** (Node → Domain, e.g.
 advertise it instead of the address, so a certificate for that name reaches
 the node with no further setup.
 
+Node host names are checked when creating or editing a node. Names differing
+only by case, a trailing DNS root dot or equivalent internationalized spelling
+are treated as the same name. An exclusive name already used by another node
+is rejected with that node's name; editing a node does not conflict with itself.
+
+For intentional DNS round robin, CDN or load balancing, enable **Shared domain /
+externally managed DNS** below the domain field. This permits reuse and stops
+Captain from automatically changing A/AAAA records for that name across all
+nodes and line ingresses. Existing records remain in place; manage DNS and
+compatible protocols, ports and credentials yourself. Sharing a name does not
+configure a CDN or synchronize the proxy configuration.
+
+Existing duplicate names are retained and marked in the node list and editor.
+Their automatic DNS updates are paused, but their other fields remain editable.
+Resolve the duplicate or explicitly select shared DNS. Older API clients that
+omit or send null for `DomainShared` preserve the saved mode. Returning a shared
+node to exclusive mode is refused while another node uses the name. The rule
+applies to node host names, not certificate names, TLS SNI or REALITY targets.
+
 Nodes learn about changes within seconds: bosun keeps a long-poll request
 open on the state endpoint, so nothing has to be pushed and no persistent
 connection is needed. The node page shows host metrics, the cores' status,
@@ -409,8 +428,36 @@ records* on (the default) gets A/AAAA records created or updated whenever a
 node with a host name under it is saved (node domain → public / IPv6
 address), or a line ingress with an *entry domain* is saved (entry domain →
 the provider's entry address). Records are never deleted and never proxied,
-and the outcome is shown in a toast. The token needs DNS edit permission on
+and the outcome is shown in a toast. Shared or duplicate node names are
+skipped, as are ingress writes whose target conflicts with a node's address.
+Existing multi-address pools and proxied records are not overwritten; their
+DNS must be managed externally. The token needs DNS edit permission on
 the zone, which the DNS-01 token already has.
+
+**DNS history and recovery.** Node details → DNS health → Automatic DNS change
+history (full administrators only) records each attempted automatic A/AAAA write.
+Captain saves the previous record, requested value, record ID, TTL, proxy status,
+actor, source and time **before** sending the write. The intent is committed with
+SQLite FULL synchronization on the reserved connection, then the previous sync
+policy is restored; ordinary application writes retain their existing policy.
+If that save fails, no write is sent. Successful provider responses are stored separately from the requested
+value. A provider rejection is marked failed; timeouts, interrupted requests or
+an unavailable completion record remain **outcome unknown**. Check Cloudflare's
+current records before retrying or restoring an old value. Writes preserve an
+existing record's TTL. Cloudflare and SQLite cannot commit atomically, and an
+external editor can race the read/write sequence; this is an audit trail, not a
+transaction with the DNS provider or an automatic rollback system.
+
+History is retained for 180 days. Deleting a node detaches its history without
+discarding the record snapshots; the fleet DNS view still lists it. Site reset
+clears this history but does not change external DNS. Records overwritten before
+this feature, or edited outside Captain, cannot be reconstructed by Captain's
+history: use the intended node/entry IP, a prior export or the provider's audit
+history. Disable the conflicting automatic writer before manual recovery.
+
+Node details and Monitoring → DNS health also show expected and observed A/AAAA
+addresses, resolver sources and check time, with an immediate check action. See
+[DNS health checks](MONITORING.md#dns-health-checks) for comparison and alert rules.
 
 ## Additions in 1.8.0
 

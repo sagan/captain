@@ -1,12 +1,14 @@
+import i18n from '../i18n'
 import { notifications } from '@mantine/notifications'
 
-export interface DNSResult { name: string; ip: string; action: string; error?: string }
+export interface DNSResult { name: string; ip: string; action: string; error?: string; reason?: string }
 // Auto DNS outcome after saving a node or ingress: errors as a warning, changes as info.
 export function dnsToast(res?: DNSResult[]) {
   if (!res || !res.length) return
   const errs = res.filter((r) => r.error)
   const changed = res.filter((r) => !r.error && (r.action === 'created' || r.action === 'updated'))
   if (errs.length) toast.err(new Error('DNS: ' + errs.map((r) => `${r.name}: ${r.error}`).join('; ')))
+  else if (res.some(r => r.reason)) notifications.show({ color: 'orange', message: i18n.t('nodes.domainDNSSkipped') })
   else if (changed.length) toast.ok('DNS: ' + changed.map((r) => `${r.name} → ${r.ip}`).join(', '))
 }
 

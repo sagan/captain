@@ -137,6 +137,17 @@
     "mitaQuotasHint": "把使用者的流量額度也寫進 mita 自己的 quotas，面板離線時核心照樣攔。視窗取方案的重置週期（按月按 31 天滾動），月初剛重置時 mita 可能還攔幾天。",
     "domain": "網域（可選）",
     "domainHint": "這台節點的主機名稱，例如 jp1.example.com。新建入站的 TLS 網域和入口顯示位址預設用它；憑證依網域自動比對下發。",
+    "domainInvalid": "只填寫一個完整網域，不含協定、連接埠、路徑或萬用字元。",
+    "domainShared": "共用網域 / 外部管理 DNS",
+    "domainSharedHint": "用於 DNS 輪詢、CDN 或負載平衡。Captain 不再自動修改此網域的解析，現有記錄保留；請自行維護解析及各節點相容的協定、連接埠與憑證資訊。",
+    "domainUsed": "網域已被使用：{{names}}",
+    "domainSharedConflictHint": "共用後，此網域在所有節點和入口中的自動 DNS 更新都會暫停，避免互相覆寫。",
+    "domainLegacyHint": "此網域由多個節點使用，自動 DNS 更新已暫停。可以繼續修改其他欄位；請改用獨立網域，或明確啟用共用網域並在外部管理解析。",
+    "domainConflictHint": "請選擇其他網域；如確實需要共用，請開啟共用網域並在外部管理解析。",
+    "domainCheckUnavailable": "暫時無法預查網域，儲存時伺服器會再次驗證。",
+    "domainExternal": "外部 DNS",
+    "domainDuplicate": "網域重複",
+    "domainDNSSkipped": "已儲存，但已略過共用網域或位址衝突的自動 DNS 更新；現有解析未修改。",
     "advIngressCount": "{{count}} 個入口",
     "advIngressHint": "NAT / 專線位址與連接埠範圍",
     "advRoutingHint": "讓流量從落地伺服器出去，做中轉",
@@ -1400,7 +1411,8 @@
       "version": "Captain 版本",
       "disk": "磁碟空間",
       "nodes": "節點",
-      "panel_cert": "面板憑證"
+      "panel_cert": "面板憑證",
+      "dns": "DNS 解析健康"
     },
     "msg": {
       "backup_local_error": "最近一次快照失敗：{{error}}",
@@ -1417,7 +1429,10 @@
       "disk_low": "資料庫所在磁碟只剩 {{free}}",
       "nodes_offline": "離線：{{names}}",
       "panel_cert_expiring": "{{days}} 天後到期",
-      "panel_cert_expired": "已過期"
+      "panel_cert_expired": "已過期",
+      "dns_problem": "{{count}} 個網域的 DNS 需要檢查",
+      "dns_pending": "{{count}} 項 DNS 結果過期或未確認",
+      "dns_unknown": "無法讀取 DNS 健康狀態"
     }
   },
   "accountID": {
@@ -1725,7 +1740,8 @@
       "mem": "記憶體使用率",
       "disk": "磁碟使用率",
       "traffic80": "月流量 ≥ 80%",
-      "traffic100": "月流量 ≥ 100%"
+      "traffic100": "月流量 ≥ 100%",
+      "dns": "DNS 解析健康"
     },
     "windowKinds": {
       "maintenance": "維護",
@@ -2156,5 +2172,66 @@
     "sshHint": "SSH 代理僅支援 TCP 轉送，使用用戶密碼和自動產生的主機金鑰。請使用 sing-box 訂閱以驗證主機公鑰；不提供 shell、SFTP 或 UDP。",
     "timeout": "操作等待逾時，請先重新整理查看節點狀態再重試。",
     "listenAddress": "此 Mieru 建置不能綁定指定監聽 IP，請使用 mita。"
+  },
+  "dnsHealth": {
+    "title": "DNS 解析健康",
+    "hint": "Captain 每 5 分鐘透過面板解析器和 Cloudflare（1.1.1.1）檢查。NAT／專線網域按公開入口 IP 核對，共用網域只檢查能否解析。啟用監控後，三次失敗且持續至少 10 分鐘才會告警。檢查不會修改 DNS。",
+    "checked": "檢查時間：{{at}}",
+    "stale": "等待新檢查",
+    "recheck": "立即檢查",
+    "empty": "沒有需要檢查的網域；純 IP 位址無需 DNS 檢查。",
+    "expected": "預期 A / AAAA",
+    "resolveOnly": "僅檢查能否解析，不核對固定 IP",
+    "inconsistentHint": "兩處解析結果不一致，可能與快取、DNS 傳播或地區有關，暫不判定為故障或恢復。",
+    "loadError": "無法載入 DNS 資料。",
+    "history": "自動 DNS 變更歷史",
+    "historyHint": "自動 A/AAAA 寫入前先儲存舊值，歷史保留 180 天。啟用前或 Captain 之外的修改不在記錄中。「結果待核實」包含進行中或中斷的寫入，請先向服務商核實再重試。舊值供手動恢復參考，不會自動回復。",
+    "noHistory": "暫無 DNS 寫入記錄。",
+    "auto": "自動",
+    "proxy": "代理",
+    "on": "開啟",
+    "off": "關閉",
+    "change": "變更",
+    "before": "寫入前",
+    "wanted": "要求寫入值",
+    "after": "服務商回傳值",
+    "node": "節點 #{{id}}",
+    "latest": "最新記錄",
+    "older": "更早記錄",
+    "checks": "次檢查",
+    "modes": {
+      "direct": "直連位址核對",
+      "shared": "共用／外部 DNS",
+      "resolve_only": "未設定固定預期 IP",
+      "conflict": "網域歸屬衝突"
+    },
+    "statuses": {
+      "ok": "正常",
+      "mismatch": "位址不符",
+      "missing": "無位址記錄",
+      "inconsistent": "解析結果不一致",
+      "unknown": "未確認",
+      "conflict": "網域衝突",
+      "invalid": "網域無效",
+      "problem": "需要檢查"
+    },
+    "sources": {
+      "panel": "面板解析器",
+      "cloudflare": "Cloudflare · 1.1.1.1"
+    },
+    "errors": {
+      "not_found": "找不到 A/AAAA 記錄",
+      "timeout": "查詢逾時",
+      "unavailable": "解析器無法使用"
+    },
+    "outcomes": {
+      "success": "寫入成功",
+      "unknown": "結果待核實",
+      "failed": "寫入被拒絕"
+    },
+    "actions": {
+      "created": "新增",
+      "updated": "更新"
+    }
   }
 }

@@ -17,7 +17,9 @@ var ErrNotFound = errors.New("store: not found")
 type Store struct {
 	// Accounts serializes renumbering and site resets with requests/jobs holding resolved IDs.
 	Accounts sync.RWMutex
-	// Topology serializes ingress, inbound and forward edits with their validation.
+	// Topology serializes node/domain, ingress, inbound and forward edits with
+	// their validation. DNS-writing handlers keep it through the DNS update so
+	// an older save cannot overwrite a newly shared name.
 	Topology sync.Mutex
 	db       *sql.DB
 }

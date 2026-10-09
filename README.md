@@ -39,6 +39,7 @@ in lockstep with the panel.
 
 ## Features
 
+- Node domain conflict checks and explicit shared/external DNS management prevent accidental record overwrites. DNS health checks, sustained alerts and durable automatic-write history help diagnose failures and recover recorded previous values. [DNS operations](docs/MONITORING.md).
 - Download reviewed core packages and activate a version from node details (bosun ≥ 0.64). Official and Extended sing-box can coexist; SSH TCP proxy subscriptions use persistent host-key pins. [Core management and limitations](docs/NODES.md#managing-node-core-packages).
 - Administrators can grant private destinations per inbound, with explicit CIDR/protocol/port scopes and default isolation elsewhere. Managed Reverse policies are enforced separately at the exit; requires bosun ≥ 0.63 and a supported Linux nft sing-box/Xray configuration. [Usage and boundaries](docs/NODES.md#per-inbound-private-access-captain-114--bosun-063).
 - Node routing includes administrator-only, port/protocol-scoped private upstream exceptions (bosun ≥ 0.62). Forwarding distinguishes TCP probe health from untested UDP, and nft supports same-family IPv6 targets.

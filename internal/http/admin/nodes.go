@@ -26,6 +26,8 @@ type nodeView struct {
 	InternalAddr       string     `json:"internal_addr"`
 	V6Addr             string     `json:"v6_addr"`
 	Domain             string     `json:"domain"`
+	DomainShared       bool       `json:"domain_shared"`
+	DomainConflict     bool       `json:"domain_conflict"`
 	MonitorURL         string     `json:"monitor_url"`
 	DecoyEnabled       bool       `json:"decoy_enabled"`
 	DecoyUpstream      string     `json:"decoy_upstream"`
@@ -50,7 +52,7 @@ type nodeView struct {
 
 func toNodeView(n *domain.Node, at time.Time) nodeView {
 	return nodeView{
-		ID: n.ID, Name: n.Name, PublicAddr: n.PublicAddr, InternalAddr: n.InternalAddr, V6Addr: n.V6Addr, Domain: n.Domain, MonitorURL: n.MonitorURL, DecoyEnabled: n.DecoyEnabled, DecoyUpstream: n.DecoyUpstream, UserSpeedLimitMbps: n.UserSpeedLimitMbps, MitaQuotas: n.MitaQuotas, EgressByIngress: n.EgressByIngress, DStatusSID: n.DStatusSID,
+		ID: n.ID, Name: n.Name, PublicAddr: n.PublicAddr, InternalAddr: n.InternalAddr, V6Addr: n.V6Addr, Domain: n.Domain, DomainShared: n.DomainShared, MonitorURL: n.MonitorURL, DecoyEnabled: n.DecoyEnabled, DecoyUpstream: n.DecoyUpstream, UserSpeedLimitMbps: n.UserSpeedLimitMbps, MitaQuotas: n.MitaQuotas, EgressByIngress: n.EgressByIngress, DStatusSID: n.DStatusSID,
 		Version: n.Version, Platform: n.Platform, Hostname: n.Hostname, LastSeenAt: n.LastSeenAt,
 		Online: n.LastSeenAt != nil && at.Sub(*n.LastSeenAt) < 3*time.Minute, Paired: n.Paired, PairCode: n.PairCode,
 		UpgradeTo: n.UpgradeTo,
@@ -80,9 +82,16 @@ func (h *handlers) listNodes(w http.ResponseWriter, r *http.Request) {
 	latest := h.bosunLatest(r.Context())
 	certProblems, _ := h.Store.CertProblems(r.Context(), now)
 	doctorFails, _ := h.Store.DoctorFails(r.Context())
+	domainCounts := map[string]int{}
+	for _, n := range nodes {
+		if key := domain.NodeDomainKey(n.Domain); key != "" {
+			domainCounts[key]++
+		}
+	}
 	out := make([]nodeView, 0, len(nodes))
 	for _, n := range nodes {
 		v := toNodeView(n, now)
+		v.DomainConflict = domainCounts[domain.NodeDomainKey(n.Domain)] > 1
 		v.PairCode = "" // only shown on create/repair
 		v.TrafficToday = traffic[n.ID]
 		v.Outdated = latest != "" && n.Version != "" && selfupdate.Newer(latest, n.Version)
@@ -98,6 +107,7 @@ func (h *handlers) listNodes(w http.ResponseWriter, r *http.Request) {
 
 type nodeInput struct {
 	Name, PublicAddr, InternalAddr, V6Addr, Domain, MonitorURL string
+	DomainShared                                               *bool
 	DecoyEnabled                                               bool
 	DecoyUpstream                                              string
 	UserSpeedLimitMbps                                         int
@@ -107,21 +117,32 @@ type nodeInput struct {
 }
 
 func (h *handlers) createNode(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	var in nodeInput
 	if !decode(r, &in) || in.Name == "" {
 		fail(w, http.StatusBadRequest, "name is required")
 		return
 	}
 	n := &domain.Node{Name: in.Name, PublicAddr: in.PublicAddr, InternalAddr: in.InternalAddr, V6Addr: in.V6Addr, Domain: strings.ToLower(strings.TrimSpace(in.Domain)), MonitorURL: in.MonitorURL, DStatusSID: strings.TrimSpace(in.DStatusSID)}
+	if in.DomainShared != nil {
+		n.DomainShared = *in.DomainShared
+	}
 	if err := h.Store.CreateNode(r.Context(), n, auth.PairCode(), 24*time.Hour); err != nil {
-		serverErr(w, err)
+		nodeSaveError(w, err)
 		return
 	}
 	v := toNodeView(n, time.Now()) // includes the pairing code once
+	uses, err := h.Store.NodeDomainUses(r.Context(), n.Domain, n.ID)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	v.DomainConflict = len(uses) > 0
 	ok(w, struct {
 		nodeView
 		DNS []service.Result `json:"dns,omitempty"`
-	}{v, h.DNS.EnsureMany(r.Context(), [2]string{n.Domain, n.PublicAddr}, [2]string{n.Domain, n.V6Addr})})
+	}{v, h.DNS.EnsureMany(service.WithDNSOrigin(r.Context(), service.DNSOrigin{NodeID: n.ID, Source: "node", Actor: userFrom(r).Email}), [2]string{n.Domain, n.PublicAddr}, [2]string{n.Domain, n.V6Addr})})
 }
 
 func (h *handlers) getNode(w http.ResponseWriter, r *http.Request) {
@@ -136,6 +157,12 @@ func (h *handlers) getNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := toNodeView(n, time.Now())
+	uses, err := h.Store.NodeDomainUses(r.Context(), n.Domain, n.ID)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	v.DomainConflict = len(uses) > 0
 	if n.Paired {
 		v.PairCode = ""
 	}
@@ -150,6 +177,8 @@ func (h *handlers) getNode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) updateNode(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	id, okID := pathID(r)
 	var in nodeInput
 	if !okID || !decode(r, &in) || in.Name == "" {
@@ -157,11 +186,20 @@ func (h *handlers) updateNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	n := &domain.Node{ID: id, Name: in.Name, PublicAddr: in.PublicAddr, InternalAddr: in.InternalAddr, V6Addr: in.V6Addr, Domain: strings.ToLower(strings.TrimSpace(in.Domain)), MonitorURL: in.MonitorURL, DecoyEnabled: in.DecoyEnabled, DecoyUpstream: strings.TrimSpace(in.DecoyUpstream), UserSpeedLimitMbps: in.UserSpeedLimitMbps, MitaQuotas: in.MitaQuotas, EgressByIngress: in.EgressByIngress, DStatusSID: strings.TrimSpace(in.DStatusSID)}
-	if err := h.Store.UpdateNode(r.Context(), n); err != nil {
-		serverErr(w, err)
+	old, err := h.Store.NodeByID(r.Context(), id)
+	if err != nil {
+		nodeSaveError(w, err)
 		return
 	}
-	ok(w, map[string]any{"ok": true, "dns": h.DNS.EnsureMany(r.Context(), [2]string{n.Domain, n.PublicAddr}, [2]string{n.Domain, n.V6Addr})})
+	n.DomainShared = old.DomainShared
+	if in.DomainShared != nil {
+		n.DomainShared = *in.DomainShared
+	}
+	if err := h.Store.UpdateNode(r.Context(), n); err != nil {
+		nodeSaveError(w, err)
+		return
+	}
+	ok(w, map[string]any{"ok": true, "dns": h.DNS.EnsureMany(service.WithDNSOrigin(r.Context(), service.DNSOrigin{NodeID: n.ID, Source: "node", Actor: userFrom(r).Email}), [2]string{n.Domain, n.PublicAddr}, [2]string{n.Domain, n.V6Addr})})
 }
 
 func (h *handlers) deleteNode(w http.ResponseWriter, r *http.Request) {

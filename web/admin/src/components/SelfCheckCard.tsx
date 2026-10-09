@@ -13,7 +13,7 @@ interface Check { id: string; status: 'ok' | 'warn' | 'fail' | 'skip'; code?: st
 // Where each finding is fixed in the console.
 const fixAt: Record<string, string> = {
   backup_local: '/settings/backup', backup_remote: '/settings/backup', backup_encrypt: '/settings/backup', heartbeat: '/settings/heartbeat',
-  mail: '/settings/mail', staff_2fa: '/admins', version: '/settings/update', nodes: '/nodes',
+  mail: '/settings/mail', staff_2fa: '/admins', version: '/settings/update', nodes: '/nodes', dns: '/monitoring?tab=dns',
 }
 
 // Panel self-check on the dashboard (admins only): the panel's own gaps —

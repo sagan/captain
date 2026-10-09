@@ -122,6 +122,17 @@
     "dstatusSidHint": "Only for the DStatus setting's active mode: this node's ID in the DStatus server list. Blank = this node does not report.",
     "domain": "Domain (optional)",
     "domainHint": "This node's host name, e.g. jp1.example.com. New inbounds and entries default to it; certificates are matched and pushed by name.",
+    "domainInvalid": "Enter one fully qualified host name without a scheme, port, path or wildcard.",
+    "domainShared": "Shared domain / externally managed DNS",
+    "domainSharedHint": "For DNS round robin, CDN or load balancing. Captain stops changing DNS for this name and keeps existing records. Manage DNS and compatible protocols, ports and credentials on the nodes yourself.",
+    "domainUsed": "Domain already used by: {{names}}",
+    "domainSharedConflictHint": "Automatic DNS updates for this name will stop across all nodes and ingresses to prevent overwrites.",
+    "domainLegacyHint": "Multiple nodes use this domain, so automatic DNS updates are paused. Other fields remain editable. Choose a unique domain, or explicitly enable sharing and manage DNS externally.",
+    "domainConflictHint": "Choose another domain, or enable sharing if this is intentional and manage DNS externally.",
+    "domainCheckUnavailable": "Domain preview is unavailable. The server will validate again when saving.",
+    "domainExternal": "External DNS",
+    "domainDuplicate": "Duplicate domain",
+    "domainDNSSkipped": "Saved, but automatic DNS updates were skipped for a shared domain or address conflict. Existing records were not changed.",
     "advIngressCount": "{{count}} ingresses",
     "advIngressHint": "NAT / dedicated-line addresses and port ranges",
     "advRoutingHint": "Exit through a landing server (relay)",
@@ -1400,7 +1411,8 @@
       "version": "Captain version",
       "disk": "Disk space",
       "nodes": "Nodes",
-      "panel_cert": "Panel certificate"
+      "panel_cert": "Panel certificate",
+      "dns": "DNS health"
     },
     "msg": {
       "backup_local_error": "the last snapshot failed: {{error}}",
@@ -1417,7 +1429,10 @@
       "disk_low": "{{free}} free where the database lives",
       "nodes_offline": "offline: {{names}}",
       "panel_cert_expiring": "expires in {{days}} days",
-      "panel_cert_expired": "has expired"
+      "panel_cert_expired": "has expired",
+      "dns_problem": "{{count}} DNS targets need attention",
+      "dns_pending": "{{count}} DNS checks are stale or unconfirmed",
+      "dns_unknown": "Could not load DNS health"
     }
   },
   "accountID": {
@@ -1725,7 +1740,8 @@
       "mem": "Memory usage",
       "disk": "Disk usage",
       "traffic80": "Monthly traffic ≥ 80%",
-      "traffic100": "Monthly traffic ≥ 100%"
+      "traffic100": "Monthly traffic ≥ 100%",
+      "dns": "DNS health"
     },
     "windowKinds": {
       "maintenance": "Maintenance",
@@ -2156,5 +2172,66 @@
     "sshHint": "SSH proxy supports TCP forwarding only, with per-user passwords and a generated host key. Use sing-box subscriptions for host key verification; no shell, SFTP or UDP.",
     "timeout": "Operation timed out. Refresh to check the node before retrying.",
     "listenAddress": "This Mieru build cannot bind a specific listening IP. Use mita."
+  },
+  "dnsHealth": {
+    "title": "DNS health",
+    "hint": "Captain checks every 5 minutes using the panel resolver and Cloudflare (1.1.1.1). NAT and dedicated-line names use the public entry IP; shared names only need to resolve. With monitoring enabled, three failures over at least 10 minutes trigger an alert. Checks never modify DNS.",
+    "checked": "Checked: {{at}}",
+    "stale": "Awaiting fresh check",
+    "recheck": "Check now",
+    "empty": "No domains to check. IP-only addresses do not need DNS checks.",
+    "expected": "Expected A / AAAA",
+    "resolveOnly": "Resolution only; no fixed IP comparison",
+    "inconsistentHint": "Answers differ: caching, propagation or location-based DNS may be involved. Failure or recovery is not confirmed.",
+    "loadError": "Could not load DNS data.",
+    "history": "Automatic DNS change history",
+    "historyHint": "Previous values are saved before automatic A/AAAA writes and retained for 180 days. Earlier changes and changes outside Captain are not included. Unknown outcomes include in-progress or interrupted writes: verify with the provider before retrying. Previous values are for manual recovery; there is no automatic rollback.",
+    "noHistory": "No recorded DNS writes.",
+    "auto": "Automatic",
+    "proxy": "Proxy",
+    "on": "On",
+    "off": "Off",
+    "change": "Change",
+    "before": "Before write",
+    "wanted": "Requested value",
+    "after": "Provider response",
+    "node": "Node #{{id}}",
+    "latest": "Latest",
+    "older": "Older",
+    "checks": "checks",
+    "modes": {
+      "direct": "Direct address check",
+      "shared": "Shared / external DNS",
+      "resolve_only": "No fixed expected IP",
+      "conflict": "Domain ownership conflict"
+    },
+    "statuses": {
+      "ok": "Healthy",
+      "mismatch": "Address mismatch",
+      "missing": "No address record",
+      "inconsistent": "Resolvers disagree",
+      "unknown": "Not confirmed",
+      "conflict": "Domain conflict",
+      "invalid": "Invalid domain",
+      "problem": "Needs attention"
+    },
+    "sources": {
+      "panel": "Panel resolver",
+      "cloudflare": "Cloudflare · 1.1.1.1"
+    },
+    "errors": {
+      "not_found": "No A/AAAA record",
+      "timeout": "Query timed out",
+      "unavailable": "Resolver unavailable"
+    },
+    "outcomes": {
+      "success": "Write succeeded",
+      "unknown": "Outcome unknown",
+      "failed": "Write rejected"
+    },
+    "actions": {
+      "created": "Create",
+      "updated": "Update"
+    }
   }
 }

@@ -1,8 +1,11 @@
+import { DNSHealthCard } from '../components/DNSHealthCard'
+import { NodeDomainFields } from '../components/NodeDomainFields'
+import { useNodeDomainCheck } from '../lib/use-node-domain-check'
 import { CoreManagementCard, type CoreInventory } from '../components/CoreManagementCard'
 import { ReverseConnections } from '../components/ReverseConnections'
 import type { ResourceHost } from '../lib/resources'
 import { coreName } from '../lib/coreSelection'
-import { NumberInput, Switch, Accordion, ActionIcon, Badge, Button, Card, Code, Group, Modal, Stack, Table, Text, TextInput, Title, Autocomplete, Alert } from '@mantine/core'
+import { NumberInput, Switch, Accordion, ActionIcon, Badge, Button, Card, Code, Group, Modal, Stack, Table, Text, TextInput, Title, Alert } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -53,9 +56,9 @@ export default function NodePage() {
   const del = useMutation({ mutationFn: (ibID: number) => api.del(`/api/admin/inbounds/${ibID}`), onSuccess: () => { toast.ok(t('common.deleted')); invalidate() }, onError: toast.err })
   const repair = useMutation({ mutationFn: () => api.post<{ pair_code: string }>(`/api/admin/nodes/${id}/repair`), onSuccess: (r) => { setPair(r.pair_code); invalidate() }, onError: toast.err })
   const [deletingNode, setDeletingNode] = useState(false)
-  const nodeForm = useForm({ initialValues: { Name: '', PublicAddr: '', InternalAddr: '', V6Addr: '', Domain: '', MonitorURL: '', DStatusSID: '', DecoyEnabled: false, DecoyUpstream: '', UserSpeedLimitMbps: 0, MitaQuotas: false, EgressByIngress: false } })
-  const domainList = useQuery({ queryKey: ['domains'], queryFn: () => api.get<{ domains: { name: string }[] }>('/api/admin/domains') })
-  const saveNode = useMutation({ mutationFn: (v: typeof nodeForm.values) => api.patch<{ ok: boolean; dns?: DNSResult[] }>(`/api/admin/nodes/${id}`, v), onSuccess: (r) => { toast.ok(t('common.saved')); setEditNode(false); invalidate(); dnsToast(r.dns) }, onError: toast.err })
+  const nodeForm = useForm({ initialValues: { Name: '', PublicAddr: '', InternalAddr: '', V6Addr: '', Domain: '', DomainShared: false, MonitorURL: '', DStatusSID: '', DecoyEnabled: false, DecoyUpstream: '', UserSpeedLimitMbps: 0, MitaQuotas: false, EgressByIngress: false } })
+  const domainCheck = useNodeDomainCheck(nodeForm.values.Domain, nodeForm.values.DomainShared, Number(id), editNode)
+  const saveNode = useMutation({ mutationFn: (v: typeof nodeForm.values) => api.patch<{ ok: boolean; dns?: DNSResult[] }>(`/api/admin/nodes/${id}`, v), onSuccess: (r) => { toast.ok(t('common.saved')); setEditNode(false); invalidate(); qc.invalidateQueries({ queryKey: ['dns-health'] }); qc.invalidateQueries({ queryKey: ['dns-history'] }); dnsToast(r.dns) }, onError: (e) => { toast.err(e); qc.invalidateQueries({ queryKey: ['node-domain-check'] }) } })
 
   const d = q.data
   if (!d) return null
@@ -63,11 +66,12 @@ export default function NodePage() {
   const host = d.status?.host
   return (
     <>
+      {(n.domain_shared || n.domain_conflict) && <Alert mb="md" color={n.domain_shared ? 'blue' : 'orange'} title={t(n.domain_shared ? 'nodes.domainExternal' : 'nodes.domainDuplicate')}>{t(n.domain_shared ? 'nodes.domainSharedHint' : 'nodes.domainLegacyHint')}</Alert>}
       <DeleteNodeModal node={n} opened={deletingNode} onClose={() => setDeletingNode(false)} onDeleted={() => { qc.invalidateQueries({ queryKey: ['nodes'] }); nav('/nodes') }} />
       <PageHeader title={n.name} subtitle={`${n.hostname || ''} ${n.platform || ''} ${n.version || ''}`.trim()} actions={<>
         <NodeStatus n={n} />
         {me?.role === 'admin' && <Button variant="light" size="xs" onClick={() => nav(`/infrastructure?node=${n.id}`)}>{t('infra.title')}</Button>}
-        <Button variant="default" size="xs" leftSection={<IconPencil size={14} />} onClick={() => { nodeForm.setValues({ Name: n.name, PublicAddr: n.public_addr, InternalAddr: n.internal_addr, V6Addr: n.v6_addr, Domain: n.domain ?? '', MonitorURL: n.monitor_url, DStatusSID: n.dstatus_sid ?? '', DecoyEnabled: !!n.decoy_enabled, DecoyUpstream: n.decoy_upstream ?? '', UserSpeedLimitMbps: n.user_speed_limit_mbps ?? 0, MitaQuotas: !!n.mita_quotas, EgressByIngress: !!n.egress_by_ingress }); setEditNode(true) }}>{t('common.edit')}</Button>
+        <Button variant="default" size="xs" leftSection={<IconPencil size={14} />} onClick={() => { nodeForm.setValues({ Name: n.name, PublicAddr: n.public_addr, InternalAddr: n.internal_addr, V6Addr: n.v6_addr, Domain: n.domain ?? '', DomainShared: !!n.domain_shared, MonitorURL: n.monitor_url, DStatusSID: n.dstatus_sid ?? '', DecoyEnabled: !!n.decoy_enabled, DecoyUpstream: n.decoy_upstream ?? '', UserSpeedLimitMbps: n.user_speed_limit_mbps ?? 0, MitaQuotas: !!n.mita_quotas, EgressByIngress: !!n.egress_by_ingress }); setEditNode(true) }}>{t('common.edit')}</Button>
         <Button variant="default" size="xs" onClick={() => modals.openConfirmModal({ title: t('nodes.repair'), children: <Text size="sm">{t('nodes.repairHint')}</Text>, labels: { confirm: t('common.confirm'), cancel: t('common.cancel') }, onConfirm: () => repair.mutate() })}>{t('nodes.repair')}</Button>
         <Button color="red" variant="light" size="xs" leftSection={<IconTrash size={14} />} onClick={() => setDeletingNode(true)}>{t('common.delete')}</Button>
       </>} />
@@ -83,6 +87,7 @@ export default function NodePage() {
       {n.paired && <NodeProbeCard key={n.id} nodeID={n.id} reportedHost={host} />}
       <Card mb="lg"><MetadataEditor endpoint={`/api/admin/nodes/${n.id}/metadata`} /></Card>
       {d.status?.doctor && <DoctorCard report={d.status.doctor} />}
+      <DNSHealthCard nodeID={n.id} />
       {d.status?.certs && d.status.certs.length > 0 && (
         <Card mb="lg">
           <Text size="sm" c="dimmed" fw={500} mb="xs">{t('nodes.certs')}</Text>
@@ -164,7 +169,7 @@ export default function NodePage() {
         <form onSubmit={nodeForm.onSubmit((v) => saveNode.mutate(v))}><Stack>
           <TextInput label={t('nodes.name')} required {...nodeForm.getInputProps('Name')} />
           <TextInput label={t('nodes.publicAddr')} {...nodeForm.getInputProps('PublicAddr')} />
-          <Autocomplete label={t('nodes.domain')} description={t('nodes.domainHint')} placeholder="jp1.example.com" data={(domainList.data?.domains ?? []).map((d) => (nodeForm.values.Domain.includes('.') && !nodeForm.values.Domain.endsWith('.' + d.name) ? `${nodeForm.values.Domain.split('.')[0]}.${d.name}` : d.name))} {...nodeForm.getInputProps('Domain')} />
+          <NodeDomainFields domain={nodeForm.values.Domain} shared={nodeForm.values.DomainShared} onDomainChange={v => nodeForm.setFieldValue('Domain', v)} onSharedChange={v => nodeForm.setFieldValue('DomainShared', v)} check={domainCheck} />
           <Group grow><TextInput label={t('nodes.internalAddr')} {...nodeForm.getInputProps('InternalAddr')} /><TextInput label={t('nodes.v6Addr')} {...nodeForm.getInputProps('V6Addr')} /></Group>
           <TextInput label={t('nodes.monitorUrl')} description={t('nodes.monitorUrlHint')} placeholder="https://komari.example.com/..." {...nodeForm.getInputProps('MonitorURL')} />
           <TextInput label={t('nodes.dstatusSid')} description={t('nodes.dstatusSidHint')} {...nodeForm.getInputProps('DStatusSID')} />
@@ -173,7 +178,7 @@ export default function NodePage() {
           <Switch label={t('nodes.egressByIngress')} description={t('nodes.egressByIngressHint')} {...nodeForm.getInputProps('EgressByIngress', { type: 'checkbox' })} />
           <Switch label={t('nodes.decoy')} description={t('nodes.decoyHint')} disabled={!nodeForm.values.Domain} {...nodeForm.getInputProps('DecoyEnabled', { type: 'checkbox' })} />
           {nodeForm.values.DecoyEnabled && <TextInput label={t('nodes.decoyUpstream')} description={t('nodes.decoyUpstreamHint')} placeholder="https://www.example.com" {...nodeForm.getInputProps('DecoyUpstream')} />}
-          <Group justify="flex-end"><Button variant="default" onClick={() => setEditNode(false)}>{t('common.cancel')}</Button><Button type="submit" loading={saveNode.isPending}>{t('common.save')}</Button></Group>
+          <Group justify="flex-end"><Button variant="default" onClick={() => setEditNode(false)}>{t('common.cancel')}</Button><Button type="submit" disabled={domainCheck.blocked} loading={saveNode.isPending}>{t('common.save')}</Button></Group>
         </Stack></form>
       </Modal>
       <Modal opened={pair !== null} onClose={() => setPair(null)} title={t('nodes.pairTitle')} size="lg">{pair && <PairCodeBox code={pair} />}</Modal>

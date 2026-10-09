@@ -6,6 +6,11 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
+- **v1.16.0** (2026-10-09) — Protect node domain ownership with canonical domain validation, conflict previews and transactional duplicate checks. Add an explicit shared/external-DNS mode; preserve legacy duplicates while suppressing unsafe automatic DNS writes, including ingress writes and proxied/multiple Cloudflare records.
+  - Add persistent DNS health checks to node details, monitoring and panel self-check, with two resolver views, public NAT/IPLC target comparison and sustained-failure incidents. Keep shared-domain resolution distinct from exclusive address matching, and preserve unknown/stale results.
+  - Journal the previous DNS record durably before automatic Cloudflare mutations, preserve TTL and record separate success/failure/unknown outcomes. Add administrator-only paginated history for manual recovery, migrations 70–71, six-language controls and permission/concurrency/recovery regressions. Existing overwritten records cannot be reconstructed retroactively.
+  - Build with Go 1.26.9 and update golang.org/x/net to v0.60.0 for the October security fixes.
+
 - **v1.15.0** (2026-10-08) — Add administrator-only node core download and activation through the existing job channel, inventory/capability reporting and version controls. Expose sing-box Extended and SSH in supported-node inbound editors, preserve SSH host identity, and validate Extended Mieru listener/ingress and native-quota limits.
 
 - **v1.14.1** (2026-10-08) — Fix replacing a custom private-access policy: switching to Off or Internal networks now clears old custom rules, and replacement rules no longer inherit omitted protocol/port restrictions. Omitted or null policy fields still preserve the existing grant. Adds regression coverage for each transition; bosun remains v0.63.0.

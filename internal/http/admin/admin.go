@@ -71,7 +71,8 @@ type Deps struct {
 	// Certs issues panel-managed certificates; nil = uploads/webhooks only.
 	Certs *service.Certs
 	// DNS keeps Cloudflare records in step with node and entry names.
-	DNS *service.DNS
+	DNS       *service.DNS
+	DNSHealth *service.DNSHealth
 	// Bot exposes the Telegram settings cache; nil disables.
 	Bot *telegram.Bot
 	// Hooks is the webhook hub (settings cache invalidation, test delivery).
@@ -106,6 +107,7 @@ func Register(mux *http.ServeMux, d Deps) {
 	mux.HandleFunc("GET /api/admin/dashboard", h.requireAdmin(h.dashboard))
 
 	mux.HandleFunc("GET /api/admin/nodes", h.requireAdmin(h.listNodes))
+	mux.HandleFunc("GET /api/admin/nodes/domain-check", h.requireAdmin(h.checkNodeDomain))
 	mux.HandleFunc("POST /api/admin/nodes", h.requireAdmin(h.createNode))
 	mux.HandleFunc("GET /api/admin/nodes/{id}", h.requireAdmin(h.getNode))
 	mux.HandleFunc("PATCH /api/admin/nodes/{id}", h.requireAdmin(h.updateNode))
@@ -121,6 +123,7 @@ func Register(mux *http.ServeMux, d Deps) {
 	h.registerPasskeys(mux)
 	h.registerUserManagement(mux)
 	h.registerOps(mux)
+	h.registerDNSHealth(mux)
 	h.registerExternal(mux)
 	h.registerSpeedtest(mux)
 	h.registerBackup(mux)

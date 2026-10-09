@@ -122,6 +122,17 @@
     "dstatusSidHint": "只在 DStatus 设置为主动模式时用：这台节点在 DStatus 服务器列表里的 ID。留空 = 这台节点不上报。",
     "domain": "域名（可选）",
     "domainHint": "这台节点的主机名，比如 jp1.example.com。新建入站的 TLS 域名和入口展示地址默认用它；证书按域名自动匹配下发。",
+    "domainInvalid": "只填写一个完整域名，不含协议、端口、路径或通配符。",
+    "domainShared": "共享域名 / 外部管理 DNS",
+    "domainSharedHint": "用于 DNS 轮询、CDN 或负载均衡。Captain 不再自动修改这个域名的解析，已有记录保留；请自行维护解析和各节点兼容的协议、端口与凭据。",
+    "domainUsed": "域名已被使用：{{names}}",
+    "domainSharedConflictHint": "共享后，此域名在所有节点和入口中的自动 DNS 更新都会暂停，避免互相覆盖。",
+    "domainLegacyHint": "此域名被多个节点使用，自动 DNS 更新已暂停。可以继续修改其他字段；请改用独立域名，或明确启用共享域名并在外部管理解析。",
+    "domainConflictHint": "请选择其他域名；如确实需要共用，请开启共享域名并在外部管理解析。",
+    "domainCheckUnavailable": "暂时无法预查域名，保存时服务器会再次校验。",
+    "domainExternal": "外部 DNS",
+    "domainDuplicate": "域名重复",
+    "domainDNSSkipped": "配置已保存，但共享域名或地址冲突的自动 DNS 更新已跳过；已有解析未修改。",
     "advIngressCount": "{{count}} 个入口",
     "advIngressHint": "NAT / 专线地址与端口范围",
     "advRoutingHint": "让流量从落地服务器出去，做中转",
@@ -1400,7 +1411,8 @@
       "version": "Captain 版本",
       "disk": "磁盘空间",
       "nodes": "节点",
-      "panel_cert": "面板证书"
+      "panel_cert": "面板证书",
+      "dns": "DNS 解析健康"
     },
     "msg": {
       "backup_local_error": "最近一次快照失败：{{error}}",
@@ -1417,7 +1429,10 @@
       "disk_low": "数据库所在磁盘只剩 {{free}}",
       "nodes_offline": "离线：{{names}}",
       "panel_cert_expiring": "{{days}} 天后到期",
-      "panel_cert_expired": "已过期"
+      "panel_cert_expired": "已过期",
+      "dns_problem": "{{count}} 个域名的 DNS 需要检查",
+      "dns_pending": "{{count}} 项 DNS 结果过期或未确认",
+      "dns_unknown": "无法读取 DNS 健康状态"
     }
   },
   "accountID": {
@@ -1725,7 +1740,8 @@
       "mem": "内存使用率",
       "disk": "磁盘使用率",
       "traffic80": "月流量 ≥ 80%",
-      "traffic100": "月流量 ≥ 100%"
+      "traffic100": "月流量 ≥ 100%",
+      "dns": "DNS 解析健康"
     },
     "windowKinds": {
       "maintenance": "维护",
@@ -2156,5 +2172,66 @@
     "sshHint": "SSH 代理仅支持 TCP 转发，使用用户密码和自动生成的主机密钥。请使用 sing-box 订阅以校验主机公钥；不提供 shell、SFTP 或 UDP。",
     "timeout": "操作等待超时，请先刷新查看节点状态再重试。",
     "listenAddress": "此 Mieru 构建不能绑定指定监听 IP，请使用 mita。"
+  },
+  "dnsHealth": {
+    "title": "DNS 解析健康",
+    "hint": "Captain 每 5 分钟通过面板解析器和 Cloudflare（1.1.1.1）检查。NAT／专线域名按公网入口 IP 核对，共享域名只检查能否解析。开启监控后，三次失败且持续至少 10 分钟才会告警。检查不会修改 DNS。",
+    "checked": "检查时间：{{at}}",
+    "stale": "等待新检查",
+    "recheck": "立即检查",
+    "empty": "没有需要检查的域名；纯 IP 地址无需 DNS 检查。",
+    "expected": "预期 A / AAAA",
+    "resolveOnly": "仅检查能否解析，不核对固定 IP",
+    "inconsistentHint": "两处解析结果不一致，可能与缓存、DNS 传播或地区有关，暂不判定为故障或恢复。",
+    "loadError": "无法加载 DNS 数据。",
+    "history": "自动 DNS 变更历史",
+    "historyHint": "自动 A/AAAA 写入前先保存旧值，历史保留 180 天。启用前或 Captain 之外的修改不在记录中。“结果待核实”包含进行中或中断的写入，请先到服务商核实再重试。旧值供手动恢复参考，不会自动回滚。",
+    "noHistory": "暂无 DNS 写入记录。",
+    "auto": "自动",
+    "proxy": "代理",
+    "on": "开启",
+    "off": "关闭",
+    "change": "变更",
+    "before": "写入前",
+    "wanted": "请求写入值",
+    "after": "服务商返回值",
+    "node": "节点 #{{id}}",
+    "latest": "最新记录",
+    "older": "更早记录",
+    "checks": "次检查",
+    "modes": {
+      "direct": "直连地址核对",
+      "shared": "共享／外部 DNS",
+      "resolve_only": "未设置固定预期 IP",
+      "conflict": "域名归属冲突"
+    },
+    "statuses": {
+      "ok": "正常",
+      "mismatch": "地址不符",
+      "missing": "无地址记录",
+      "inconsistent": "解析结果不一致",
+      "unknown": "未确认",
+      "conflict": "域名冲突",
+      "invalid": "域名无效",
+      "problem": "需要检查"
+    },
+    "sources": {
+      "panel": "面板解析器",
+      "cloudflare": "Cloudflare · 1.1.1.1"
+    },
+    "errors": {
+      "not_found": "未找到 A/AAAA 记录",
+      "timeout": "查询超时",
+      "unavailable": "解析器不可用"
+    },
+    "outcomes": {
+      "success": "写入成功",
+      "unknown": "结果待核实",
+      "failed": "写入被拒绝"
+    },
+    "actions": {
+      "created": "新增",
+      "updated": "更新"
+    }
   }
 }

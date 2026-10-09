@@ -10,6 +10,7 @@ import (
 
 	"github.com/zeptop-dev/bosun/pkg/spec"
 	"github.com/zeptop-dev/captain/internal/domain"
+	"github.com/zeptop-dev/captain/internal/service"
 	"github.com/zeptop-dev/captain/internal/store"
 )
 
@@ -120,7 +121,7 @@ func (h *handlers) createIngress(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	ok(w, map[string]any{"ingress": g, "dns": h.DNS.EnsureMany(r.Context(), [2]string{g.EntryDomain, g.EntryHost})})
+	ok(w, map[string]any{"ingress": g, "dns": h.DNS.EnsureMany(service.WithDNSOrigin(r.Context(), service.DNSOrigin{NodeID: g.NodeID, Source: "ingress:" + strconv.FormatInt(g.ID, 10), Actor: userFrom(r).Email}), [2]string{g.EntryDomain, g.EntryHost})})
 }
 
 func (h *handlers) updateIngress(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +151,7 @@ func (h *handlers) updateIngress(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	ok(w, map[string]any{"ingress": g, "dns": h.DNS.EnsureMany(r.Context(), [2]string{g.EntryDomain, g.EntryHost})})
+	ok(w, map[string]any{"ingress": g, "dns": h.DNS.EnsureMany(service.WithDNSOrigin(r.Context(), service.DNSOrigin{NodeID: g.NodeID, Source: "ingress:" + strconv.FormatInt(g.ID, 10), Actor: userFrom(r).Email}), [2]string{g.EntryDomain, g.EntryHost})})
 }
 
 func (h *handlers) deleteIngress(w http.ResponseWriter, r *http.Request) {

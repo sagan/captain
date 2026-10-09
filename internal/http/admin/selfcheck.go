@@ -44,7 +44,7 @@ func (h *handlers) selfCheck(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	checks := []func(context.Context) []selfCheck{
 		h.checkBackups, h.checkHeartbeat, h.checkMail, h.checkStaff2FA,
-		h.checkVersion, h.checkDisk, h.checkNodes, h.checkPanelCert,
+		h.checkVersion, h.checkDisk, h.checkNodes, h.checkPanelCert, h.checkDNS,
 	}
 	var mu sync.Mutex
 	var out []selfCheck
@@ -61,7 +61,7 @@ func (h *handlers) selfCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	wg.Wait()
 	order := map[string]int{}
-	for i, id := range []string{"backup_local", "backup_remote", "backup_encrypt", "heartbeat", "mail", "staff_2fa", "version", "disk", "nodes", "panel_cert"} {
+	for i, id := range []string{"backup_local", "backup_remote", "backup_encrypt", "heartbeat", "mail", "staff_2fa", "version", "disk", "nodes", "panel_cert", "dns"} {
 		order[id] = i
 	}
 	sort.Slice(out, func(i, j int) bool { return order[out[i].ID] < order[out[j].ID] })

@@ -137,6 +137,17 @@
     "mitaQuotasHint": "ユーザーの通信量上限を mita 自身の quotas にも書き込み、パネル不通時もコアが遮断します。ウィンドウはプランのリセット周期（月次は 31 日ローリング）です。",
     "domain": "ドメイン（任意）",
     "domainHint": "このノードのホスト名（例：jp1.example.com）。新規インバウンドとエントリは既定でこれを使い、証明書はドメイン名で自動照合して配布されます。",
+    "domainInvalid": "スキーム、ポート、パス、ワイルドカードを含まない完全なホスト名を1つ入力してください。",
+    "domainShared": "共有ドメイン / DNS を外部で管理",
+    "domainSharedHint": "DNS ラウンドロビン、CDN、負荷分散向けです。Captain はこの名前の DNS 更新を停止し、既存レコードを保持します。DNS と各ノードの互換性のあるプロトコル、ポート、認証情報は別途管理してください。",
+    "domainUsed": "このドメインを使用中：{{names}}",
+    "domainSharedConflictHint": "上書きを防ぐため、この名前を使用する全ノードと入口の自動 DNS 更新を停止します。",
+    "domainLegacyHint": "複数のノードがこのドメインを使用しているため、自動 DNS 更新を停止しています。他の項目は編集できます。固有のドメインを選ぶか、共有を明示的に有効にして DNS を外部管理してください。",
+    "domainConflictHint": "別のドメインを選ぶか、意図的な共有なら共有を有効にして DNS を外部管理してください。",
+    "domainCheckUnavailable": "ドメインの事前確認ができません。保存時にサーバーが再検証します。",
+    "domainExternal": "外部 DNS",
+    "domainDuplicate": "ドメイン重複",
+    "domainDNSSkipped": "保存しましたが、共有ドメインまたはアドレス競合のため自動 DNS 更新をスキップしました。既存レコードは変更されていません。",
     "advIngressCount": "入口 {{count}} 件",
     "advIngressHint": "NAT / 専用回線のアドレスとポート範囲",
     "advRoutingHint": "着地サーバーから出る（中継）",
@@ -1400,7 +1411,8 @@
       "version": "Captain のバージョン",
       "disk": "ディスク容量",
       "nodes": "ノード",
-      "panel_cert": "パネルの証明書"
+      "panel_cert": "パネルの証明書",
+      "dns": "DNS の状態"
     },
     "msg": {
       "backup_local_error": "直近のスナップショットが失敗しました：{{error}}",
@@ -1417,7 +1429,10 @@
       "disk_low": "データベースのあるディスクの空きが {{free}} です",
       "nodes_offline": "オフライン：{{names}}",
       "panel_cert_expiring": "あと {{days}} 日で期限切れ",
-      "panel_cert_expired": "期限切れです"
+      "panel_cert_expired": "期限切れです",
+      "dns_problem": "{{count}} 件の DNS 対象に確認が必要です",
+      "dns_pending": "{{count}} 件の DNS 確認が古いか未確認です",
+      "dns_unknown": "DNS の状態を読み込めませんでした"
     }
   },
   "accountID": {
@@ -1725,7 +1740,8 @@
       "mem": "メモリー使用率",
       "disk": "ディスク使用率",
       "traffic80": "月間転送量 ≥ 80%",
-      "traffic100": "月間転送量 ≥ 100%"
+      "traffic100": "月間転送量 ≥ 100%",
+      "dns": "DNS の状態"
     },
     "windowKinds": {
       "maintenance": "メンテナンス",
@@ -2156,5 +2172,66 @@
     "sshHint": "SSH プロキシは TCP 転送のみです。ユーザーパスワードと生成したホスト鍵を使用します。ホスト公開鍵を検証する sing-box 購読を使用してください。shell、SFTP、UDP は提供しません。",
     "timeout": "待機がタイムアウトしました。ノードの状態を更新してから再試行してください。",
     "listenAddress": "この Mieru ビルドは特定の IP にバインドできません。mita を使用してください。"
+  },
+  "dnsHealth": {
+    "title": "DNS の状態",
+    "hint": "Captain が 5 分ごとにパネルのリゾルバーと Cloudflare（1.1.1.1）で確認します。NAT・専用線は公開入口の IP と比較し、共有ドメインは名前解決のみ確認します。監視が有効な場合、10 分以上にわたる 3 回の失敗で通知します。DNS は変更しません。",
+    "checked": "確認日時：{{at}}",
+    "stale": "再確認待ち",
+    "recheck": "今すぐ確認",
+    "empty": "確認対象のドメインがありません。IP アドレスのみの場合は確認不要です。",
+    "expected": "期待する A / AAAA",
+    "resolveOnly": "名前解決のみ確認（固定 IP との比較なし）",
+    "inconsistentHint": "結果が異なります。キャッシュ、DNS の伝播、地域別応答の可能性があるため、障害や復旧とは判定しません。",
+    "loadError": "DNS データを読み込めませんでした。",
+    "history": "自動 DNS 変更履歴",
+    "historyHint": "自動 A/AAAA 書き込み前に旧値を保存し、180 日間保持します。導入前や Captain 外の変更は含みません。結果未確認には処理中や中断も含みます。再試行前にプロバイダーで確認してください。旧値は手動復元の参考用です。",
+    "noHistory": "DNS 書き込み履歴はありません。",
+    "auto": "自動",
+    "proxy": "プロキシ",
+    "on": "有効",
+    "off": "無効",
+    "change": "変更",
+    "before": "書き込み前",
+    "wanted": "要求値",
+    "after": "プロバイダーの応答",
+    "node": "ノード #{{id}}",
+    "latest": "最新",
+    "older": "以前の履歴",
+    "checks": "回",
+    "modes": {
+      "direct": "直接接続先の比較",
+      "shared": "共有・外部 DNS",
+      "resolve_only": "固定の期待 IP なし",
+      "conflict": "ドメインの割り当てが競合"
+    },
+    "statuses": {
+      "ok": "正常",
+      "mismatch": "アドレス不一致",
+      "missing": "アドレスレコードなし",
+      "inconsistent": "解決結果が不一致",
+      "unknown": "未確認",
+      "conflict": "ドメイン競合",
+      "invalid": "無効なドメイン",
+      "problem": "要確認"
+    },
+    "sources": {
+      "panel": "パネルのリゾルバー",
+      "cloudflare": "Cloudflare · 1.1.1.1"
+    },
+    "errors": {
+      "not_found": "A/AAAA レコードなし",
+      "timeout": "タイムアウト",
+      "unavailable": "リゾルバーを利用できません"
+    },
+    "outcomes": {
+      "success": "書き込み成功",
+      "unknown": "結果未確認",
+      "failed": "書き込み拒否"
+    },
+    "actions": {
+      "created": "作成",
+      "updated": "更新"
+    }
   }
 }

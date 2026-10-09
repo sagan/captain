@@ -26,6 +26,12 @@ type Cloudflare struct {
 	Client *http.Client
 }
 
+// Rejected means the provider explicitly rejected a request (not a timeout or
+// ambiguous server failure). Do not persist Message: it is provider-controlled.
+type Rejected struct{ Message string }
+
+func (e *Rejected) Error() string { return "cloudflare: " + e.Message }
+
 func (c *Cloudflare) base() string {
 	if c.Base != "" {
 		return strings.TrimRight(c.Base, "/")
@@ -67,6 +73,9 @@ func (c *Cloudflare) do(ctx context.Context, method, path string, body any, out 
 		if len(env.Errors) > 0 {
 			msg = env.Errors[0].Message
 		}
+		if resp.StatusCode < 500 {
+			return &Rejected{Message: msg}
+		}
 		return fmt.Errorf("cloudflare: %s", msg)
 	}
 	if out != nil {
@@ -98,13 +107,36 @@ type Record struct {
 }
 
 // EnsureAddress makes fqdn resolve to ip (A or AAAA by the address kind),
-// creating or updating the record; other records of that type on the name
-// are left alone only when they already match. Returns "created",
+// creating or updating a single DNS-only record. Multi-record pools and
+// proxied records are externally managed and must not be overwritten. Returns "created",
 // "updated" or "unchanged".
 func (c *Cloudflare) EnsureAddress(ctx context.Context, zone, fqdn, ip string) (string, error) {
+	p, err := c.PlanAddress(ctx, zone, fqdn, ip)
+	if err != nil {
+		return "skipped", err
+	}
+	if p.Action == "unchanged" {
+		return p.Action, nil
+	}
+	_, err = c.ApplyAddress(ctx, p)
+	return p.Action, err
+}
+
+// AddressPlan separates read/validation from mutation so callers can durably
+// journal the previous record before sending a write. It is not a provider CAS:
+// an external editor may still change the record between these requests.
+type AddressPlan struct {
+	ZoneID string
+	Action string
+	Before *Record
+	Wanted Record
+}
+
+func (c *Cloudflare) PlanAddress(ctx context.Context, zone, fqdn, ip string) (AddressPlan, error) {
+	p := AddressPlan{}
 	parsed := net.ParseIP(ip)
 	if parsed == nil {
-		return "", errors.New("not an IP address: " + ip)
+		return p, errors.New("not an IP address: " + ip)
 	}
 	typ := "A"
 	if parsed.To4() == nil {
@@ -112,18 +144,38 @@ func (c *Cloudflare) EnsureAddress(ctx context.Context, zone, fqdn, ip string) (
 	}
 	zid, err := c.ZoneID(ctx, zone)
 	if err != nil {
-		return "", err
+		return p, err
 	}
 	var recs []Record
 	if err := c.do(ctx, http.MethodGet, "/zones/"+zid+"/dns_records?type="+typ+"&name="+url.QueryEscape(fqdn), nil, &recs); err != nil {
-		return "", err
+		return p, err
 	}
 	want := Record{Type: typ, Name: fqdn, Content: ip, TTL: 1}
+	p.ZoneID, p.Wanted, p.Action = zid, want, "created"
 	if len(recs) == 0 {
-		return "created", c.do(ctx, http.MethodPost, "/zones/"+zid+"/dns_records", want, nil)
+		return p, nil
 	}
-	if recs[0].Content == ip && !recs[0].Proxied {
-		return "unchanged", nil
+	if len(recs) > 1 || recs[0].Proxied {
+		return p, errors.New("existing DNS records use multiple addresses or a proxy; manage this name externally")
 	}
-	return "updated", c.do(ctx, http.MethodPut, "/zones/"+zid+"/dns_records/"+recs[0].ID, want, nil)
+	p.Before = &recs[0]
+	p.Action = "updated"
+	p.Wanted.TTL = recs[0].TTL
+	if p.Wanted.TTL == 0 {
+		p.Wanted.TTL = 1
+	}
+	if recs[0].Content == ip {
+		p.Action = "unchanged"
+	}
+	return p, nil
+}
+
+func (c *Cloudflare) ApplyAddress(ctx context.Context, p AddressPlan) (*Record, error) {
+	method, path := http.MethodPost, "/zones/"+p.ZoneID+"/dns_records"
+	if p.Before != nil {
+		method, path = http.MethodPut, path+"/"+p.Before.ID
+	}
+	var record *Record
+	err := c.do(ctx, method, path, p.Wanted, &record)
+	return record, err
 }

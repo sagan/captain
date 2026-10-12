@@ -2,12 +2,12 @@
 import { computed, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { snapshot, shows } from '@/captain'
-import { carriers, selectPings } from '@/ping-selection'
-import type { CarrierKey } from '@/ping-selection'
-import type { NodePingHistoryPoint } from '@/ping-summary'
+import { carriers, selectPings } from '@shared/ping-selection'
+import type { CarrierKey } from '@shared/ping-selection'
+import type { NodePingHistoryPoint } from '@shared/ping-summary'
 import { useNodePingStats } from '@/composables/useNodePingStats'
-import { formatDateTime } from '@/utils/helper'
-import { t } from '@/i18n'
+import { formatDateTime } from '@shared/utils/helper'
+import { t } from '@shared/i18n'
 interface CarrierPingBar { key: string; className: string; tooltip: string }
 const EMPTY_PING_BAR_COUNT = 20
 

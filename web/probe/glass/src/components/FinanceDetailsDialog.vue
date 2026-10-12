@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { t } from '@/i18n'
+import { t } from '@shared/i18n'
 import type { NodeData } from '@/stores/nodes'
 import type {
   CurrencyCode,
@@ -7,15 +7,15 @@ import type {
   ExchangeRateSource,
   MeteredEstimateSettings,
   MeteredTrafficMode,
-} from '@/utils/financeHelper'
+} from '@shared/utils/financeHelper'
 import { Icon } from '@iconify/vue'
 import { computed, ref, watch } from 'vue'
 import { AppDialog } from '@/components/ui/app-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import * as financeHelper from '@/utils/financeHelper'
-import { formatPriceWithCycle, getDaysUntilExpired, getExpireStatus, isFreeNode, isFreePrice } from '@/utils/tagHelper'
+import * as financeHelper from '@shared/utils/financeHelper'
+import { formatPriceWithCycle, getDaysUntilExpired, getExpireStatus, isFreeNode, isFreePrice } from '@shared/utils/tagHelper'
 
 type FinanceTab = 'fixed' | 'metered' | 'rates'
 interface UsageSnapshot {

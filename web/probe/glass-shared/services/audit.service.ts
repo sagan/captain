@@ -1,6 +1,6 @@
-import type { AuditLogsResponse } from '@/utils/rpc'
-import { requestManager } from '@/services/request.service'
-import { getSharedRpc } from '@/utils/rpc'
+import type { AuditLogsResponse } from '@shared/utils/rpc'
+import { requestManager } from '@shared/services/request.service'
+import { getSharedRpc } from '@shared/utils/rpc'
 
 const DEFAULT_AUDIT_LOG_LIMIT = 50
 

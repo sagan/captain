@@ -1,4 +1,4 @@
-import { t } from '@/i18n'
+import { t } from '@shared/i18n'
 import dayjs from 'dayjs'
 
 /** 计费周期类型 */

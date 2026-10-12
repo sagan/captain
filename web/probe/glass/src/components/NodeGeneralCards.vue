@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { t } from '@/i18n'
+import { t } from '@shared/i18n'
 import type { GeneralCardKey } from '@/stores/app'
 import type { NodeData } from '@/stores/nodes'
-import type { CurrencyCode, ExchangeRateSource } from '@/utils/financeHelper'
+import type { CurrencyCode, ExchangeRateSource } from '@shared/utils/financeHelper'
 import type { TopNodeMetric } from '@/utils/nodeMetricsHelper'
 import { Icon } from '@iconify/vue'
 import { useNow } from '@vueuse/core'
@@ -10,12 +10,12 @@ import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import NodeEarthGlobe from '@/components/NodeEarthGlobe.vue'
 import { CardX } from '@/components/ui/card-x'
 import { DataTooltip } from '@/components/ui/data-tooltip'
-import { UI_CONFIG } from '@/constants/ui'
+import { UI_CONFIG } from '@shared/constants/ui'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
-import * as financeHelper from '@/utils/financeHelper'
-import { gpuUsageFromStatus } from '@/utils/gpuHelper'
-import { formatBytesPerSecondSplit, formatBytesSplit } from '@/utils/helper'
+import * as financeHelper from '@shared/utils/financeHelper'
+import { gpuUsageFromStatus } from '@shared/utils/gpuHelper'
+import { formatBytesPerSecondSplit, formatBytesSplit } from '@shared/utils/helper'
 import {
   getConnectionCount,
   getExpiryDays,
@@ -27,8 +27,8 @@ import {
   isHighLoadNode,
   isTrafficWarningNode,
 } from '@/utils/nodeMetricsHelper'
-import { getRegionDisplayName } from '@/utils/regionHelper'
-import { isFreeNode } from '@/utils/tagHelper'
+import { getRegionDisplayName } from '@shared/utils/regionHelper'
+import { isFreeNode } from '@shared/utils/tagHelper'
 
 interface GeneralMetricCard {
   key: GeneralCardKey

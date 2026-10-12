@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import type { NodeData } from '@/stores/nodes'
-import type { PingRecord, StatusRecord } from '@/utils/rpc'
+import type { PingRecord, StatusRecord } from '@shared/utils/rpc'
 import { Icon } from '@iconify/vue'
 import { computed, ref } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CardX } from '@/components/ui/card-x'
 import { Spinner } from '@/components/ui/spinner'
-import { LOAD_RECORD_MAX_COUNT, PING_RECORD_MAX_COUNT } from '@/constants/load'
-import { loadLoadRecords, loadPingRecords } from '@/services/history.service'
-import { analyzeDiskPrediction } from '@/services/prediction.service'
+import { LOAD_RECORD_MAX_COUNT, PING_RECORD_MAX_COUNT } from '@shared/constants/load'
+import { loadLoadRecords, loadPingRecords } from '@shared/services/history.service'
+import { analyzeDiskPrediction } from '@shared/services/prediction.service'
 import { useAppStore } from '@/stores/app'
-import { formatBytesPerSecondWithConfig, formatBytesWithConfig } from '@/utils/helper'
+import { formatBytesPerSecondWithConfig, formatBytesWithConfig } from '@shared/utils/helper'
 import { getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@/utils/nodeMetricsHelper'
 
 interface HealthRangeOption {

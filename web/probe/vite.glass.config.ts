@@ -16,7 +16,10 @@ export default defineConfig({
       }
     },
   }],
-  resolve: { alias: { '@': fileURLToPath(new URL('./glass/src', import.meta.url)) } },
+  resolve: { alias: {
+    '@': fileURLToPath(new URL('./glass/src', import.meta.url)),
+    '@shared': fileURLToPath(new URL('./glass-shared', import.meta.url)),
+  } },
   define: { __BUILD_VERSION__: JSON.stringify('3.3.7'), __BUILD_GIT_HASH__: JSON.stringify('06999d5') },
   css: { postcss: { plugins: [] } },
   server: { port: 5177, proxy: { '/api': 'http://127.0.0.1:8080' } },

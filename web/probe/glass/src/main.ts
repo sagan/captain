@@ -1,11 +1,11 @@
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
-import { setupIconify } from '@/utils/iconify'
-import { message } from '@/utils/message'
+import { setupIconify } from '@/iconify'
+import { message } from '@shared/utils/message'
 import App from './App.vue'
 import router from './router'
 
-import './styles/main.css'
+import '@shared/styles/main.css'
 
 window.$message = message
 

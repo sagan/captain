@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "composite": true,
+    "tsBuildInfoFile": "../node_modules/.tmp/glass-react.tsbuildinfo",
+    "types": [
+      "vite/client"
+    ],
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@shared/*": [
+        "../glass-shared/*"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "../glass-shared/**/*.ts",
+    "../src/lib/**/*.ts",
+    "../src/appearance.ts"
+  ],
+  "exclude": [
+    "../glass/src/**/*.test.mjs",
+    "../glass/src/**/__tests__/*"
+  ]
+}

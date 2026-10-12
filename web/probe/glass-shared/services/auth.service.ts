@@ -1,6 +1,6 @@
-import type { MeInfo } from '@/utils/api'
-import { SECURITY_CONFIG } from '@/constants/security'
-import { getSharedApi } from '@/utils/api'
+import type { MeInfo } from '@shared/utils/api'
+import { SECURITY_CONFIG } from '@shared/constants/security'
+import { getSharedApi } from '@shared/utils/api'
 
 export type AuthStatus = 'unknown' | 'guest' | 'authenticated' | 'error'
 export type PermissionKey

@@ -6,9 +6,9 @@ import { Badge } from '@/components/ui/badge'
 import { CardX } from '@/components/ui/card-x'
 import { useNodeProviderMetadata } from '@/composables/useNodeProviderMetadata'
 import { useAppStore } from '@/stores/app'
-import * as financeHelper from '@/utils/financeHelper'
-import { formatBytesWithConfig } from '@/utils/helper'
-import { hasFreeNodeTag } from '@/utils/tagHelper'
+import * as financeHelper from '@shared/utils/financeHelper'
+import { formatBytesWithConfig } from '@shared/utils/helper'
+import { hasFreeNodeTag } from '@shared/utils/tagHelper'
 
 interface NodeValueRow {
   key: string

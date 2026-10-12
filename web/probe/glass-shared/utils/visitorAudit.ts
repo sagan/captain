@@ -1,5 +1,5 @@
-import { t } from '@/i18n'
-import type { AuditLogEntry } from '@/utils/rpc'
+import { t } from '@shared/i18n'
+import type { AuditLogEntry } from '@shared/utils/rpc'
 
 export interface ParsedVisitorAuditMessage {
   event: string

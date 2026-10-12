@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { t, language } from '@/i18n'
+import { t, language } from '@shared/i18n'
 import { shows, snapshot } from '@/captain'
-import { selectPings } from '@/ping-selection'
+import { selectPings } from '@shared/ping-selection'
 import ThreeNetworkPing from '@/components/ThreeNetworkPing.vue'
-import { formatNumber } from '@/utils/helper'
+import { formatNumber } from '@shared/utils/helper'
 import type { NodeData } from '@/stores/nodes'
 import { Icon } from '@iconify/vue'
 import { computed } from 'vue'
@@ -13,11 +13,11 @@ import { DataTooltip } from '@/components/ui/data-tooltip'
 import { ProgressThin } from '@/components/ui/progress-thin'
 import { useNodePingDisplay } from '@/composables/useNodePingDisplay'
 import { useAppStore } from '@/stores/app'
-import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, getStatus, getUptimeDays } from '@/utils/helper'
+import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, getStatus, getUptimeDays } from '@shared/utils/helper'
 import { getDiskPercentage, getMemoryPercentage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@/utils/nodeMetricsHelper'
-import { getOSImage, getOSName } from '@/utils/osImageHelper'
-import { getRegionCode, getRegionDisplayName } from '@/utils/regionHelper'
-import { formatCurrencyValue, formatPriceWithCycle, getDaysUntilExpired, getExpireStatus, getRemainingValue, isFreePrice, parseTags } from '@/utils/tagHelper'
+import { getOSImage, getOSName } from '@shared/utils/osImageHelper'
+import { getRegionCode, getRegionDisplayName } from '@shared/utils/regionHelper'
+import { formatCurrencyValue, formatPriceWithCycle, getDaysUntilExpired, getExpireStatus, getRemainingValue, isFreePrice, parseTags } from '@shared/utils/tagHelper'
 
 const props = withDefaults(defineProps<{
   node: NodeData

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { t } from '@/i18n'
+import { t } from '@shared/i18n'
 import { defineAsyncComponent } from 'vue'
 import { AppDialog } from '@/components/ui/app-dialog'
 

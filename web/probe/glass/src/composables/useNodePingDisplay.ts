@@ -1,10 +1,10 @@
-import { t } from '@/i18n'
+import { t } from '@shared/i18n'
 import type { MaybeRefOrGetter } from 'vue'
 import { computed, toValue } from 'vue'
 import { useNodePingStats } from '@/composables/useNodePingStats'
-import { PING_SUMMARY_MAX_COUNT } from '@/constants/load'
+import { PING_SUMMARY_MAX_COUNT } from '@shared/constants/load'
 import { useAppStore } from '@/stores/app'
-import { formatDateTime } from '@/utils/helper'
+import { formatDateTime } from '@shared/utils/helper'
 
 export type NodePingMetric = 'latency' | 'loss'
 

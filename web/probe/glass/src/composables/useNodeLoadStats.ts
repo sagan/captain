@@ -1,14 +1,14 @@
 import type { MaybeRefOrGetter } from 'vue'
-import type { PermissionKey } from '@/services/auth.service'
-import type { StatusRecord } from '@/utils/rpc'
+import type { PermissionKey } from '@shared/services/auth.service'
+import type { StatusRecord } from '@shared/utils/rpc'
 import { computed, onScopeDispose, ref, shallowRef, toValue, watch } from 'vue'
-import { LOAD_CONFIG, LOAD_RECORD_MAX_COUNT } from '@/constants/load'
-import { abortLoadRecords, abortNodeLoadRecords, buildRecordsByClient, loadLoadRecords, loadNodeLoadRecords } from '@/services/history.service'
-import { analyzeDiskPrediction, buildDiskPrediction } from '@/services/prediction.service'
+import { LOAD_CONFIG, LOAD_RECORD_MAX_COUNT } from '@shared/constants/load'
+import { abortLoadRecords, abortNodeLoadRecords, buildRecordsByClient, loadLoadRecords, loadNodeLoadRecords } from '@shared/services/history.service'
+import { analyzeDiskPrediction, buildDiskPrediction } from '@shared/services/prediction.service'
 import { useAppStore } from '@/stores/app'
 
 export { analyzeDiskPrediction, buildDiskPrediction, loadNodeLoadRecords }
-export type { DiskPredictionState, NodeDiskPrediction } from '@/services/prediction.service'
+export type { DiskPredictionState, NodeDiskPrediction } from '@shared/services/prediction.service'
 
 interface SharedLoadRecordsState {
   recordsByClient: Map<string, StatusRecord[]>

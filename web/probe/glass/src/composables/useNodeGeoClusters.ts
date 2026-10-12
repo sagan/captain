@@ -1,8 +1,8 @@
 import type { NodeData } from '@/stores/nodes'
 import { computed } from 'vue'
 import { useNodesStore } from '@/stores/nodes'
-import { getCoordByCode, getCountryCodeFromRegion } from '@/utils/geoHelper'
-import { getRegionDisplayName } from '@/utils/regionHelper'
+import { getCoordByCode, getCountryCodeFromRegion } from '@shared/utils/geoHelper'
+import { getRegionDisplayName } from '@shared/utils/regionHelper'
 
 interface UseNodeGeoClustersOptions {
   nodes?: () => NodeData[] | undefined

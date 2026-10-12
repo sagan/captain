@@ -1,4 +1,4 @@
-import { emojiToRegionMap } from '@/utils/regionHelper'
+import { emojiToRegionMap } from '@shared/utils/regionHelper'
 
 /** 国家/地区 ISO 代码 → [lat, lng] */
 export const COORD_MAP: Record<string, [number, number]> = {

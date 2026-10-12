@@ -1,5 +1,5 @@
-import type { Node, PublicPingTask } from '../../src/lib/api'
-import type { NetworkHistory } from '../../src/lib/network'
+import type { Node, PublicPingTask } from '../src/lib/api'
+import type { NetworkHistory } from '../src/lib/network'
 
 export const carriers = [
   { key: 'CU', label: '联通', dotClass: 'bg-rose-500' },

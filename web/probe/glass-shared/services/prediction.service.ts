@@ -1,6 +1,6 @@
-import type { StatusRecord } from '@/utils/rpc'
-import { LOAD_CONFIG } from '@/constants/load'
-import { TIME_MS } from '@/constants/time'
+import type { StatusRecord } from '@shared/utils/rpc'
+import { LOAD_CONFIG } from '@shared/constants/load'
+import { TIME_MS } from '@shared/constants/time'
 
 export interface NodeDiskPrediction {
   daysUntilFull: number

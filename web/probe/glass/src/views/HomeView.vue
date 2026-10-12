@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { t } from '@/i18n'
-import type { PermissionKey } from '@/services/auth.service'
+import { t } from '@shared/i18n'
+import type { PermissionKey } from '@shared/services/auth.service'
 import type { HomeQuickControlKey } from '@/stores/app'
 import type { NodeData } from '@/stores/nodes'
 import { Icon } from '@iconify/vue'
@@ -15,10 +15,10 @@ import { Empty } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useVisitorAudit } from '@/composables/useVisitorAudit'
-import { UI_CONFIG } from '@/constants/ui'
+import { UI_CONFIG } from '@shared/constants/ui'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
-import * as financeHelper from '@/utils/financeHelper'
+import * as financeHelper from '@shared/utils/financeHelper'
 import {
   getRealtimePeakSpeed,
   getTotalTraffic,
@@ -26,7 +26,7 @@ import {
   isHighLoadNode,
 } from '@/utils/nodeMetricsHelper'
 import { isNodeMatchSearch } from '@/utils/nodeSearch'
-import { isFreeNode } from '@/utils/tagHelper'
+import { isFreeNode } from '@shared/utils/tagHelper'
 
 interface QuickControlOption {
   key: HomeQuickControlKey

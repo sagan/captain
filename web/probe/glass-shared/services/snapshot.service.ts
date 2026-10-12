@@ -1,4 +1,4 @@
-import { escapeCsvCell, toCsvRows } from '@/utils/csv'
+import { escapeCsvCell, toCsvRows } from '@shared/utils/csv'
 
 const UTF8_BOM = String.fromCharCode(0xFEFF)
 const JSON_NEWLINE_REGEX = /\n/g

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { formatBytes } from '@/utils/helper'
+import { formatBytes } from '@shared/utils/helper'
 
 export interface TrafficProgressProps {
   upload: number

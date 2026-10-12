@@ -2,9 +2,9 @@
 import { computed } from 'vue'
 import VChart from 'vue-echarts'
 import { CardX } from '@/components/ui/card-x'
-import { formatBytes } from '@/utils/helper'
+import { formatBytes } from '@shared/utils/helper'
 import MetricChartHeader from './MetricChartHeader.vue'
-import '@/utils/echarts'
+import '@shared/utils/echarts'
 
 type MetricChartTone = 'rose' | 'amber' | 'emerald' | 'cyan' | 'sky' | 'violet' | 'orange' | 'slate'
 type MetricValueKind = 'bytes' | 'bytesPerSecond' | 'count' | 'milliseconds' | 'percent' | 'temperature'

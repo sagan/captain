@@ -1,8 +1,8 @@
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
-import { snapshot, readJSON, clientFor, statusFor, periodTraffic, shows, clearHistoryCache } from '@/captain'
+import { snapshot, readJSON, clientFor, statusFor, periodTraffic, shows, clearHistoryCache } from '@shared/captain'
 import type { Snapshot } from '../../../src/lib/api'
-import type { PublicSettings } from './api'
+import type { PublicSettings } from '@shared/utils/api'
 
 let timer: ReturnType<typeof setTimeout> | undefined
 let controller: AbortController | undefined

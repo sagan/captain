@@ -1,5 +1,5 @@
-import type { NodeData } from '@/stores/nodes'
-import { isFreeNode } from '@/utils/tagHelper'
+import type { NodeData } from '@shared/types/node'
+import { isFreeNode } from '@shared/utils/tagHelper'
 
 export type CurrencyCode = 'CNY' | 'USD' | 'HKD' | 'EUR' | 'GBP' | 'JPY' | 'RUB' | 'CHF' | 'INR' | 'VND' | 'THB' | 'CAD'
 export type ExchangeRates = Record<CurrencyCode, number>

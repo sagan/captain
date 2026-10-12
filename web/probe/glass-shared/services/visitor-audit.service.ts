@@ -1,6 +1,6 @@
-import type { VisitorAuditEventParams } from '@/utils/rpc'
-import { requestManager } from '@/services/request.service'
-import { getSharedRpc } from '@/utils/rpc'
+import type { VisitorAuditEventParams } from '@shared/utils/rpc'
+import { requestManager } from '@shared/services/request.service'
+import { getSharedRpc } from '@shared/utils/rpc'
 
 export type VisitorAuditSubmitStatus = 'success' | 'disabled' | 'rate_limited' | 'failed'
 

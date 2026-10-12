@@ -1,4 +1,4 @@
-import type { GlassCustomColors } from '@/stores/app'
+import type { GlassCustomColors } from '@shared/types/theme'
 
 export type GlassColorPreset = 'emerald' | 'soft' | 'contrast' | 'midnight' | 'custom'
 

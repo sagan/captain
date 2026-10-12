@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Layout from vlongx/komari-theme-Glassmorphism-three-network (MIT).
 import { computed } from 'vue'
-import { t } from '@/i18n'
+import { t } from '@shared/i18n'
 import { useAppStore } from '@/stores/app'
 import { DataTooltip } from '@/components/ui/data-tooltip'
 import { useNodeCarrierPingDisplay } from '@/composables/useNodeCarrierPingDisplay'

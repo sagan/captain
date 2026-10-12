@@ -1,4 +1,4 @@
-import type { MessageApi } from '@/utils/message'
+import type { MessageApi } from '@shared/utils/message'
 
 declare const __BUILD_VERSION__: string
 declare const __BUILD_GIT_HASH__: string

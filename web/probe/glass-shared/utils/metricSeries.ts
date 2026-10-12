@@ -1,4 +1,4 @@
-import type { MetricPoint, MetricSeries, PingMetricTaskStats, PingTaskInfo } from '@/utils/rpc'
+import type { MetricPoint, MetricSeries, PingMetricTaskStats, PingTaskInfo } from '@shared/utils/rpc'
 
 export const PING_LATENCY_METRIC = 'ping.latency_ms'
 export const PING_LOSS_METRIC = 'ping.loss'

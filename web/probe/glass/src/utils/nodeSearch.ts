@@ -1,5 +1,5 @@
 import type { NodeData } from '@/stores/nodes'
-import { isRegionMatch } from '@/utils/regionHelper'
+import { isRegionMatch } from '@shared/utils/regionHelper'
 
 const SEARCH_TERM_SEPARATOR = /\s+/
 

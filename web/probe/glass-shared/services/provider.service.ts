@@ -1,8 +1,8 @@
-import type { NodeData } from '@/stores/nodes'
-import type { IpGeo } from '@/utils/ipGeoHelper'
-import type { ProviderResolveResult } from '@/utils/providerInfo'
-import { lookupIpGeo } from '@/utils/ipGeoHelper'
-import { resolveProviderInfo } from '@/utils/providerInfo'
+import type { NodeData } from '@shared/types/node'
+import type { IpGeo } from '@shared/utils/ipGeoHelper'
+import type { ProviderResolveResult } from '@shared/utils/providerInfo'
+import { lookupIpGeo } from '@shared/utils/ipGeoHelper'
+import { resolveProviderInfo } from '@shared/utils/providerInfo'
 
 export interface NodeProviderMetadata {
   provider: ProviderResolveResult | null

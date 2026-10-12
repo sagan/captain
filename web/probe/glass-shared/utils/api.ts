@@ -1,5 +1,5 @@
-import { captainCall } from '@/captain'
-import { NETWORK_CONFIG } from '@/constants/network'
+import { captainCall } from '@shared/captain'
+import { NETWORK_CONFIG } from '@shared/constants/network'
 
 /**
  * Komari API 客户端 SDK

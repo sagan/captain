@@ -2,7 +2,7 @@
 import { provide, ref, watch } from 'vue'
 import { BackTop } from '@/components/ui/back-top'
 import { useAppStore } from '@/stores/app'
-import { buildGlassThemeTokens } from '@/utils/glassTheme'
+import { buildGlassThemeTokens } from '@shared/utils/glassTheme'
 
 const appStore = useAppStore()
 

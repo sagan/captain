@@ -1,8 +1,8 @@
-import type { MetricDefinition, MetricQueryParams, MetricQueryResponse, PingMetricStatsParams, PingMetricStatsResponse, PingTaskInfo } from '@/utils/rpc'
-import { CACHE_CONFIG } from '@/constants/cache'
-import { SharedCache } from '@/services/cache.service'
-import { requestManager } from '@/services/request.service'
-import { getSharedRpc, RpcError } from '@/utils/rpc'
+import type { MetricDefinition, MetricQueryParams, MetricQueryResponse, PingMetricStatsParams, PingMetricStatsResponse, PingTaskInfo } from '@shared/utils/rpc'
+import { CACHE_CONFIG } from '@shared/constants/cache'
+import { SharedCache } from '@shared/services/cache.service'
+import { requestManager } from '@shared/services/request.service'
+import { getSharedRpc, RpcError } from '@shared/utils/rpc'
 
 function normalizeHours(hours: number | null | undefined): number | undefined {
   if (typeof hours !== 'number' || !Number.isFinite(hours) || hours <= 0)

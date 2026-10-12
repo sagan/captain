@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { VersionInfo } from '@/utils/api'
+import type { VersionInfo } from '@shared/utils/api'
 import { computed, onMounted, ref } from 'vue'
 import { DataTooltip } from '@/components/ui/data-tooltip'
-import { getSharedApi } from '@/utils/api'
+import { getSharedApi } from '@shared/utils/api'
 
 const api = getSharedApi()
 

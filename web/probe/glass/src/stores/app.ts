@@ -1,10 +1,12 @@
-import type { PermissionKey, VerifyLoginOptions } from '@/services/auth.service'
-import type { MeInfo, PublicSettings } from '@/utils/api'
-import type { ByteDecimalsConfig } from '@/utils/helper'
+import type { GlassCustomColors } from '@shared/types/theme'
+export type { GlassCustomColors }
+import type { PermissionKey, VerifyLoginOptions } from '@shared/services/auth.service'
+import type { MeInfo, PublicSettings } from '@shared/utils/api'
+import type { ByteDecimalsConfig } from '@shared/utils/helper'
 import { useStorageAsync } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { getAuthSession, requirePermission, setAuthSessionFromLogin, verifyLogin } from '@/services/auth.service'
+import { getAuthSession, requirePermission, setAuthSessionFromLogin, verifyLogin } from '@shared/services/auth.service'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
 export type ManagedThemeMode = 'beijing' | 'light' | 'dark'
@@ -105,18 +107,6 @@ export type ChartDashboardCardKey
     | 'ping'
     | 'pingLoss'
 
-export interface GlassCustomColors {
-  lightCard: string
-  lightControl: string
-  lightText: string
-  lightMutedText: string
-  lightBorder: string
-  darkCard: string
-  darkControl: string
-  darkText: string
-  darkMutedText: string
-  darkBorder: string
-}
 
 export interface ChartDashboardTemplate {
   cards: ChartDashboardCardKey[]

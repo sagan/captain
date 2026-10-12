@@ -1,4 +1,4 @@
-import { REQUEST_CONFIG } from '@/constants/request'
+import { REQUEST_CONFIG } from '@shared/constants/request'
 
 interface PendingRequest<T> {
   promise: Promise<T>

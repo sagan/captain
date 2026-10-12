@@ -4,10 +4,10 @@ import { computed, onScopeDispose, ref, shallowRef, toValue, watch } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { historyFor, snapshot } from '@/captain'
 import type { PublicPingTask } from '../../../src/lib/api'
-import { selectPings, selectedHistory } from '@/ping-selection'
+import { selectPings, selectedHistory } from '@shared/ping-selection'
 import type { NetworkHistory } from '../../../src/lib/network'
-import { summarizePings } from '@/ping-summary'
-import type { NodePingStatsState } from '@/ping-summary'
+import { summarizePings } from '@shared/ping-summary'
+import type { NodePingStatsState } from '@shared/ping-summary'
 export function useNodePingStats(uuid: MaybeRefOrGetter<string>, options?: { hours?: MaybeRefOrGetter<number>; enabled?: MaybeRefOrGetter<boolean>; maxCount?: MaybeRefOrGetter<number | undefined>; source?: MaybeRefOrGetter<PublicPingTask | null> }) {
   const loading = ref(false), error = ref<string | null>(null), state = shallowRef<NodePingStatsState | null>(null)
   let epoch = 0, timer: ReturnType<typeof setTimeout> | undefined

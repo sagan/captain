@@ -1,8 +1,8 @@
-import type { PingRecord, PingTaskInfo, StatusRecord } from '@/utils/rpc'
-import { requestManager } from '@/services/request.service'
-import { ApiError, getSharedApi } from '@/utils/api'
-import { gpuUsageFromStatus } from '@/utils/gpuHelper'
-import { getSharedRpc, RpcError } from '@/utils/rpc'
+import type { PingRecord, PingTaskInfo, StatusRecord } from '@shared/utils/rpc'
+import { requestManager } from '@shared/services/request.service'
+import { ApiError, getSharedApi } from '@shared/utils/api'
+import { gpuUsageFromStatus } from '@shared/utils/gpuHelper'
+import { getSharedRpc, RpcError } from '@shared/utils/rpc'
 
 function numberOrZero(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : Number.NaN

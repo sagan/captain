@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { escapeHTML } from '@/utils/html'
-import { t } from '@/i18n'
-import type { MetricSeries, PingMetricTaskStats, PingRecord, PingTaskInfo } from '@/utils/rpc'
+import { escapeHTML } from '@shared/utils/html'
+import { t } from '@shared/i18n'
+import type { MetricSeries, PingMetricTaskStats, PingRecord, PingTaskInfo } from '@shared/utils/rpc'
 import { Icon } from '@iconify/vue'
 import dayjs from 'dayjs'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch, watchEffect } from 'vue'
@@ -12,14 +12,14 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { PING_RECORD_MAX_COUNT } from '@/constants/load'
-import { loadPingRecordsWithTasks } from '@/services/history.service'
-import { loadPingMetricStats, loadPublicPingTasks, queryMetrics } from '@/services/metrics.service'
+import { PING_RECORD_MAX_COUNT } from '@shared/constants/load'
+import { loadPingRecordsWithTasks } from '@shared/services/history.service'
+import { loadPingMetricStats, loadPublicPingTasks, queryMetrics } from '@shared/services/metrics.service'
 import { useAppStore } from '@/stores/app'
-import { ACCESSIBLE_LINE_TYPES, getChartSeriesPalette } from '@/utils/chartPalette'
-import { isPingMetric, normalizeMetricSeriesList, orderPingTasksByBackend, PING_LATENCY_METRIC, pingTaskId, pingTaskName } from '@/utils/metricSeries'
-import { cutPeakValues, interpolateNullsLinear } from '@/utils/recordHelper'
-import '@/utils/echarts' // 共享 ECharts 配置
+import { ACCESSIBLE_LINE_TYPES, getChartSeriesPalette } from '@shared/utils/chartPalette'
+import { isPingMetric, normalizeMetricSeriesList, orderPingTasksByBackend, PING_LATENCY_METRIC, pingTaskId, pingTaskName } from '@shared/utils/metricSeries'
+import { cutPeakValues, interpolateNullsLinear } from '@shared/utils/recordHelper'
+import '@shared/utils/echarts' // 共享 ECharts 配置
 
 const props = defineProps<{
   uuid: string

@@ -1,4 +1,4 @@
-import type { NetworkHistory } from '../../src/lib/network'
+import type { NetworkHistory } from '../src/lib/network'
 export interface NodePingHistoryPoint { time: string; latency: number | null; loss: number | null }
 export interface NodePingStatsState {
   avgLatency: number; avgLoss: number; avgVolatility: number; history: NodePingHistoryPoint[]; hasData: boolean

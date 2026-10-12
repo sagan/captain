@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { t } from '@/i18n'
+import { t } from '@shared/i18n'
 import type { NodeProviderMetadata } from '@/composables/useNodeProviderMetadata'
 import type { NodeData } from '@/stores/nodes'
 import { Icon } from '@iconify/vue'
@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button'
 import { CardX } from '@/components/ui/card-x'
 import { useNodeProviderMetadata } from '@/composables/useNodeProviderMetadata'
 import { useAppStore } from '@/stores/app'
-import { getRegionDisplayName } from '@/utils/regionHelper'
-import { parseTags } from '@/utils/tagHelper'
+import { getRegionDisplayName } from '@shared/utils/regionHelper'
+import { parseTags } from '@shared/utils/tagHelper'
 
 interface TopologyNodeView {
   node: NodeData

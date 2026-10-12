@@ -1,74 +1,15 @@
-import type { Client, NodeStatus } from '@/utils/rpc'
+import type { NodeData, TrafficLimitType } from '@shared/types/node'
+export type { NodeData, TrafficLimitType }
+import type { Client, NodeStatus } from '@shared/utils/rpc'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useAppStore } from '@/stores/app'
-import { gpuUsageFromStatus } from '@/utils/gpuHelper'
-import { parseNodeGroups } from '@/utils/groupHelper'
+import { gpuUsageFromStatus } from '@shared/utils/gpuHelper'
+import { parseNodeGroups } from '@shared/utils/groupHelper'
 
 /** 流量限制类型 */
-export type TrafficLimitType = 'up' | 'down' | 'min' | 'max' | 'sum'
 
 /** 节点完整信息（合并 Client 和 Status） */
-export interface NodeData {
-  uuid: string
-  // Client 信息
-  name: string
-  cpu_name: string
-  virtualization: string
-  arch: string
-  cpu_cores: number
-  cpu_physical_cores?: number
-  os: string
-  kernel_version: string
-  gpu_name?: string
-  ipv4?: string
-  ipv6?: string
-  region: string
-  remark?: string
-  public_remark: string
-  mem_total: number
-  swap_total: number
-  disk_total: number
-  version?: string
-  weight: number
-  price: number
-  billing_cycle: number
-  auto_renewal: boolean
-  currency: string
-  expired_at: string
-  group: string
-  groups: string[]
-  tags: string
-  hidden: boolean
-  traffic_limit: number
-  traffic_limit_type: TrafficLimitType
-  created_at: string
-  updated_at: string
-  // Status 信息
-  online: boolean
-  time: string
-  cpu: number
-  gpu: number
-  ram: number
-  swap: number
-  load: number
-  load5: number
-  load15: number
-  temp: number
-  disk: number
-  net_in: number
-  net_out: number
-  net_total_up: number
-  net_total_down: number
-  traffic_up?: number
-  traffic_down?: number
-  process: number
-  connections: number
-  connections_udp: number
-  uptime: number
-  message?: string
-  status_updated_at?: string
-}
 
 /** WebSocket 连接状态 */
 export type WsConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'

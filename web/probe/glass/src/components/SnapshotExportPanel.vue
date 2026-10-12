@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { t } from '@/i18n'
+import { t } from '@shared/i18n'
 import type { NodeData } from '@/stores/nodes'
 import { Icon } from '@iconify/vue'
 import { computed, onMounted, ref } from 'vue'
@@ -8,10 +8,10 @@ import { CardX } from '@/components/ui/card-x'
 import { Input } from '@/components/ui/input'
 import { useNodeProviderMetadata } from '@/composables/useNodeProviderMetadata'
 import { useVisitorAudit } from '@/composables/useVisitorAudit'
-import { buildSnapshotCsvAsync, buildSnapshotJsonAsync, downloadText } from '@/services/snapshot.service'
+import { buildSnapshotCsvAsync, buildSnapshotJsonAsync, downloadText } from '@shared/services/snapshot.service'
 import { useAppStore } from '@/stores/app'
-import * as financeHelper from '@/utils/financeHelper'
-import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat } from '@/utils/helper'
+import * as financeHelper from '@shared/utils/financeHelper'
+import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat } from '@shared/utils/helper'
 import { getTrafficUsed, getTrafficUsedPercentage } from '@/utils/nodeMetricsHelper'
 
 interface SnapshotRow {

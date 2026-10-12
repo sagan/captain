@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { snapshot } from '@/captain'
-import { t } from '@/i18n'
-import { selectPings } from '@/ping-selection'
+import { t } from '@shared/i18n'
+import { selectPings } from '@shared/ping-selection'
 import { useNodeCarrierPingDisplay } from '@/composables/useNodeCarrierPingDisplay'
 import { useNodePingDisplay } from '@/composables/useNodePingDisplay'
 

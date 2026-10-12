@@ -1,6 +1,6 @@
-import { t } from '@/i18n'
+import { t } from '@shared/i18n'
 import type { NodeData } from '@/stores/nodes'
-import { getDaysUntilExpired } from '@/utils/tagHelper'
+import { getDaysUntilExpired } from '@shared/utils/tagHelper'
 
 export interface TopNodeMetric {
   node: NodeData

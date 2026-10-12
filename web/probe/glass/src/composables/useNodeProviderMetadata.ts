@@ -1,14 +1,14 @@
 import type { MaybeRefOrGetter } from 'vue'
-import type { PermissionKey } from '@/services/auth.service'
-import type { NodeProviderMetadata } from '@/services/provider.service'
+import type { PermissionKey } from '@shared/services/auth.service'
+import type { NodeProviderMetadata } from '@shared/services/provider.service'
 import type { NodeData } from '@/stores/nodes'
 import { markRaw, ref, toValue, watch } from 'vue'
-import { CACHE_CONFIG } from '@/constants/cache'
-import { SharedCache } from '@/services/cache.service'
-import { buildNodeProviderMetadata, getNodeIps, getNodeProviderFingerprint, lookupNodeGeo } from '@/services/provider.service'
+import { CACHE_CONFIG } from '@shared/constants/cache'
+import { SharedCache } from '@shared/services/cache.service'
+import { buildNodeProviderMetadata, getNodeIps, getNodeProviderFingerprint, lookupNodeGeo } from '@shared/services/provider.service'
 import { useAppStore } from '@/stores/app'
 
-export type { NodeProviderMetadata } from '@/services/provider.service'
+export type { NodeProviderMetadata } from '@shared/services/provider.service'
 
 interface UseNodeProviderMetadataOptions {
   nodes: MaybeRefOrGetter<NodeData[]>

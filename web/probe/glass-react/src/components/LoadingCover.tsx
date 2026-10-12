@@ -1,13 +1,15 @@
+import type { Ref } from 'react'
 import '@/scoped/loading-cover.css'
 import { scope } from '@/scoped/scope'
 import { useApp } from '@/stores/app'
 
 const s = scope('loading-cover')
 
-export default function LoadingCover() {
+export default function LoadingCover({ ref }: { ref?: Ref<HTMLDivElement> }) {
   const hasCustomBackground = useApp(st => st.backgroundEnabled && Boolean(st.currentBackgroundUrl))
   return (
     <div
+      ref={ref}
       {...s}
       className={`loading-cover flex items-center inset-0 justify-center fixed z-20 ${hasCustomBackground ? 'loading-cover--custom-background' : ''}`}
     >

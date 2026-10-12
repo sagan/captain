@@ -18,6 +18,7 @@ export function AvatarImage({ src, referrerPolicy, crossOrigin, onLoadingStatusC
   const root = useContext(AvatarStateContext)
   const [status, setStatus] = useState<ImageLoadingStatus>('idle')
   const latest = useRef({ root, onLoadingStatusChange })
+  const imgRef = useRef<HTMLImageElement | null>(null)
   latest.current = { root, onLoadingStatusChange }
 
   useLayoutEffect(() => {
@@ -49,6 +50,13 @@ export function AvatarImage({ src, referrerPolicy, crossOrigin, onLoadingStatusC
     }
   }, [src, referrerPolicy, crossOrigin])
 
+  // React 19 omits src="" (it would refetch the page); Vue and reka render it,
+  // so set it on the element to keep the same DOM and requests.
+  useLayoutEffect(() => {
+    if (src === '' && imgRef.current && !imgRef.current.hasAttribute('src'))
+      imgRef.current.setAttribute('src', '')
+  }, [src])
+
   useLayoutEffect(() => {
     latest.current.onLoadingStatusChange?.(status)
     if (status !== 'idle')
@@ -57,10 +65,11 @@ export function AvatarImage({ src, referrerPolicy, crossOrigin, onLoadingStatusC
 
   return (
     <img
+      ref={imgRef}
       data-slot="avatar-image"
       {...props}
       role="img"
-      src={src}
+      src={src || undefined}
       referrerPolicy={referrerPolicy}
       crossOrigin={crossOrigin}
       className="rounded-full aspect-square size-full object-cover"

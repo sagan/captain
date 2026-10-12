@@ -11,6 +11,8 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   root: fileURLToPath(new URL('./glass-react', import.meta.url)),
   base: './',
+  // Same static files (flags, OS icons, globe textures) as the Vue build.
+  publicDir: fileURLToPath(new URL('./glass/public', import.meta.url)),
   plugins: [react(), tailwindcss(), {
     name: 'glass-licenses',
     generateBundle() {

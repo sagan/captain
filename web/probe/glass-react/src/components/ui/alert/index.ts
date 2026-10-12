@@ -1,0 +1,6 @@
+export { alertVariants } from '@shared/ui/alert'
+export type { AlertVariants } from '@shared/ui/alert'
+export { Alert } from './Alert'
+export { AlertAction } from './AlertAction'
+export { AlertDescription } from './AlertDescription'
+export { AlertTitle } from './AlertTitle'

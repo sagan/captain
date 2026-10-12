@@ -1,0 +1,6 @@
+export { tabsListVariants } from '@shared/ui/tabs'
+export type { TabsListVariants } from '@shared/ui/tabs'
+export { Tabs } from './Tabs'
+export { TabsContent } from './TabsContent'
+export { TabsList } from './TabsList'
+export { TabsTrigger } from './TabsTrigger'

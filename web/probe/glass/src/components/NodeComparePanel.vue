@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAppStore } from '@/stores/app'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatUptimeWithFormat } from '@shared/utils/helper'
-import { getDiskPercentage, getMemoryPercentage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@/utils/nodeMetricsHelper'
-import { isNodeMatchSearch } from '@/utils/nodeSearch'
+import { getDiskPercentage, getMemoryPercentage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@shared/utils/nodeMetricsHelper'
+import { isNodeMatchSearch } from '@shared/utils/nodeSearch'
 import { formatPriceWithCycle, isFreePrice } from '@shared/utils/tagHelper'
 
 interface CompareMetric {

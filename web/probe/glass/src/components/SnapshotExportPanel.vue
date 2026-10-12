@@ -12,7 +12,7 @@ import { buildSnapshotCsvAsync, buildSnapshotJsonAsync, downloadText } from '@sh
 import { useAppStore } from '@/stores/app'
 import * as financeHelper from '@shared/utils/financeHelper'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat } from '@shared/utils/helper'
-import { getTrafficUsed, getTrafficUsedPercentage } from '@/utils/nodeMetricsHelper'
+import { getTrafficUsed, getTrafficUsedPercentage } from '@shared/utils/nodeMetricsHelper'
 
 interface SnapshotRow {
   uuid: string

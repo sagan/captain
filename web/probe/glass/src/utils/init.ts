@@ -41,7 +41,7 @@ async function refresh(): Promise<boolean> {
     nodes.updateNodeStatuses(Object.fromEntries(s.nodes.map(n => [String(n.id), statusFor(n)])))
     // Exact group labels; commas in Captain group names are not separators.
     for (const n of nodes.nodes) {
-      (n as typeof n & { captainTraffic: number }).captainTraffic = periodTraffic(s.nodes.find(v => String(v.id) === n.uuid)!).used
+      n.captainTraffic = periodTraffic(s.nodes.find(v => String(v.id) === n.uuid)!).used
       n.groups = s.nodes.find(v => String(v.id) === n.uuid)?.group ? [s.nodes.find(v => String(v.id) === n.uuid)!.group!] : []
     }
     app.connectionError = false

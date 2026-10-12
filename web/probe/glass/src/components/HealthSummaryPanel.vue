@@ -12,7 +12,7 @@ import { loadLoadRecords, loadPingRecords } from '@shared/services/history.servi
 import { analyzeDiskPrediction } from '@shared/services/prediction.service'
 import { useAppStore } from '@/stores/app'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig } from '@shared/utils/helper'
-import { getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@/utils/nodeMetricsHelper'
+import { getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@shared/utils/nodeMetricsHelper'
 
 interface HealthRangeOption {
   key: 'day' | 'week' | 'month' | 'all'

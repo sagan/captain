@@ -24,8 +24,8 @@ import {
   getTotalTraffic,
   isExpiringNode,
   isHighLoadNode,
-} from '@/utils/nodeMetricsHelper'
-import { isNodeMatchSearch } from '@/utils/nodeSearch'
+} from '@shared/utils/nodeMetricsHelper'
+import { isNodeMatchSearch } from '@shared/utils/nodeSearch'
 import { isFreeNode } from '@shared/utils/tagHelper'
 
 interface QuickControlOption {

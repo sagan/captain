@@ -61,4 +61,6 @@ export interface NodeData {
   uptime: number
   message?: string
   status_updated_at?: string
+  /** Captain 当前周期流量（数据库周期值，覆盖开机计数） */
+  captainTraffic?: number
 }

@@ -3,7 +3,7 @@ import { t } from '@shared/i18n'
 import type { GeneralCardKey } from '@/stores/app'
 import type { NodeData } from '@/stores/nodes'
 import type { CurrencyCode, ExchangeRateSource } from '@shared/utils/financeHelper'
-import type { TopNodeMetric } from '@/utils/nodeMetricsHelper'
+import type { TopNodeMetric } from '@shared/utils/nodeMetricsHelper'
 import { Icon } from '@iconify/vue'
 import { useNow } from '@vueuse/core'
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
@@ -26,7 +26,7 @@ import {
   isExpiringNode,
   isHighLoadNode,
   isTrafficWarningNode,
-} from '@/utils/nodeMetricsHelper'
+} from '@shared/utils/nodeMetricsHelper'
 import { getRegionDisplayName } from '@shared/utils/regionHelper'
 import { isFreeNode } from '@shared/utils/tagHelper'
 

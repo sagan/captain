@@ -1,5 +1,5 @@
 import { t } from '@shared/i18n'
-import type { NodeData } from '@/stores/nodes'
+import type { NodeData } from '@shared/types/node'
 import { getDaysUntilExpired } from '@shared/utils/tagHelper'
 
 export interface TopNodeMetric {
@@ -18,7 +18,7 @@ export function hasTrafficLimit(node: Pick<NodeData, 'traffic_limit'>): boolean 
 }
 
 export function getTrafficUsed(node: Pick<NodeData, 'net_total_up' | 'net_total_down' | 'traffic_limit_type'>): number {
-  const monthly = (node as NodeData & { captainTraffic?: number }).captainTraffic
+  const monthly = (node as Pick<NodeData, 'captainTraffic'>).captainTraffic
   if (monthly !== undefined) return monthly
   const { net_total_up = 0, net_total_down = 0, traffic_limit_type } = node
 

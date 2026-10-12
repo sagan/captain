@@ -3,10 +3,7 @@
 // two derive identical values from the same public settings.
 import type { GlassCustomColors } from '@shared/types/theme'
 export type { GlassCustomColors }
-import type { PermissionKey, VerifyLoginOptions } from '@shared/services/auth.service'
-import type { MeInfo, PublicSettings } from '@shared/utils/api'
 import type { ByteDecimalsConfig } from '@shared/utils/helper'
-import { getAuthSession, requirePermission, setAuthSessionFromLogin, verifyLogin } from '@shared/services/auth.service'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
 export type ManagedThemeMode = 'beijing' | 'light' | 'dark'

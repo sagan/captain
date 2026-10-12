@@ -1,7 +1,6 @@
 import { useStorageAsync } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import type { GlassCustomColors } from '@shared/types/theme'
 import type { PermissionKey, VerifyLoginOptions } from '@shared/services/auth.service'
 import type { MeInfo, PublicSettings } from '@shared/utils/api'
 import type { ByteDecimalsConfig } from '@shared/utils/helper'
@@ -14,13 +13,7 @@ import {
   normalizeThemeSettings,
 } from '@shared/stores/app-settings'
 import type {
-  ChartDashboardCardKey,
-  ChartDashboardTemplate,
-  DetailMetricCardKey,
-  GeneralCardKey,
-  HomeQuickControlKey,
   Lang,
-  ManagedThemeMode,
   NodeViewMode,
   ThemeMode,
 } from '@shared/stores/app-settings'

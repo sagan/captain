@@ -3,12 +3,12 @@ import type { PermissionKey } from '@shared/services/auth.service'
 import type { NodeProviderMetadata } from '@shared/services/provider.service'
 import type { NodeData } from '@/stores/nodes'
 import { markRaw, ref, toValue, watch } from 'vue'
-import { CACHE_CONFIG } from '@shared/constants/cache'
-import { SharedCache } from '@shared/services/cache.service'
-import { buildNodeProviderMetadata, getNodeIps, getNodeProviderFingerprint, lookupNodeGeo } from '@shared/services/provider.service'
+import { getNodeProviderFingerprint, getSharedMetadataEntry, releaseSharedMetadataEntry, setProviderMetadataWrapper } from '@shared/composables/providerMetadata'
 import { useAppStore } from '@/stores/app'
 
 export type { NodeProviderMetadata } from '@shared/services/provider.service'
+
+setProviderMetadataWrapper(metadata => markRaw(metadata))
 
 interface UseNodeProviderMetadataOptions {
   nodes: MaybeRefOrGetter<NodeData[]>
@@ -16,66 +16,6 @@ interface UseNodeProviderMetadataOptions {
   enabled?: MaybeRefOrGetter<boolean>
   allowGeoLookup?: MaybeRefOrGetter<boolean>
   geoPermission?: PermissionKey
-}
-
-interface SharedCacheEntry {
-  metadata: NodeProviderMetadata
-  subscribers: Set<(metadata: NodeProviderMetadata) => void>
-  promise: Promise<void> | null
-}
-
-const sharedMetadataCache = new SharedCache<SharedCacheEntry>({
-  maxSize: CACHE_CONFIG.providerMetadata.maxSize,
-  ttl: CACHE_CONFIG.providerMetadata.ttl,
-  cleanupInterval: CACHE_CONFIG.cleanup.interval,
-  canEvict: entry => entry.subscribers.size === 0 && entry.promise === null,
-})
-
-function buildRawNodeProviderMetadata(...args: Parameters<typeof buildNodeProviderMetadata>): NodeProviderMetadata {
-  return markRaw(buildNodeProviderMetadata(...args))
-}
-
-function notifySharedEntry(entry: SharedCacheEntry): void {
-  for (const subscriber of entry.subscribers)
-    subscriber(entry.metadata)
-}
-
-function releaseSharedMetadataEntry(entry: SharedCacheEntry, subscriber: (metadata: NodeProviderMetadata) => void): void {
-  entry.subscribers.delete(subscriber)
-  sharedMetadataCache.sweep()
-}
-
-function getSharedMetadataEntry(node: NodeData, customAliases: string, allowGeoLookup: boolean): { fingerprint: string, entry: SharedCacheEntry } {
-  const fingerprint = getNodeProviderFingerprint(node, customAliases, allowGeoLookup)
-  const cached = sharedMetadataCache.get(fingerprint)
-  if (cached)
-    return { fingerprint, entry: cached }
-
-  const hasIps = allowGeoLookup && getNodeIps(node).length > 0
-  const entry: SharedCacheEntry = {
-    metadata: buildRawNodeProviderMetadata(node, customAliases, null, hasIps),
-    subscribers: new Set(),
-    promise: null,
-  }
-  sharedMetadataCache.set(fingerprint, entry)
-
-  if (hasIps) {
-    entry.promise = lookupNodeGeo(node)
-      .then((geo) => {
-        entry.metadata = buildRawNodeProviderMetadata(node, customAliases, geo, false)
-        notifySharedEntry(entry)
-      })
-      .catch(() => {
-        entry.metadata = buildRawNodeProviderMetadata(node, customAliases, null, false)
-        notifySharedEntry(entry)
-      })
-      .finally(() => {
-        entry.promise = null
-        sharedMetadataCache.sweep()
-      })
-  }
-
-  return { fingerprint, entry }
 }
 
 export function useNodeProviderMetadata(options: UseNodeProviderMetadataOptions) {

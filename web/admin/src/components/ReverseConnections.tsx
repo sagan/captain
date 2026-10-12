@@ -43,7 +43,7 @@ function Connections({ node }: { node: Node }) {
   const [sni, setSni] = useState('')
   const [advanced, setAdvanced] = useState<number | null>(null)
   useSettingsDirty(opened && dirty)
-  const details = useQueries({ queries: (nodes.data ?? []).filter(n => n.id !== node.id).map(n => ({ queryKey: ['node', String(n.id)], queryFn: () => api.get<Detail>(`/api/admin/nodes/${n.id}`), enabled: opened })) })
+  const details = useQueries({ queries: (nodes.data ?? []).filter(n => n.id !== node.id && n.proxy_allowed !== false).map(n => ({ queryKey: ['node', String(n.id)], queryFn: () => api.get<Detail>(`/api/admin/nodes/${n.id}`), enabled: opened })) })
   const detail = (id: number) => details.find(d => d.data?.node.id === id)?.data
   const name = (id: number) => nodes.data?.find(n => n.id === id)?.name ?? `#${id}`
   const edit = () => {
@@ -91,7 +91,7 @@ function Connections({ node }: { node: Node }) {
           <Button variant="light" disabled={!draft.length || !sni.trim()} onClick={() => modals.openConfirmModal({ title: t('reverse.applyCommon'), children: <Text>{t('reverse.applyHint', { count: draft.length })}</Text>, labels: { confirm: t('common.save'), cancel: t('common.cancel') }, onConfirm: () => { setDraft(ds => ds.map(d => withReverseTarget(d, sni.trim()))); setDirty(true) } })}>{t('reverse.applyCommon')}</Button>
         </Group>
         <Text size="xs" c="dimmed">{t('reverse.sniHint')}</Text>
-        <MultiSelect searchable label={t('reverse.transits')} value={draft.map(d => String(d.transit_id))} data={(nodes.data ?? []).filter(n => n.id !== node.id).map(n => ({ value: String(n.id), label: n.name, disabled: !detail(n.id) }))} onChange={select} />
+        <MultiSelect searchable label={t('reverse.transits')} value={draft.map(d => String(d.transit_id))} data={(nodes.data ?? []).filter(n => n.id !== node.id && n.proxy_allowed !== false).map(n => ({ value: String(n.id), label: n.name, disabled: !detail(n.id) }))} onChange={select} />
         {details.some(d => d.isError) && <Alert color="red">{t('reverse.loadFailed')}</Alert>}
         {draft.map((d, i) => {
           const dt = detail(d.transit_id); const gs = dt?.ingresses ?? []; const g = gs.find(g => g.id === d.ingress_id)

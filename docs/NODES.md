@@ -13,11 +13,47 @@ use it:
 curl -fsSL https://panel.example.com/api/agent/install.sh?pair=CODE | sh
 ```
 
-or, with Docker, a `docker run` line carrying `BOSUN_CAPTAIN` and
-`BOSUN_PAIR`. The installer fetches bosun, writes
+or the generated Docker Compose installer command (`--mode docker --web-upgrade`). The installer fetches bosun, writes
 `/etc/bosun/config.yaml`, creates the service, pairs with the panel and
 applies the state it receives. A node that pairs with an empty public
 address gets it filled in from the address it paired from.
+
+### Monitor-only nodes (Captain 1.18 / bosun 0.66)
+
+Select **Monitor only** when adding a node. The generated installer appends
+`--monitor-only` for both native and Compose installations. It installs bosun
+without downloading or initializing proxy cores. Native installs also skip
+installing nftables/iproute2 solely for proxy features. Host resource collection,
+interface traffic accounting, latency probes, alerts, the public status page and
+bosun upgrades remain available.
+
+Nodes have a mode badge/filter and a mode card in their details. Full
+administrators can switch modes. Existing nodes remain full nodes; switching
+requires a fresh mode-capable report (bosun v0.66.0+). Saving the requested mode
+is not proof it is running: the card shows the last reported mode and errors.
+
+Before switching a full node to monitor-only, remove all inbounds (even disabled
+ones), forwards, managed reverse links and node proxy policies/overrides. Wait
+for queued jobs to finish. Historical monitoring data and downloaded core files
+are retained; this action is not an uninstall. The agent stops cores, checkpoints
+traffic, clears its proxy network helpers, persists the mode and restarts.
+
+Switching back enables the configured core adapters after restart. Full mode
+needs the normal host prerequisites, including nftables/iproute2 for isolation
+and shaping; missing prerequisites are reported by the doctor. If a manually
+written monitor configuration has no core definitions, add them before switching.
+The UI enables proxy controls only after the agent confirms the requested mode
+and revision. The API and agent independently refuse proxy state and core/WARP
+jobs while monitoring; global users, proxy credentials and proxy configuration
+are never included in monitor-only desired state.
+
+The runtime mode is stored in the private `data_dir/node-mode` file so Docker
+read-only config mounts work. Requests and acknowledgements have monotonic
+revisions; the local revision is bound to the authenticated panel identity so
+re-pairing cannot inherit another panel's generation. Late requests cannot undo
+a mode change. Once enabled, the updater refuses releases older than v0.66.0,
+which would ignore this guard. New fields are additive; old full-mode nodes
+continue working without mode support.
 
 A node can be given a **host name** (Node → Domain, e.g.
 `jp1.example.com`): new inbound recipes use it as the TLS name and entries

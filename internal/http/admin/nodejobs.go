@@ -19,6 +19,8 @@ import (
 var jobKinds = map[string]bool{spec.CoreManagementKind: true, "reality_scan": true, "warp_register": true, "rollback": true, spec.NetworkDiagnosticKind: true}
 
 func (h *handlers) createNodeJob(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	id, okID := pathID(r)
 	if !okID {
 		fail(w, http.StatusBadRequest, "bad id")
@@ -35,6 +37,9 @@ func (h *handlers) createNodeJob(w http.ResponseWriter, r *http.Request) {
 	n, err := h.Store.NodeByID(r.Context(), id)
 	if err != nil {
 		fail(w, http.StatusNotFound, "node not found")
+		return
+	}
+	if (in.Kind == spec.CoreManagementKind || in.Kind == "warp_register" || in.Kind == "reality_scan") && !h.requireProxyNode(w, r, id) {
 		return
 	}
 	jobID := auth.Token(12)

@@ -116,11 +116,22 @@ func (a *AgentState) withhold(over map[int64]bool, at time.Time) map[int64]bool 
 // everyone use the node-level user list (all users with a usable
 // subscription); inbounds restricted to a group carry their own scoped list.
 func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*agentproto.State, error) {
+	// Long-poll callers can hold a node loaded before a mode change.
+	var err error
+	n, err = a.Store.NodeByID(ctx, n.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !store.NodeProxyAllowed(n) {
+		st := &agentproto.State{Node: spec.Node{ID: strconv.FormatInt(n.ID, 10), Mode: n.Mode, ModeRevision: n.ModeRevision}, Users: []spec.User{}, Forwards: []spec.Forward{}, PullSeconds: a.PullSeconds, PushSeconds: a.PushSeconds}
+		return a.finishState(ctx, n, st)
+	}
+
 	inbounds, err := a.Store.InboundsByNode(ctx, n.ID)
 	if err != nil {
 		return nil, err
 	}
-	node := spec.Node{ID: strconv.FormatInt(n.ID, 10)}
+	node := spec.Node{ID: strconv.FormatInt(n.ID, 10), Mode: n.Mode, ModeRevision: n.ModeRevision}
 	node.EgressUpstreams, err = a.Store.NodeEgressUpstreams(ctx, n.ID)
 	if err != nil {
 		return nil, err
@@ -320,6 +331,10 @@ func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*
 			st.Forwards = append(st.Forwards, f.Forward)
 		}
 	}
+	return a.finishState(ctx, n, st)
+}
+
+func (a *AgentState) finishState(ctx context.Context, n *domain.Node, st *agentproto.State) (*agentproto.State, error) {
 	if a.Probe != nil {
 		st.Probe = a.Probe.AgentConfig(ctx, n.ID)
 	}
@@ -346,6 +361,9 @@ func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*
 	}
 	if jobs, err := a.Store.PendingNodeJobs(ctx, n.ID); err == nil {
 		for _, j := range jobs {
+			if !store.NodeProxyAllowed(n) && (j.Kind == spec.CoreManagementKind || j.Kind == "warp_register" || j.Kind == "reality_scan") {
+				continue
+			}
 			st.Jobs = append(st.Jobs, agentproto.Job{ID: j.ID, Kind: j.Kind, Params: j.Params})
 		}
 	}

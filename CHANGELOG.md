@@ -6,6 +6,8 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
+- **v1.18.0** (2026-10-11) — Add explicit monitor-only nodes, generated lightweight install commands, mode badges/filtering and administrator-controlled transitions with fresh agent acknowledgement. Preserve existing full nodes; refuse proxy writes/state while monitoring, require idle resources before switching, and keep monitoring and upgrades. Adds migration 72 and six-language controls (requires bosun v0.66.0+).
+
 - **v1.17.0** (2026-10-10) — Add optional host-managed Docker web upgrades through a dedicated Unix socket, with fixed official image sources, stopped-data backups, persisted progress and verification of the running application's target version. Keep Docker daemon access outside the web process.
   - Add explicit installer `upgrade` and `enable-web-upgrade` commands, preserve deployment configuration during upgrades, and complete host-side uninstall of installer-managed binary/Compose deployments. Default uninstall removes application configuration/data/backups; `--keep-data` remains available. Preserve unrelated containers, shared volumes/networks and system packages; report incomplete cleanup instead of ignoring errors.
 

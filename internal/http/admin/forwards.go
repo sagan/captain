@@ -31,6 +31,9 @@ func (h *handlers) getNodeForwards(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) putNodeForwards(w http.ResponseWriter, r *http.Request) {
 	h.Store.Topology.Lock()
 	defer h.Store.Topology.Unlock()
+	if !h.requireProxyNode(w, r, idOf(r)) {
+		return
+	}
 	id := idOf(r)
 	var in struct{ Forwards []store.NodeForward }
 	if !readJSON(w, r, &in) {

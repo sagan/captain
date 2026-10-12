@@ -20,38 +20,46 @@ import (
 )
 
 type nodeView struct {
-	ID                 int64      `json:"id"`
-	Name               string     `json:"name"`
-	PublicAddr         string     `json:"public_addr"`
-	InternalAddr       string     `json:"internal_addr"`
-	V6Addr             string     `json:"v6_addr"`
-	Domain             string     `json:"domain"`
-	DomainShared       bool       `json:"domain_shared"`
-	DomainConflict     bool       `json:"domain_conflict"`
-	MonitorURL         string     `json:"monitor_url"`
-	DecoyEnabled       bool       `json:"decoy_enabled"`
-	DecoyUpstream      string     `json:"decoy_upstream"`
-	UserSpeedLimitMbps int        `json:"user_speed_limit_mbps"`
-	MitaQuotas         bool       `json:"mita_quotas"`
-	EgressByIngress    bool       `json:"egress_by_ingress"`
-	DStatusSID         string     `json:"dstatus_sid"`
-	Version            string     `json:"version"`
-	Platform           string     `json:"platform"`
-	Hostname           string     `json:"hostname"`
-	LastSeenAt         *time.Time `json:"last_seen_at"`
-	Online             bool       `json:"online"`
-	Paired             bool       `json:"paired"`
-	PairCode           string     `json:"pair_code,omitempty"`
-	TrafficToday       int64      `json:"traffic_today_bytes"`
-	Inbounds           int        `json:"inbounds"`
-	UpgradeTo          string     `json:"upgrade_to,omitempty"` // pending upgrade request
-	Outdated           bool       `json:"outdated"`             // reported version older than the latest bosun release
-	CertProblem        bool       `json:"cert_problem"`         // an automatic certificate failed or expires soon
-	DoctorFail         bool       `json:"doctor_fail"`          // the node's last self-check had failures
+	ModeRevision         uint64        `json:"mode_revision"`
+	ReportedModeRevision uint64        `json:"reported_mode_revision"`
+	ModeSwitchAvailable  bool          `json:"mode_switch_available"`
+	ProxyAllowed         bool          `json:"proxy_allowed"`
+	Mode                 spec.NodeMode `json:"mode"`
+	ReportedMode         spec.NodeMode `json:"reported_mode"`
+	ModeReportedAt       *time.Time    `json:"mode_reported_at,omitempty"`
+	ModeError            string        `json:"mode_error,omitempty"`
+	ID                   int64         `json:"id"`
+	Name                 string        `json:"name"`
+	PublicAddr           string        `json:"public_addr"`
+	InternalAddr         string        `json:"internal_addr"`
+	V6Addr               string        `json:"v6_addr"`
+	Domain               string        `json:"domain"`
+	DomainShared         bool          `json:"domain_shared"`
+	DomainConflict       bool          `json:"domain_conflict"`
+	MonitorURL           string        `json:"monitor_url"`
+	DecoyEnabled         bool          `json:"decoy_enabled"`
+	DecoyUpstream        string        `json:"decoy_upstream"`
+	UserSpeedLimitMbps   int           `json:"user_speed_limit_mbps"`
+	MitaQuotas           bool          `json:"mita_quotas"`
+	EgressByIngress      bool          `json:"egress_by_ingress"`
+	DStatusSID           string        `json:"dstatus_sid"`
+	Version              string        `json:"version"`
+	Platform             string        `json:"platform"`
+	Hostname             string        `json:"hostname"`
+	LastSeenAt           *time.Time    `json:"last_seen_at"`
+	Online               bool          `json:"online"`
+	Paired               bool          `json:"paired"`
+	PairCode             string        `json:"pair_code,omitempty"`
+	TrafficToday         int64         `json:"traffic_today_bytes"`
+	Inbounds             int           `json:"inbounds"`
+	UpgradeTo            string        `json:"upgrade_to,omitempty"` // pending upgrade request
+	Outdated             bool          `json:"outdated"`             // reported version older than the latest bosun release
+	CertProblem          bool          `json:"cert_problem"`         // an automatic certificate failed or expires soon
+	DoctorFail           bool          `json:"doctor_fail"`          // the node's last self-check had failures
 }
 
 func toNodeView(n *domain.Node, at time.Time) nodeView {
-	return nodeView{
+	return nodeView{ModeRevision: n.ModeRevision, ReportedModeRevision: n.ReportedModeRevision, ModeSwitchAvailable: !n.Paired || (n.ReportedMode != "" && n.ModeReportedAt != nil && at.Sub(*n.ModeReportedAt) < 3*time.Minute), ProxyAllowed: store.NodeProxyAllowed(n), Mode: n.Mode.Effective(), ReportedMode: n.ReportedMode, ModeReportedAt: n.ModeReportedAt, ModeError: n.ModeError,
 		ID: n.ID, Name: n.Name, PublicAddr: n.PublicAddr, InternalAddr: n.InternalAddr, V6Addr: n.V6Addr, Domain: n.Domain, DomainShared: n.DomainShared, MonitorURL: n.MonitorURL, DecoyEnabled: n.DecoyEnabled, DecoyUpstream: n.DecoyUpstream, UserSpeedLimitMbps: n.UserSpeedLimitMbps, MitaQuotas: n.MitaQuotas, EgressByIngress: n.EgressByIngress, DStatusSID: n.DStatusSID,
 		Version: n.Version, Platform: n.Platform, Hostname: n.Hostname, LastSeenAt: n.LastSeenAt,
 		Online: n.LastSeenAt != nil && at.Sub(*n.LastSeenAt) < 3*time.Minute, Paired: n.Paired, PairCode: n.PairCode,
@@ -106,6 +114,7 @@ func (h *handlers) listNodes(w http.ResponseWriter, r *http.Request) {
 }
 
 type nodeInput struct {
+	Mode                                                       *spec.NodeMode
 	Name, PublicAddr, InternalAddr, V6Addr, Domain, MonitorURL string
 	DomainShared                                               *bool
 	DecoyEnabled                                               bool
@@ -125,6 +134,13 @@ func (h *handlers) createNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	n := &domain.Node{Name: in.Name, PublicAddr: in.PublicAddr, InternalAddr: in.InternalAddr, V6Addr: in.V6Addr, Domain: strings.ToLower(strings.TrimSpace(in.Domain)), MonitorURL: in.MonitorURL, DStatusSID: strings.TrimSpace(in.DStatusSID)}
+	if in.Mode != nil {
+		n.Mode = *in.Mode
+	}
+	if n.Mode.Validate() != nil {
+		fail(w, 400, "invalid node mode")
+		return
+	}
 	if in.DomainShared != nil {
 		n.DomainShared = *in.DomainShared
 	}
@@ -191,6 +207,14 @@ func (h *handlers) updateNode(w http.ResponseWriter, r *http.Request) {
 		nodeSaveError(w, err)
 		return
 	}
+	if in.Mode != nil && in.Mode.Effective() != old.Mode {
+		fail(w, 400, "use the node mode endpoint to switch modes")
+		return
+	}
+	if !store.NodeProxyAllowed(old) && (n.DecoyEnabled || n.UserSpeedLimitMbps != 0 || n.MitaQuotas || n.EgressByIngress) {
+		fail(w, 409, spec.ErrMonitorOnly.Error())
+		return
+	}
 	n.DomainShared = old.DomainShared
 	if in.DomainShared != nil {
 		n.DomainShared = *in.DomainShared
@@ -233,6 +257,8 @@ func (h *handlers) deleteNode(w http.ResponseWriter, r *http.Request) {
 
 // repairNode issues a new pairing code and revokes the old token.
 func (h *handlers) repairNode(w http.ResponseWriter, r *http.Request) {
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
 	id, okID := pathID(r)
 	if !okID {
 		fail(w, http.StatusBadRequest, "bad id")
@@ -268,6 +294,9 @@ func (h *handlers) createInbound(w http.ResponseWriter, r *http.Request) {
 	var ib domain.Inbound
 	if !okID || !decode(r, &ib) || ib.Tag == "" || ib.Protocol == "" || ib.Port == 0 {
 		fail(w, http.StatusBadRequest, "tag, protocol and port are required")
+		return
+	}
+	if !h.requireProxyNode(w, r, nodeID) {
 		return
 	}
 	ib.NodeID = nodeID
@@ -345,6 +374,9 @@ func (h *handlers) updateInbound(w http.ResponseWriter, r *http.Request) {
 	}
 	if ib.Settings.Reverse != nil {
 		fail(w, 400, "use the reverse connection wizard")
+		return
+	}
+	if !h.requireProxyNode(w, r, ib.NodeID) {
 		return
 	}
 	fillInboundSecrets(&ib)

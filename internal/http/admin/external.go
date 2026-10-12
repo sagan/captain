@@ -192,6 +192,9 @@ func (h *handlers) getNodeRouting(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) putNodeRouting(w http.ResponseWriter, r *http.Request) {
 	h.Store.Topology.Lock()
 	defer h.Store.Topology.Unlock()
+	if !h.requireProxyNode(w, r, idOf(r)) {
+		return
+	}
 	var nr store.NodeRouting
 	if !readJSON(w, r, &nr) {
 		return
@@ -320,6 +323,9 @@ func (h *handlers) getNodeOverrides(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) putNodeOverrides(w http.ResponseWriter, r *http.Request) {
 	h.Store.Topology.Lock()
 	defer h.Store.Topology.Unlock()
+	if !h.requireProxyNode(w, r, idOf(r)) {
+		return
+	}
 	id, okID := pathID(r)
 	var in map[string]string
 	if !okID {

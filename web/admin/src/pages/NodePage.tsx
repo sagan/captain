@@ -1,3 +1,4 @@
+import { NodeModeCard } from '../components/NodeModeCard'
 import { DNSHealthCard } from '../components/DNSHealthCard'
 import { NodeDomainFields } from '../components/NodeDomainFields'
 import { useNodeDomainCheck } from '../lib/use-node-domain-check'
@@ -64,6 +65,7 @@ export default function NodePage() {
   if (!d) return null
   const n = d.node
   const host = d.status?.host
+  const proxyAllowed = n.proxy_allowed !== false
   return (
     <>
       {(n.domain_shared || n.domain_conflict) && <Alert mb="md" color={n.domain_shared ? 'blue' : 'orange'} title={t(n.domain_shared ? 'nodes.domainExternal' : 'nodes.domainDuplicate')}>{t(n.domain_shared ? 'nodes.domainSharedHint' : 'nodes.domainLegacyHint')}</Alert>}
@@ -76,14 +78,15 @@ export default function NodePage() {
         <Button color="red" variant="light" size="xs" leftSection={<IconTrash size={14} />} onClick={() => setDeletingNode(true)}>{t('common.delete')}</Button>
       </>} />
 
-      {me?.role === 'admin' && <CoreManagementCard inventory={d.status?.core_inventory} online={n.online} canWrite inbounds={d.inbounds.filter(ib => ib.Enabled).map(ib => ib.Tag)} onAction={async request => {
+      <NodeModeCard node={n} canWrite={me?.role === 'admin'} />
+      {proxyAllowed && me?.role === 'admin' && <CoreManagementCard inventory={d.status?.core_inventory} online={n.online} canWrite inbounds={d.inbounds.filter(ib => ib.Enabled).map(ib => ib.Tag)} onAction={async request => {
         const result = await runNodeJob<CoreInventory>(n.id, 'core_manage', request, 920_000)
         qc.setQueryData<Detail>(['node', id], old => old?.status ? { ...old, status: { ...old.status, core_inventory: result } } : old)
         invalidate()
         qc.invalidateQueries({ queryKey: ['core-options'] })
       }} />}
-      <NodeWorkflow node={n} inbounds={d.inbounds} cores={d.status?.cores} />
-      {!n.paired && n.pair_code && <Card mb="lg"><Title order={5} mb="sm">{t('nodes.pairTitle')}</Title><PairCodeBox code={n.pair_code} /></Card>}
+      {proxyAllowed && <NodeWorkflow node={n} inbounds={d.inbounds} cores={d.status?.cores} />}
+      {!n.paired && n.pair_code && <Card mb="lg"><Title order={5} mb="sm">{t('nodes.pairTitle')}</Title><PairCodeBox code={n.pair_code} mode={n.mode} /></Card>}
       {n.paired && <NodeProbeCard key={n.id} nodeID={n.id} reportedHost={host} />}
       <Card mb="lg"><MetadataEditor endpoint={`/api/admin/nodes/${n.id}/metadata`} /></Card>
       {d.status?.doctor && <DoctorCard report={d.status.doctor} />}
@@ -124,7 +127,7 @@ export default function NodePage() {
       </Card>
 
 
-      <Card p={0} id="node-inbounds" style={{ scrollMarginTop: 80 }}>
+      {proxyAllowed && <><Card p={0} id="node-inbounds" style={{ scrollMarginTop: 80 }}>
         <Group justify="space-between" p="md" pb="xs">
           <div><Text fw={600}>{t('inbounds.title')}</Text><Text size="xs" c="dimmed">{t('inbounds.subtitle')}</Text></div>
           <Group gap="xs"><Button component={Link} to={`/entries?node=${n.id}`} variant="light" size="xs">{t('entries.title')}</Button><Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setEditing('new')}>{t('inbounds.create')}</Button></Group>
@@ -162,6 +165,7 @@ export default function NodePage() {
           <Accordion.Item value="forwards"><Accordion.Control><Text size="sm" fw={600}>{t('forwards.title')}</Text><Text size="xs" c="dimmed">{t('nodes.advForwardsHint')}</Text></Accordion.Control><Accordion.Panel><ForwardsCard key={n.id} embedded node={n} ingresses={d.ingresses ?? []} /></Accordion.Panel></Accordion.Item>
         </Accordion>
       </Card>
+      </>}
       <Modal opened={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? t('inbounds.create') : t('common.edit')} size="xl">
         {editing !== null && <InboundForm nodeID={n.id} decoyDomain={n.decoy_enabled ? n.domain : undefined} domain={n.domain} lineOnly={!n.public_addr && !n.domain} ingresses={d.ingresses ?? []} usedPorts={d.inbounds.filter((ib) => editing === 'new' || ib.ID !== (editing as Inbound).ID).map((ib) => ib.Port)} initial={toValues(editing === 'new' ? undefined : editing)} groups={groups.data ?? []} busy={save.isPending} onSubmit={(v) => save.mutate(v)} onCancel={() => setEditing(null)} />}
       </Modal>
@@ -173,15 +177,16 @@ export default function NodePage() {
           <Group grow><TextInput label={t('nodes.internalAddr')} {...nodeForm.getInputProps('InternalAddr')} /><TextInput label={t('nodes.v6Addr')} {...nodeForm.getInputProps('V6Addr')} /></Group>
           <TextInput label={t('nodes.monitorUrl')} description={t('nodes.monitorUrlHint')} placeholder="https://komari.example.com/..." {...nodeForm.getInputProps('MonitorURL')} />
           <TextInput label={t('nodes.dstatusSid')} description={t('nodes.dstatusSidHint')} {...nodeForm.getInputProps('DStatusSID')} />
-          <NumberInput label={t('nodes.speedLimit')} description={t('nodes.speedLimitHint')} min={0} {...nodeForm.getInputProps('UserSpeedLimitMbps')} />
+          {proxyAllowed && <><NumberInput label={t('nodes.speedLimit')} description={t('nodes.speedLimitHint')} min={0} {...nodeForm.getInputProps('UserSpeedLimitMbps')} />
           <Switch label={t('nodes.mitaQuotas')} description={t('nodes.mitaQuotasHint')} {...nodeForm.getInputProps('MitaQuotas', { type: 'checkbox' })} />
           <Switch label={t('nodes.egressByIngress')} description={t('nodes.egressByIngressHint')} {...nodeForm.getInputProps('EgressByIngress', { type: 'checkbox' })} />
           <Switch label={t('nodes.decoy')} description={t('nodes.decoyHint')} disabled={!nodeForm.values.Domain} {...nodeForm.getInputProps('DecoyEnabled', { type: 'checkbox' })} />
           {nodeForm.values.DecoyEnabled && <TextInput label={t('nodes.decoyUpstream')} description={t('nodes.decoyUpstreamHint')} placeholder="https://www.example.com" {...nodeForm.getInputProps('DecoyUpstream')} />}
+          </>}
           <Group justify="flex-end"><Button variant="default" onClick={() => setEditNode(false)}>{t('common.cancel')}</Button><Button type="submit" disabled={domainCheck.blocked} loading={saveNode.isPending}>{t('common.save')}</Button></Group>
         </Stack></form>
       </Modal>
-      <Modal opened={pair !== null} onClose={() => setPair(null)} title={t('nodes.pairTitle')} size="lg">{pair && <PairCodeBox code={pair} />}</Modal>
+      <Modal opened={pair !== null} onClose={() => setPair(null)} title={t('nodes.pairTitle')} size="lg">{pair && <PairCodeBox code={pair} mode={n.mode} />}</Modal>
     </>
   )
 }

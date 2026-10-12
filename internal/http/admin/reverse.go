@@ -153,6 +153,9 @@ func (h *handlers) saveReverse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(in.Links) > 0 {
+		if !h.requireProxyNode(w, r, exitID) {
+			return
+		}
 		ids := []int64{exitID}
 		for _, v := range in.Links {
 			ids = append(ids, v.TransitID)
@@ -199,6 +202,9 @@ func (h *handlers) saveReverse(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		seen[v.TransitID] = true
+		if !h.requireProxyNode(w, r, v.TransitID) {
+			return
+		}
 		if _, err := h.Store.NodeByID(r.Context(), v.TransitID); err != nil {
 			fail(w, 400, "transit node not found")
 			return

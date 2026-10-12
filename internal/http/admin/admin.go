@@ -110,6 +110,7 @@ func Register(mux *http.ServeMux, d Deps) {
 	mux.HandleFunc("GET /api/admin/nodes/domain-check", h.requireAdmin(h.checkNodeDomain))
 	mux.HandleFunc("POST /api/admin/nodes", h.requireAdmin(h.createNode))
 	mux.HandleFunc("GET /api/admin/nodes/{id}", h.requireAdmin(h.getNode))
+	mux.HandleFunc("PUT /api/admin/nodes/{id}/mode", h.requireAdmin(h.setNodeMode))
 	mux.HandleFunc("PATCH /api/admin/nodes/{id}", h.requireAdmin(h.updateNode))
 	mux.HandleFunc("DELETE /api/admin/nodes/{id}", h.requireAdmin(h.deleteNode))
 	mux.HandleFunc("POST /api/admin/nodes/{id}/removal", h.requireAdmin(h.startNodeRemoval))

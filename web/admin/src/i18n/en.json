@@ -2246,5 +2246,22 @@
       "created": "Create",
       "updated": "Update"
     }
+  },
+  "nodeMode": {
+    "title": "Node mode",
+    "monitor": "Monitor only",
+    "full": "Full node",
+    "monitorHint": "Monitor availability, system resources, network speed, traffic and latency without running proxy cores or port forwarding services. Core files downloaded before switching are retained.",
+    "fullHint": "Monitoring and proxy services are available.",
+    "installHint": "Monitor server availability, CPU, memory, disks, network speed and traffic, with latency checks and alerts. No proxy cores are downloaded or started, and proxy and port forwarding services are unavailable. Switch to a full node later from node details.",
+    "toFull": "Switch to full node",
+    "toMonitor": "Switch to monitor only",
+    "confirmFull": "The agent will restart and enable its configured proxy cores. Full mode requires the host network tools (nftables/iproute2); missing prerequisites appear in diagnostics.",
+    "confirmMonitor": "Remove all inbounds (including disabled ones), forwards, reverse links and proxy policies first. Monitoring history and existing core files are retained. The agent will restart.",
+    "requested": "Mode change requested.",
+    "pending": "Waiting for the node to apply the change. Last reported mode: {{mode}}.",
+    "upgradeHint": "Mode changes require an online node reporting mode support. Upgrade bosun and wait for a fresh report.",
+    "failed": "Mode change failed",
+    "installOnly": "Install monitoring only (no proxy cores)"
   }
 }

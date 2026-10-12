@@ -140,14 +140,21 @@ func (s *Subscription) Usable(t time.Time) bool {
 }
 
 type Node struct {
-	ID           int64
-	Name         string
-	PublicAddr   string
-	InternalAddr string
-	V6Addr       string
-	Domain       string // host name under a registered domain, e.g. jp1.example.com
-	DomainShared bool   // shared/external DNS; never automatically point this name at a node
-	MonitorURL   string
+	ModeRevision         uint64
+	ReportedModeRevision uint64
+	ModeManaged          bool
+	Mode                 spec.NodeMode
+	ReportedMode         spec.NodeMode
+	ModeReportedAt       *time.Time
+	ModeError            string
+	ID                   int64
+	Name                 string
+	PublicAddr           string
+	InternalAddr         string
+	V6Addr               string
+	Domain               string // host name under a registered domain, e.g. jp1.example.com
+	DomainShared         bool   // shared/external DNS; never automatically point this name at a node
+	MonitorURL           string
 	// DStatusSID is this node's server id in a DStatus panel, needed only
 	// when the DStatus setting runs in active (reporting) mode.
 	DStatusSID string

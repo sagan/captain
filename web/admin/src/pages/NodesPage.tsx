@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Code, Group, Modal, Stack, Table, Text, TextInput, Anchor, ActionIcon, Tooltip, Select } from '@mantine/core'
+import { Badge, Button, Card, Code, Group, Modal, Stack, Table, Text, TextInput, Anchor, ActionIcon, Tooltip, Select, Switch } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { useDisclosure } from '@mantine/hooks'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -17,12 +17,12 @@ import { NodeDomainFields } from '../components/NodeDomainFields'
 import { useNodeDomainCheck } from '../lib/use-node-domain-check'
 import { useAuth } from '../lib/auth'
 
-export function PairCodeBox({ code }: { code: string }) {
+export function PairCodeBox({ code, mode = 'full' }: { code: string; mode?: 'full' | 'monitor' }) {
   const { t } = useTranslation()
   const origin = window.location.origin
   const install = `curl -fsSL "${origin}/api/agent/install.sh?pair=${code}" | sh`
   const docker = `${install} -s -- --mode docker --web-upgrade`
-  const snippet = `panel:\n  driver: captain\n  captain:\n    url: ${origin}\n    pair_code: ${code}`
+  const snippet = `${mode === 'monitor' ? 'node_mode: monitor\n' : ''}panel:\n  driver: captain\n  captain:\n    url: ${origin}\n    pair_code: ${code}`
   return (
     <Stack gap="xs">
       <Text size="sm" c="dimmed">{t('nodes.pairHint')}</Text>
@@ -47,11 +47,11 @@ export default function NodesPage() {
   const isAdmin = useAuth().me?.role === 'admin'
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['nodes'], queryFn: () => api.get<Node[]>('/api/admin/nodes'), refetchInterval: 15_000 })
-  const [status, setStatus] = useURLChoice('status', ['all', 'offline', 'unpaired', 'doctor'], 'all')
-  const filtered = (q.data ?? []).filter(n => status === 'all' || (status === 'offline' && n.paired && !n.online) || (status === 'unpaired' && !n.paired) || (status === 'doctor' && n.paired && n.doctor_fail))
+  const [status, setStatus] = useURLChoice('status', ['all', 'offline', 'unpaired', 'doctor', 'monitor'], 'all')
+  const filtered = (q.data ?? []).filter(n => status === 'all' || (status === 'offline' && n.paired && !n.online) || (status === 'unpaired' && !n.paired) || (status === 'doctor' && n.paired && n.doctor_fail) || (status === 'monitor' && n.mode === 'monitor'))
   const [opened, { open, close }] = useDisclosure()
   const [created, setCreated] = useState<Node | null>(null)
-  const form = useForm({ initialValues: { Name: '', PublicAddr: '', InternalAddr: '', V6Addr: '', Domain: '', DomainShared: false, MonitorURL: '' } })
+  const form = useForm({ initialValues: { Name: '', PublicAddr: '', InternalAddr: '', V6Addr: '', Domain: '', DomainShared: false, MonitorURL: '', Mode: 'full' } })
   const domainCheck = useNodeDomainCheck(form.values.Domain, form.values.DomainShared, undefined, opened && !created)
   const sys = useQuery({ queryKey: ['update'], queryFn: () => api.get<SystemUpdate>('/api/admin/system/update'), enabled: isAdmin, staleTime: 10 * 60_000, retry: false })
   const rollback = useMutation({ mutationFn: (id: number) => api.post(`/api/admin/nodes/${id}/jobs`, { kind: 'rollback', params: {} }), onSuccess: () => { toast.ok(t('nodes.rollbackQueued')); qc.invalidateQueries({ queryKey: ['nodes'] }) }, onError: toast.err })
@@ -69,7 +69,7 @@ export default function NodesPage() {
         {isAdmin && outdated > 0 && <Button variant="light" color="orange" leftSection={<IconArrowUp size={16} />} loading={upgradeAll.isPending} onClick={() => modals.openConfirmModal({ title: t('nodes.upgradeAll', { count: outdated }), children: <Text size="sm">{t('nodes.upgradeAllConfirm', { count: outdated, version: sys.data?.bosun_latest ?? '' })}</Text>, labels: { confirm: t('nodes.upgradeAll', { count: outdated }), cancel: t('common.cancel') }, confirmProps: { color: 'orange' }, onConfirm: () => upgradeAll.mutate() })}>{t('nodes.upgradeAll', { count: outdated })}</Button>}
         <Button leftSection={<IconPlus size={16} />} onClick={open}>{t('nodes.create')}</Button>
       </>} />
-      <Select mb="md" maw={320} label={t('monitoring.status')} value={status} onChange={value => setStatus(value ?? 'all')} allowDeselect={false} data={[{ value: 'all', label: t('common.all') }, { value: 'offline', label: t('nodes.offline') }, { value: 'unpaired', label: t('nodes.unpaired') }, { value: 'doctor', label: t('dashboard.lastCheckFailed') }]} />
+      <Select mb="md" maw={320} label={t('monitoring.status')} value={status} onChange={value => setStatus(value ?? 'all')} allowDeselect={false} data={[{ value: 'all', label: t('common.all') }, { value: 'offline', label: t('nodes.offline') }, { value: 'unpaired', label: t('nodes.unpaired') }, { value: 'doctor', label: t('dashboard.lastCheckFailed') }, { value: 'monitor', label: t('nodeMode.monitor') }]} />
       <Card p={0}>
         <Table.ScrollContainer minWidth={720}>
           <Table>
@@ -80,7 +80,7 @@ export default function NodesPage() {
             <Table.Tbody>
               {filtered.map((n) => (
                 <Table.Tr key={n.id}>
-                  <Table.Td><Anchor component={Link} to={`/nodes/${n.id}`} fw={600}>{n.name}</Anchor><Text size="xs" c="dimmed">{n.hostname}</Text></Table.Td>
+                  <Table.Td><Anchor component={Link} to={`/nodes/${n.id}`} fw={600}>{n.name}</Anchor>{n.mode === 'monitor' && <Badge ml="xs" size="xs" color="cyan">{t('nodeMode.monitor')}</Badge>}<Text size="xs" c="dimmed">{n.hostname}</Text></Table.Td>
                   <Table.Td><Group gap={4}><NodeStatus n={n} />{n.cert_problem && <Badge color="red" size="xs" title={t('nodes.certProblem')}>TLS</Badge>}{n.doctor_fail && <Badge color="red" size="xs" variant="light" title={t('nodes.doctorFailHint')}>{t('nodes.doctor')}</Badge>}</Group></Table.Td>
                   <Table.Td><Code>{n.public_addr || '—'}</Code><Text size="xs" c="dimmed">{n.domain}</Text>{(n.domain_shared || n.domain_conflict) && <Tooltip label={t(n.domain_shared ? 'nodes.domainSharedHint' : 'nodes.domainLegacyHint')}><Badge size="xs" color={n.domain_shared ? 'blue' : 'orange'}>{t(n.domain_shared ? 'nodes.domainExternal' : 'nodes.domainDuplicate')}</Badge></Tooltip>}</Table.Td>
                   <Table.Td>{n.inbounds}</Table.Td>
@@ -102,9 +102,10 @@ export default function NodesPage() {
         </Table.ScrollContainer>
       </Card>
       <Modal opened={opened} onClose={() => { close(); setCreated(null) }} title={created ? t('nodes.pairTitle') : t('nodes.create')} size="lg">
-        {created ? <PairCodeBox code={created.pair_code ?? ''} /> : (
+        {created ? <PairCodeBox code={created.pair_code ?? ''} mode={created.mode} /> : (
           <form onSubmit={form.onSubmit((v) => create.mutate(v))}>
             <Stack>
+              <Switch label={t('nodeMode.installOnly')} description={t('nodeMode.installHint')} checked={form.values.Mode === 'monitor'} onChange={e => form.setFieldValue('Mode', e.currentTarget.checked ? 'monitor' : 'full')} />
               <TextInput label={t('nodes.name')} placeholder="jp-1" required {...form.getInputProps('Name')} />
               <TextInput label={t('nodes.publicAddr')} placeholder="203.0.113.5" {...form.getInputProps('PublicAddr')} />
               <NodeDomainFields domain={form.values.Domain} shared={form.values.DomainShared} onDomainChange={v => form.setFieldValue('Domain', v)} onSharedChange={v => form.setFieldValue('DomainShared', v)} check={domainCheck} />

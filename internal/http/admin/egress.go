@@ -28,6 +28,9 @@ func (h *handlers) getNodeEgress(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) putNodeEgress(w http.ResponseWriter, r *http.Request) {
 	h.Store.Topology.Lock()
 	defer h.Store.Topology.Unlock()
+	if !h.requireProxyNode(w, r, idOf(r)) {
+		return
+	}
 	var in struct {
 		Upstreams *[]spec.EgressUpstream `json:"upstreams"`
 	}

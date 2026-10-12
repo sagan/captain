@@ -12,17 +12,22 @@ import (
 	"github.com/zeptop-dev/captain/internal/domain"
 )
 
-const nodeCols = "id, name, token_hash, pair_code, public_addr, internal_addr, v6_addr, domain, monitor_url, version, platform, hostname, last_seen_at, applied_revision, upgrade_to, created_at, decoy_enabled, decoy_upstream, user_speed_limit_mbps, mita_quotas, egress_by_ingress, dstatus_sid, domain_shared"
+const nodeCols = "id, name, token_hash, pair_code, public_addr, internal_addr, v6_addr, domain, monitor_url, version, platform, hostname, last_seen_at, applied_revision, upgrade_to, created_at, decoy_enabled, decoy_upstream, user_speed_limit_mbps, mita_quotas, egress_by_ingress, dstatus_sid, domain_shared, node_mode, reported_mode, mode_reported_at, mode_error, mode_managed, mode_revision, reported_mode_revision"
 
 func scanNode(row interface{ Scan(...any) error }) (*domain.Node, error) {
 	var n domain.Node
 	var tokenHash, pairCode sql.NullString
 	var lastSeen sql.NullInt64
-	var created int64
-	var decoy, mitaQ, egress, shared int
+	var created, modeReported int64
+	var decoy, mitaQ, egress, shared, modeManaged int
 	if err := row.Scan(&n.ID, &n.Name, &tokenHash, &pairCode, &n.PublicAddr, &n.InternalAddr, &n.V6Addr, &n.Domain, &n.MonitorURL,
-		&n.Version, &n.Platform, &n.Hostname, &lastSeen, &n.AppliedRevision, &n.UpgradeTo, &created, &decoy, &n.DecoyUpstream, &n.UserSpeedLimitMbps, &mitaQ, &egress, &n.DStatusSID, &shared); err != nil {
+		&n.Version, &n.Platform, &n.Hostname, &lastSeen, &n.AppliedRevision, &n.UpgradeTo, &created, &decoy, &n.DecoyUpstream, &n.UserSpeedLimitMbps, &mitaQ, &egress, &n.DStatusSID, &shared, &n.Mode, &n.ReportedMode, &modeReported, &n.ModeError, &modeManaged, &n.ModeRevision, &n.ReportedModeRevision); err != nil {
 		return nil, wrapNotFound(err)
+	}
+	n.ModeManaged = modeManaged != 0
+	if modeReported > 0 {
+		t := unix(modeReported)
+		n.ModeReportedAt = &t
 	}
 	n.Paired = tokenHash.Valid && tokenHash.String != ""
 	n.DomainShared = shared != 0
@@ -37,6 +42,13 @@ func scanNode(row interface{ Scan(...any) error }) (*domain.Node, error) {
 
 // CreateNode inserts a node with a fresh pairing code valid for ttl.
 func (s *Store) CreateNode(ctx context.Context, n *domain.Node, pairCode string, ttl time.Duration) error {
+	n.Mode = n.Mode.Effective()
+	if n.Mode == spec.NodeMonitor {
+		n.ModeRevision = 1
+	}
+	if err := n.Mode.Validate(); err != nil {
+		return err
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -46,9 +58,9 @@ func (s *Store) CreateNode(ctx context.Context, n *domain.Node, pairCode string,
 		return err
 	}
 	ts := now()
-	res, err := tx.ExecContext(ctx, `INSERT INTO nodes (name, pair_code, pair_code_expires_at, public_addr, internal_addr, v6_addr, domain, monitor_url, dstatus_sid, created_at, updated_at, domain_shared)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		n.Name, pairCode, time.Now().Add(ttl).Unix(), n.PublicAddr, n.InternalAddr, n.V6Addr, n.Domain, n.MonitorURL, n.DStatusSID, ts, ts, boolInt(n.DomainShared))
+	res, err := tx.ExecContext(ctx, `INSERT INTO nodes (name, pair_code, pair_code_expires_at, public_addr, internal_addr, v6_addr, domain, monitor_url, dstatus_sid, created_at, updated_at, domain_shared, node_mode, mode_managed, mode_revision)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.Name, pairCode, time.Now().Add(ttl).Unix(), n.PublicAddr, n.InternalAddr, n.V6Addr, n.Domain, n.MonitorURL, n.DStatusSID, ts, ts, boolInt(n.DomainShared), n.Mode, boolInt(n.Mode == spec.NodeMonitor), n.ModeRevision)
 	if err != nil {
 		return err
 	}
@@ -57,6 +69,7 @@ func (s *Store) CreateNode(ctx context.Context, n *domain.Node, pairCode string,
 	}
 	n.ID, _ = res.LastInsertId()
 	n.PairCode = pairCode
+	n.ModeManaged = n.Mode == spec.NodeMonitor
 	n.CreatedAt = unix(ts)
 	return nil
 }
@@ -216,7 +229,7 @@ func (s *Store) UpdateNode(ctx context.Context, n *domain.Node) error {
 
 // ResetPairCode issues a fresh pairing code and revokes the current token.
 func (s *Store) ResetPairCode(ctx context.Context, id int64, code string, ttl time.Duration) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET pair_code = ?, pair_code_expires_at = ?, token_hash = NULL, updated_at = ? WHERE id = ?`,
+	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET pair_code = ?, pair_code_expires_at = ?, token_hash = NULL, reported_mode = '', mode_reported_at = 0, reported_mode_revision = 0, mode_error = '', updated_at = ? WHERE id = ?`,
 		code, time.Now().Add(ttl).Unix(), now(), id)
 	return err
 }

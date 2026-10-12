@@ -103,6 +103,13 @@ func (h *handlers) pair(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	h.Store.Topology.Lock()
+	defer h.Store.Topology.Unlock()
+	pending, lookupErr := h.Store.NodeByPairCode(r.Context(), strings.ToUpper(strings.TrimSpace(in.Code)))
+	if lookupErr == nil && pending.ModeManaged && !in.NodeModes {
+		fail(w, 409, "this node requires bosun with monitor-only mode support")
+		return
+	}
 	token := auth.Token(32)
 	n, err := h.Store.RedeemPairCode(r.Context(), strings.ToUpper(strings.TrimSpace(in.Code)), auth.SHA256Hex(token), in.Hostname, in.Version, in.Platform)
 	if errors.Is(err, store.ErrNotFound) {
@@ -190,6 +197,15 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 	var rep agentproto.Report
 	if err := json.NewDecoder(r.Body).Decode(&rep); err != nil {
 		fail(w, http.StatusBadRequest, "bad json")
+		return
+	}
+	if rep.NodeMode.Validate() != nil {
+		fail(w, 400, "invalid node mode")
+		return
+	}
+	tokenHash := auth.SHA256Hex(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	if err := h.Store.ReportNodeMode(r.Context(), n.ID, tokenHash, rep.NodeMode, rep.NodeModeRevision, rep.NodeModeError); err != nil {
+		fail(w, 500, "internal error")
 		return
 	}
 	metrics.NodeReports.Inc(nil)
@@ -365,18 +381,22 @@ func (h *handlers) installScript(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "pair code required", http.StatusBadRequest)
 		return
 	}
-	okCode, err := h.Store.PairCodeValid(r.Context(), code)
-	if err != nil {
+	installNode, err := h.Store.NodeByPairCode(r.Context(), code)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if !okCode {
+	if installNode == nil {
 		http.Error(w, "pairing code unknown, expired or already used; issue a new one from the node page", http.StatusNotFound)
 		return
 	}
 	upstream := h.BosunInstaller
 	if upstream == "" {
 		upstream = "https://raw.githubusercontent.com/zeptop-dev/bosun/master/scripts/install.sh"
+	}
+	modeArg := ""
+	if installNode.Mode == spec.NodeMonitor {
+		modeArg = " --monitor-only"
 	}
 	w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -385,8 +405,8 @@ func (h *handlers) installScript(w http.ResponseWriter, r *http.Request) {
 set -eu
 [ "$(id -u)" = 0 ] || { echo "run as root" >&2; exit 1; }
 command -v curl >/dev/null || { echo "curl is required" >&2; exit 1; }
-curl -fsSL %q | sh -s -- --captain %q --pair %q "$@"
-`, h.BaseURL, upstream, h.BaseURL, code)
+curl -fsSL %q | sh -s -- --captain %q --pair %q "$@"%s
+`, h.BaseURL, upstream, h.BaseURL, code, modeArg)
 }
 
 // beat stores one frequent host sample while probing is enabled.

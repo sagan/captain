@@ -37,6 +37,8 @@ in lockstep with the panel.
 > and for the law where your servers and your users are. Check both before
 > you deploy.
 
+Monitor-only nodes can be installed without proxy cores and later switched to full nodes. Monitoring, alerts and agent updates remain available; proxy configuration is blocked on both panel and agent. See [node modes](docs/NODES.md#monitor-only-nodes-captain-118--bosun-066).
+
 ## Features
 
 - Node domain conflict checks and explicit shared/external DNS management prevent accidental record overwrites. DNS health checks, sustained alerts and durable automatic-write history help diagnose failures and recover recorded previous values. [DNS operations](docs/MONITORING.md).

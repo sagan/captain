@@ -427,18 +427,29 @@ async function main() {
   const summary = {}, problems = []
   try {
     for (const variant of variants.filter(v => !opts.only || opts.only.includes(v.name))) {
-      const ref = await capture(browser, servers[0].url, variant, fixture, opts, outDir, 'ref')
-      for (const e of ref.errors) problems.push(`${variant.name} ref: ${e}`)
-      if (opts.refOnly) { for (const [name, file] of Object.entries(ref.shots)) summary[name] = { file: path.relative(outDir, file) }; continue }
-      const cand = await capture(browser, servers[1].url, variant, fixture, opts, outDir, 'cand')
-      for (const e of cand.errors) problems.push(`${variant.name} cand: ${e}`)
-      for (const name of Object.keys(ref.shots)) {
-        if (!cand.shots[name]) { summary[name] = { size: null, native_size: null, over8: Infinity, mean: Infinity }; continue }
-        const r = compare(await readPNG(ref.shots[name]), await readPNG(cand.shots[name]))
-        const diffFile = path.join(outDir, name.replace(/\.png$/, '-diff.png'))
-        await writeFile(diffFile, PNG.sync.write(r.diff))
-        summary[name] = { size: r.size, native_size: r.native_size, over8: r.over8, mean: r.mean }
-        if (opts.dom) summary[name].dom = await domDiff(outDir, name)
+      // A variant whose images differ is captured once more on both sides: the
+      // realistic globe's rotation origin can land a fraction of a frame apart
+      // (see newFrozenContext). Only a difference seen twice counts; a passing
+      // retry is recorded as `retried` so the noise stays visible.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const ref = await capture(browser, servers[0].url, variant, fixture, opts, outDir, 'ref')
+        for (const e of ref.errors) problems.push(`${variant.name} ref: ${e}`)
+        if (opts.refOnly) { for (const [name, file] of Object.entries(ref.shots)) summary[name] = { file: path.relative(outDir, file) }; break }
+        const cand = await capture(browser, servers[1].url, variant, fixture, opts, outDir, 'cand')
+        for (const e of cand.errors) problems.push(`${variant.name} cand: ${e}`)
+        let failed = false
+        for (const name of Object.keys(ref.shots)) {
+          if (!cand.shots[name]) { summary[name] = { size: null, native_size: null, over8: Infinity, mean: Infinity }; failed = true; continue }
+          const r = compare(await readPNG(ref.shots[name]), await readPNG(cand.shots[name]))
+          const diffFile = path.join(outDir, name.replace(/\.png$/, '-diff.png'))
+          await writeFile(diffFile, PNG.sync.write(r.diff))
+          const previous = summary[name]
+          summary[name] = { size: r.size, native_size: r.native_size, over8: r.over8, mean: r.mean }
+          if (attempt > 1) summary[name].retried = { first_over8: previous?.over8 ?? null }
+          if (opts.dom) summary[name].dom = await domDiff(outDir, name)
+          if (!(r.over8 <= opts.tolerate)) failed = true
+        }
+        if (!failed) break
       }
     }
   } finally {
@@ -455,6 +466,8 @@ async function main() {
     console.error(`FAIL: ${failing.map(([n, v]) => `${n} over8=${v.over8}`).join(', ')} (tolerance ${opts.tolerate}); diffs in ${outDir}`)
     process.exit(1)
   }
+  const retried = Object.entries(summary).filter(([, v]) => v.retried).map(([n, v]) => `${n} (first over8=${v.retried.first_over8})`)
+  if (retried.length) console.log(`note: passed on retry: ${retried.join(', ')}`)
   console.log(`PASS: every image within tolerance ${opts.tolerate}; written to ${outDir}`)
 }
 

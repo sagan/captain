@@ -869,3 +869,313 @@ export function parseColorVisionMode(value: unknown): ColorVisionMode {
   return COLOR_VISION_MODE_ALIASES[value.trim()] ?? 'default'
 }
 
+export function isValidNodeCardSize(value: unknown): value is NodeCardSize {
+  return value === 'mini' || value === 'compact' || value === 'comfortable' || value === 'large'
+}
+
+export function isValidEarthRenderer(value: unknown): value is EarthRenderer {
+  return value === 'realistic' || value === 'cobe' || value === 'tiled'
+}
+
+// Settings derived from the normalised theme settings. The Vue store keeps one
+// computed over this; the React store memoises it per settings object.
+export interface DerivedAppSettings {
+  defaultViewMode: NodeViewMode
+  nodeCardSize: NodeCardSize
+  rpcTransportMode: RpcTransportMode
+  alertEnabled: boolean
+  alertTitle: string
+  alertContent: string
+  dataUpdateInterval: number
+  stopEarth: boolean
+  earthRenderer: EarthRenderer
+  hideEarth: boolean
+  hideGeneralCard: boolean
+  visitorInfoEnabled: boolean
+  generalCardEnabledMap: Record<GeneralCardKey, boolean>
+  generalCardOrder: GeneralCardKey[]
+  homeToolsEnabled: boolean
+  glassColorPreset: GlassColorPreset
+  glassCustomColors: GlassCustomColors
+  colorVisionMode: ColorVisionMode
+  colorVisionFriendly: boolean
+  homeQuickControlsEnabled: boolean
+  homeQuickControlOrder: HomeQuickControlKey[]
+  nodeListMetadataEnabled: boolean
+  nodeListMetadataFields: NodeListMetadataField[]
+  nodeListCustomTagsVisible: boolean
+  nodeDetailSectionTabsEnabled: boolean
+  gpuChartEnabled: boolean
+  detailMetricCardOrder: DetailMetricCardKey[]
+  offlineNodesLast: boolean
+  homeHighLoadThreshold: number
+  homeTrafficWarningThreshold: number
+  homeExpiringDays: number
+  diskPredictionEnabled: boolean
+  diskPredictionThresholdDays: number
+  chartDashboardTemplate: ChartDashboardTemplate
+  hideAdminEntryWhenLoggedOut: boolean
+  hidePriceWhenLoggedOut: boolean
+  providerAliases: string
+  exportSecondaryPassword: string
+  disablePageAnimation: boolean
+  backgroundEnabled: boolean
+  backgroundType: 'image' | 'video'
+  lightBackgroundUrl: string
+  darkBackgroundUrl: string
+  backgroundBlur: number
+  backgroundOverlay: number
+  managedThemeMode: ManagedThemeMode
+}
+
+export function deriveAppSettings(themeSettings: ThemeSettings): DerivedAppSettings {
+  const defaultViewMode: NodeViewMode = (() => {
+    const settings = themeSettings
+    if (typeof settings.defaultViewMode === 'string') {
+      const mode = settings.defaultViewMode
+      if (mode === 'card' || mode === 'list') {
+        return mode
+      }
+    }
+    return 'card'
+  })()
+  const nodeCardSize: NodeCardSize = (() => {
+    const settings = themeSettings
+    if (isValidNodeCardSize(settings.nodeCardSize))
+      return settings.nodeCardSize
+    return 'compact'
+  })()
+  const rpcTransportMode: RpcTransportMode = (() => {
+    const settings = themeSettings
+    if (typeof settings.rpcTransportMode === 'string') {
+      const mode = settings.rpcTransportMode
+      if (mode === 'websocket' || mode === 'http') {
+        return mode
+      }
+    }
+    return 'http'
+  })()
+  const alertEnabled: boolean = readBooleanSetting(themeSettings, 'alertEnabled', false)
+  const alertTitle: string = (() => {
+    const value = themeSettings.alertTitle
+    return typeof value === 'string' ? value : ''
+  })()
+  const alertContent: string = (() => {
+    const value = themeSettings.alertContent
+    return typeof value === 'string' ? value : ''
+  })()
+  const dataUpdateInterval: number = readNumberSetting(themeSettings, 'dataUpdateInterval', 3, 1, 60)
+  const stopEarth: boolean = readBooleanSetting(themeSettings, 'stopEarth', false)
+  const earthRenderer: EarthRenderer = (() => {
+    const value = themeSettings.earthRenderer
+    return isValidEarthRenderer(value) ? value : 'realistic'
+  })()
+  const hideEarth: boolean = readBooleanSetting(themeSettings, 'hideEarth', false)
+  const hideGeneralCard: boolean = readBooleanSetting(themeSettings, 'hideGeneralCard', false)
+  const visitorInfoEnabled: boolean = readBooleanSetting(themeSettings, 'visitorInfoEnabled', true)
+  const generalCardEnabledMap: Record<GeneralCardKey, boolean> = (() => {
+    const settings = themeSettings
+    const enabledMap = { ...DEFAULT_GENERAL_CARD_ENABLED }
+
+    for (const key of ALL_GENERAL_CARD_KEYS) {
+      const settingKey = LEGACY_GENERAL_CARD_SETTING_KEYS[key]
+      if (!settingKey)
+        continue
+
+      const value = settings[settingKey]
+      if (typeof value === 'boolean')
+        enabledMap[key] = value
+    }
+
+    return enabledMap
+  })()
+  const generalCardOrder: GeneralCardKey[] = (() => {
+    const settings = themeSettings
+    const hasNewPreset = typeof settings.generalCardPreset === 'string'
+    const preset = parseGeneralCardPreset(settings.generalCardPreset)
+
+    if (hasNewPreset) {
+      if (preset === 'custom') {
+        const advancedKeys = typeof settings.generalCardKeys === 'string'
+          ? settings.generalCardKeys.trim()
+          : ''
+        if (advancedKeys)
+          return parseKeyList(advancedKeys, isGeneralCardKey, DEFAULT_GENERAL_CARD_ORDER)
+
+        const slotKeys = parseGeneralCardSlots(settings)
+        return slotKeys.length > 0 ? slotKeys : [...DEFAULT_GENERAL_CARD_ORDER]
+      }
+
+      return [...GENERAL_CARD_PRESETS[preset]]
+    }
+
+    if (typeof settings.generalCardKeys === 'string')
+      return parseKeyList(settings.generalCardKeys, isGeneralCardKey, DEFAULT_GENERAL_CARD_ORDER)
+
+    const orderedKeys = parseKeyList(settings.generalCardOrder, isGeneralCardKey, DEFAULT_GENERAL_CARD_ORDER)
+    const orderedKeySet = new Set<GeneralCardKey>(orderedKeys)
+    for (const key of ALL_GENERAL_CARD_KEYS) {
+      if (orderedKeySet.has(key))
+        continue
+      orderedKeys.push(key)
+      orderedKeySet.add(key)
+    }
+
+    return orderedKeys.filter(key => generalCardEnabledMap[key])
+  })()
+  const homeToolsEnabled: boolean = readBooleanSetting(themeSettings, 'homeToolsEnabled', true)
+  const glassColorPreset: GlassColorPreset = parseGlassColorPreset(themeSettings.glassColorPreset)
+  const glassCustomColors: GlassCustomColors = parseGlassCustomColors(themeSettings)
+  const colorVisionMode: ColorVisionMode = parseColorVisionMode(themeSettings.colorVisionMode)
+  const colorVisionFriendly: boolean = colorVisionMode === 'accessible'
+  const homeQuickControlsEnabled: boolean = readBooleanSetting(themeSettings, 'homeQuickControlsEnabled', true)
+  const homeQuickControlOrder: HomeQuickControlKey[] = (() => {
+    const settings = themeSettings
+    const preset = parseHomeQuickControlPreset(settings.homeQuickControlPreset)
+    if (preset === 'custom') {
+      return normalizeHomeQuickControlOrder(
+        parseKeyList(settings.homeQuickControlKeys, isHomeQuickControlKey, DEFAULT_HOME_QUICK_CONTROL_ORDER),
+      )
+    }
+
+    if (typeof settings.homeQuickControlKeys === 'string' && typeof settings.homeQuickControlPreset !== 'string') {
+      return normalizeHomeQuickControlOrder(
+        parseKeyList(settings.homeQuickControlKeys, isHomeQuickControlKey, DEFAULT_HOME_QUICK_CONTROL_ORDER),
+      )
+    }
+
+    return normalizeHomeQuickControlOrder([...HOME_QUICK_CONTROL_PRESETS[preset]])
+  })()
+  const nodeListMetadataEnabled: boolean = readBooleanSetting(themeSettings, 'nodeListMetadataEnabled', true)
+  const nodeListMetadataFields: NodeListMetadataField[] = (() => {
+    return parseKeyList(themeSettings.nodeListMetadataFields, isNodeListMetadataField, DEFAULT_NODE_LIST_METADATA_FIELDS)
+  })()
+  const nodeListCustomTagsVisible: boolean = readBooleanSetting(themeSettings, 'nodeListCustomTagsVisible', true)
+  const nodeDetailSectionTabsEnabled: boolean = readBooleanSetting(themeSettings, 'nodeDetailSectionTabsEnabled', false)
+  const gpuChartEnabled: boolean = readBooleanSetting(themeSettings, 'gpuChartEnabled', false)
+  const detailMetricCardOrder: DetailMetricCardKey[] = (() => {
+    const settings = themeSettings
+    const preset = parseDetailMetricCardPreset(settings.detailMetricCardPreset)
+    if (preset !== 'custom')
+      return [...DETAIL_METRIC_CARD_PRESETS[preset]]
+
+    const advancedKeys = typeof settings.detailMetricCardKeys === 'string'
+      ? settings.detailMetricCardKeys.trim()
+      : ''
+    if (advancedKeys)
+      return parseKeyList(advancedKeys, isDetailMetricCardKey, DEFAULT_DETAIL_METRIC_CARD_ORDER)
+
+    const slotKeys = parseDetailMetricCardSlots(settings)
+    return slotKeys.length > 0 ? slotKeys : [...DEFAULT_DETAIL_METRIC_CARD_ORDER]
+  })()
+  const offlineNodesLast: boolean = readBooleanSetting(themeSettings, 'offlineNodesLast', false)
+  const homeHighLoadThreshold: number = readNumberSetting(themeSettings, 'homeHighLoadThreshold', 80, 1, 100)
+  const homeTrafficWarningThreshold: number = readNumberSetting(themeSettings, 'homeTrafficWarningThreshold', 80, 1, 100)
+  const homeExpiringDays: number = readNumberSetting(themeSettings, 'homeExpiringDays', 30, 1, 3650)
+  const diskPredictionEnabled: boolean = readBooleanSetting(themeSettings, 'diskPredictionEnabled', false)
+  const diskPredictionThresholdDays: number = readNumberSetting(themeSettings, 'diskPredictionThresholdDays', 30, 1, 3650)
+  const chartDashboardTemplate: ChartDashboardTemplate = (() => {
+    const settings = themeSettings
+
+    // 旧配置没有 preset 字段时继续以原 JSON/key 列表为准。
+    if (typeof settings.chartDashboardPreset !== 'string')
+      return parseChartDashboardTemplate(settings.chartDashboardTemplate)
+
+    const preset = parseChartDashboardPreset(settings.chartDashboardPreset)
+    if (preset === 'advanced')
+      return parseChartDashboardTemplate(settings.chartDashboardTemplate)
+
+    if (preset === 'custom') {
+      // 旧版托管设置使用 7 个独立卡位，升级后优先保留原有顺序。
+      const slotKeys = parseChartDashboardSlots(settings)
+      if (slotKeys.length > 0)
+        return { cards: slotKeys }
+
+      const customKeys = typeof settings.chartDashboardTemplate === 'string'
+        ? settings.chartDashboardTemplate.trim()
+        : ''
+      if (customKeys)
+        return parseChartDashboardTemplate(customKeys)
+
+      return { cards: [...DEFAULT_CHART_DASHBOARD_CARDS] }
+    }
+
+    return { cards: [...CHART_DASHBOARD_PRESETS[preset]] }
+  })()
+  const hideAdminEntryWhenLoggedOut: boolean = readBooleanSetting(themeSettings, 'hideAdminEntryWhenLoggedOut', false)
+  const hidePriceWhenLoggedOut: boolean = readBooleanSetting(themeSettings, 'hidePriceWhenLoggedOut', false)
+  const providerAliases: string = readStringSetting(themeSettings, 'providerAliases')
+  const exportSecondaryPassword: string = readStringSetting(themeSettings, 'exportSecondaryPassword')
+  const disablePageAnimation: boolean = readBooleanSetting(themeSettings, 'disablePageAnimation', false)
+  const backgroundEnabled: boolean = readBooleanSetting(themeSettings, 'backgroundEnabled', false)
+  const backgroundType: 'image' | 'video' = (() => {
+    const settings = themeSettings
+    if (typeof settings.backgroundType === 'string') {
+      const type = settings.backgroundType
+      if (type === 'image' || type === 'video') {
+        return type
+      }
+    }
+    return 'image'
+  })()
+  const lightBackgroundUrl: string = (() => {
+    return resolveBackgroundSource(themeSettings.lightBackgroundUrl)
+  })()
+  const darkBackgroundUrl: string = (() => {
+    return resolveBackgroundSource(themeSettings.darkBackgroundUrl)
+  })()
+  const backgroundBlur: number = readNumberSetting(themeSettings, 'backgroundBlur', 0, 0, Number.MAX_SAFE_INTEGER)
+  const backgroundOverlay: number = readNumberSetting(themeSettings, 'backgroundOverlay', 0, -100, 100)
+  const managedThemeMode: ManagedThemeMode = (() => {
+    const value = themeSettings.themeMode
+    return isValidManagedThemeMode(value) ? value : 'beijing'
+  })()
+  return {
+    defaultViewMode,
+    nodeCardSize,
+    rpcTransportMode,
+    alertEnabled,
+    alertTitle,
+    alertContent,
+    dataUpdateInterval,
+    stopEarth,
+    earthRenderer,
+    hideEarth,
+    hideGeneralCard,
+    visitorInfoEnabled,
+    generalCardEnabledMap,
+    generalCardOrder,
+    homeToolsEnabled,
+    glassColorPreset,
+    glassCustomColors,
+    colorVisionMode,
+    colorVisionFriendly,
+    homeQuickControlsEnabled,
+    homeQuickControlOrder,
+    nodeListMetadataEnabled,
+    nodeListMetadataFields,
+    nodeListCustomTagsVisible,
+    nodeDetailSectionTabsEnabled,
+    gpuChartEnabled,
+    detailMetricCardOrder,
+    offlineNodesLast,
+    homeHighLoadThreshold,
+    homeTrafficWarningThreshold,
+    homeExpiringDays,
+    diskPredictionEnabled,
+    diskPredictionThresholdDays,
+    chartDashboardTemplate,
+    hideAdminEntryWhenLoggedOut,
+    hidePriceWhenLoggedOut,
+    providerAliases,
+    exportSecondaryPassword,
+    disablePageAnimation,
+    backgroundEnabled,
+    backgroundType,
+    lightBackgroundUrl,
+    darkBackgroundUrl,
+    backgroundBlur,
+    backgroundOverlay,
+    managedThemeMode,
+  }
+}

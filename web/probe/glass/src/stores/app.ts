@@ -7,60 +7,21 @@ import type { MeInfo, PublicSettings } from '@shared/utils/api'
 import type { ByteDecimalsConfig } from '@shared/utils/helper'
 import { getAuthSession, requirePermission, setAuthSessionFromLogin, verifyLogin } from '@shared/services/auth.service'
 import {
-  ALL_GENERAL_CARD_KEYS,
   BYTE_DECIMALS,
-  CHART_DASHBOARD_PRESETS,
-  DEFAULT_CHART_DASHBOARD_CARDS,
-  DEFAULT_DETAIL_METRIC_CARD_ORDER,
-  DEFAULT_GENERAL_CARD_ENABLED,
-  DEFAULT_GENERAL_CARD_ORDER,
-  DEFAULT_HOME_QUICK_CONTROL_ORDER,
-  DEFAULT_NODE_LIST_METADATA_FIELDS,
-  DETAIL_METRIC_CARD_PRESETS,
-  GENERAL_CARD_PRESETS,
-  HOME_QUICK_CONTROL_PRESETS,
-  LEGACY_GENERAL_CARD_SETTING_KEYS,
   getBeijingHour,
-  isDetailMetricCardKey,
-  isGeneralCardKey,
-  isHomeQuickControlKey,
-  isNodeListMetadataField,
-  isValidManagedThemeMode,
   isValidThemeMode,
-  normalizeHomeQuickControlOrder,
+  deriveAppSettings,
   normalizeThemeSettings,
-  parseChartDashboardPreset,
-  parseChartDashboardSlots,
-  parseChartDashboardTemplate,
-  parseColorVisionMode,
-  parseDetailMetricCardPreset,
-  parseDetailMetricCardSlots,
-  parseGeneralCardPreset,
-  parseGeneralCardSlots,
-  parseGlassColorPreset,
-  parseGlassCustomColors,
-  parseHomeQuickControlPreset,
-  parseKeyList,
-  readBooleanSetting,
-  readNumberSetting,
-  readStringSetting,
-  resolveBackgroundSource,
 } from '@shared/stores/app-settings'
 import type {
   ChartDashboardCardKey,
   ChartDashboardTemplate,
-  ColorVisionMode,
   DetailMetricCardKey,
-  EarthRenderer,
   GeneralCardKey,
-  GlassColorPreset,
   HomeQuickControlKey,
   Lang,
   ManagedThemeMode,
-  NodeCardSize,
-  NodeListMetadataField,
   NodeViewMode,
-  RpcTransportMode,
   ThemeMode,
 } from '@shared/stores/app-settings'
 export type {
@@ -125,36 +86,16 @@ const useAppStore = defineStore('app', () => {
   }
 
   // 计算属性：从主题配置获取默认视图模式
-  const defaultViewMode = computed<NodeViewMode>(() => {
-    const settings = themeSettings.value
-    if (typeof settings.defaultViewMode === 'string') {
-      const mode = settings.defaultViewMode
-      if (mode === 'card' || mode === 'list') {
-        return mode
-      }
-    }
-    return 'card'
-  })
+  const derived = computed(() => deriveAppSettings(themeSettings.value))
+
+  const defaultViewMode = computed(() => derived.value.defaultViewMode)
 
   // 校验视图模式是否为合法值
   function isValidViewMode(value: string | null): value is NodeViewMode {
     return value === 'card' || value === 'list'
   }
 
-  function isValidNodeCardSize(value: unknown): value is NodeCardSize {
-    return value === 'mini' || value === 'compact' || value === 'comfortable' || value === 'large'
-  }
-
-  function isValidEarthRenderer(value: unknown): value is EarthRenderer {
-    return value === 'realistic' || value === 'cobe' || value === 'tiled'
-  }
-
-  const nodeCardSize = computed<NodeCardSize>(() => {
-    const settings = themeSettings.value
-    if (isValidNodeCardSize(settings.nodeCardSize))
-      return settings.nodeCardSize
-    return 'compact'
-  })
+  const nodeCardSize = computed(() => derived.value.nodeCardSize)
 
   // 当前实际使用的视图模式
   const nodeViewMode = computed<NodeViewMode>({
@@ -171,234 +112,96 @@ const useAppStore = defineStore('app', () => {
   })
 
   // 计算属性：从主题配置获取 RPC 连接模式
-  const rpcTransportMode = computed<RpcTransportMode>(() => {
-    const settings = themeSettings.value
-    if (typeof settings.rpcTransportMode === 'string') {
-      const mode = settings.rpcTransportMode
-      if (mode === 'websocket' || mode === 'http') {
-        return mode
-      }
-    }
-    return 'http'
-  })
+  const rpcTransportMode = computed(() => derived.value.rpcTransportMode)
 
   // 字节格式化精度（固定配置）
   const byteDecimals: ByteDecimalsConfig = { ...BYTE_DECIMALS }
 
   // 计算属性：公告配置
-  const alertEnabled = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'alertEnabled', false))
+  const alertEnabled = computed(() => derived.value.alertEnabled)
 
-  const alertTitle = computed<string>(() => {
-    const value = themeSettings.value.alertTitle
-    return typeof value === 'string' ? value : ''
-  })
+  const alertTitle = computed(() => derived.value.alertTitle)
 
-  const alertContent = computed<string>(() => {
-    const value = themeSettings.value.alertContent
-    return typeof value === 'string' ? value : ''
-  })
+  const alertContent = computed(() => derived.value.alertContent)
 
-  const dataUpdateInterval = computed<number>(() => readNumberSetting(themeSettings.value, 'dataUpdateInterval', 3, 1, 60))
+  const dataUpdateInterval = computed(() => derived.value.dataUpdateInterval)
 
-  const stopEarth = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'stopEarth', false))
+  const stopEarth = computed(() => derived.value.stopEarth)
 
-  const earthRenderer = computed<EarthRenderer>(() => {
-    const value = themeSettings.value.earthRenderer
-    return isValidEarthRenderer(value) ? value : 'realistic'
-  })
+  const earthRenderer = computed(() => derived.value.earthRenderer)
 
-  const hideEarth = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'hideEarth', false))
+  const hideEarth = computed(() => derived.value.hideEarth)
 
-  const hideGeneralCard = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'hideGeneralCard', false))
+  const hideGeneralCard = computed(() => derived.value.hideGeneralCard)
 
-  const visitorInfoEnabled = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'visitorInfoEnabled', true))
+  const visitorInfoEnabled = computed(() => derived.value.visitorInfoEnabled)
 
-  const generalCardEnabledMap = computed<Record<GeneralCardKey, boolean>>(() => {
-    const settings = themeSettings.value
-    const enabledMap = { ...DEFAULT_GENERAL_CARD_ENABLED }
+  const generalCardEnabledMap = computed(() => derived.value.generalCardEnabledMap)
 
-    for (const key of ALL_GENERAL_CARD_KEYS) {
-      const settingKey = LEGACY_GENERAL_CARD_SETTING_KEYS[key]
-      if (!settingKey)
-        continue
+  const generalCardOrder = computed(() => derived.value.generalCardOrder)
 
-      const value = settings[settingKey]
-      if (typeof value === 'boolean')
-        enabledMap[key] = value
-    }
+  const homeToolsEnabled = computed(() => derived.value.homeToolsEnabled)
 
-    return enabledMap
-  })
+  const glassColorPreset = computed(() => derived.value.glassColorPreset)
 
-  const generalCardOrder = computed<GeneralCardKey[]>(() => {
-    const settings = themeSettings.value
-    const hasNewPreset = typeof settings.generalCardPreset === 'string'
-    const preset = parseGeneralCardPreset(settings.generalCardPreset)
+  const glassCustomColors = computed(() => derived.value.glassCustomColors)
 
-    if (hasNewPreset) {
-      if (preset === 'custom') {
-        const advancedKeys = typeof settings.generalCardKeys === 'string'
-          ? settings.generalCardKeys.trim()
-          : ''
-        if (advancedKeys)
-          return parseKeyList(advancedKeys, isGeneralCardKey, DEFAULT_GENERAL_CARD_ORDER)
+  const colorVisionMode = computed(() => derived.value.colorVisionMode)
 
-        const slotKeys = parseGeneralCardSlots(settings)
-        return slotKeys.length > 0 ? slotKeys : [...DEFAULT_GENERAL_CARD_ORDER]
-      }
+  const colorVisionFriendly = computed(() => derived.value.colorVisionFriendly)
 
-      return [...GENERAL_CARD_PRESETS[preset]]
-    }
+  const homeQuickControlsEnabled = computed(() => derived.value.homeQuickControlsEnabled)
 
-    if (typeof settings.generalCardKeys === 'string')
-      return parseKeyList(settings.generalCardKeys, isGeneralCardKey, DEFAULT_GENERAL_CARD_ORDER)
+  const homeQuickControlOrder = computed(() => derived.value.homeQuickControlOrder)
 
-    const orderedKeys = parseKeyList(settings.generalCardOrder, isGeneralCardKey, DEFAULT_GENERAL_CARD_ORDER)
-    const orderedKeySet = new Set<GeneralCardKey>(orderedKeys)
-    for (const key of ALL_GENERAL_CARD_KEYS) {
-      if (orderedKeySet.has(key))
-        continue
-      orderedKeys.push(key)
-      orderedKeySet.add(key)
-    }
+  const nodeListMetadataEnabled = computed(() => derived.value.nodeListMetadataEnabled)
 
-    return orderedKeys.filter(key => generalCardEnabledMap.value[key])
-  })
+  const nodeListMetadataFields = computed(() => derived.value.nodeListMetadataFields)
 
-  const homeToolsEnabled = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'homeToolsEnabled', true))
+  const nodeListCustomTagsVisible = computed(() => derived.value.nodeListCustomTagsVisible)
 
-  const glassColorPreset = computed<GlassColorPreset>(() => parseGlassColorPreset(themeSettings.value.glassColorPreset))
+  const nodeDetailSectionTabsEnabled = computed(() => derived.value.nodeDetailSectionTabsEnabled)
 
-  const glassCustomColors = computed<GlassCustomColors>(() => parseGlassCustomColors(themeSettings.value))
+  const gpuChartEnabled = computed(() => derived.value.gpuChartEnabled)
 
-  const colorVisionMode = computed<ColorVisionMode>(() => parseColorVisionMode(themeSettings.value.colorVisionMode))
+  const detailMetricCardOrder = computed(() => derived.value.detailMetricCardOrder)
 
-  const colorVisionFriendly = computed<boolean>(() => colorVisionMode.value === 'accessible')
+  const offlineNodesLast = computed(() => derived.value.offlineNodesLast)
 
-  const homeQuickControlsEnabled = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'homeQuickControlsEnabled', true))
+  const homeHighLoadThreshold = computed(() => derived.value.homeHighLoadThreshold)
 
-  const homeQuickControlOrder = computed<HomeQuickControlKey[]>(() => {
-    const settings = themeSettings.value
-    const preset = parseHomeQuickControlPreset(settings.homeQuickControlPreset)
-    if (preset === 'custom') {
-      return normalizeHomeQuickControlOrder(
-        parseKeyList(settings.homeQuickControlKeys, isHomeQuickControlKey, DEFAULT_HOME_QUICK_CONTROL_ORDER),
-      )
-    }
+  const homeTrafficWarningThreshold = computed(() => derived.value.homeTrafficWarningThreshold)
 
-    if (typeof settings.homeQuickControlKeys === 'string' && typeof settings.homeQuickControlPreset !== 'string') {
-      return normalizeHomeQuickControlOrder(
-        parseKeyList(settings.homeQuickControlKeys, isHomeQuickControlKey, DEFAULT_HOME_QUICK_CONTROL_ORDER),
-      )
-    }
+  const homeExpiringDays = computed(() => derived.value.homeExpiringDays)
 
-    return normalizeHomeQuickControlOrder([...HOME_QUICK_CONTROL_PRESETS[preset]])
-  })
+  const diskPredictionEnabled = computed(() => derived.value.diskPredictionEnabled)
 
-  const nodeListMetadataEnabled = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'nodeListMetadataEnabled', true))
+  const diskPredictionThresholdDays = computed(() => derived.value.diskPredictionThresholdDays)
 
-  const nodeListMetadataFields = computed<NodeListMetadataField[]>(() => {
-    return parseKeyList(themeSettings.value.nodeListMetadataFields, isNodeListMetadataField, DEFAULT_NODE_LIST_METADATA_FIELDS)
-  })
+  const chartDashboardTemplate = computed(() => derived.value.chartDashboardTemplate)
 
-  const nodeListCustomTagsVisible = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'nodeListCustomTagsVisible', true))
+  const hideAdminEntryWhenLoggedOut = computed(() => derived.value.hideAdminEntryWhenLoggedOut)
 
-  const nodeDetailSectionTabsEnabled = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'nodeDetailSectionTabsEnabled', false))
+  const hidePriceWhenLoggedOut = computed(() => derived.value.hidePriceWhenLoggedOut)
 
-  const gpuChartEnabled = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'gpuChartEnabled', false))
+  const providerAliases = computed(() => derived.value.providerAliases)
 
-  const detailMetricCardOrder = computed<DetailMetricCardKey[]>(() => {
-    const settings = themeSettings.value
-    const preset = parseDetailMetricCardPreset(settings.detailMetricCardPreset)
-    if (preset !== 'custom')
-      return [...DETAIL_METRIC_CARD_PRESETS[preset]]
+  const exportSecondaryPassword = computed(() => derived.value.exportSecondaryPassword)
 
-    const advancedKeys = typeof settings.detailMetricCardKeys === 'string'
-      ? settings.detailMetricCardKeys.trim()
-      : ''
-    if (advancedKeys)
-      return parseKeyList(advancedKeys, isDetailMetricCardKey, DEFAULT_DETAIL_METRIC_CARD_ORDER)
-
-    const slotKeys = parseDetailMetricCardSlots(settings)
-    return slotKeys.length > 0 ? slotKeys : [...DEFAULT_DETAIL_METRIC_CARD_ORDER]
-  })
-
-  const offlineNodesLast = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'offlineNodesLast', false))
-
-  const homeHighLoadThreshold = computed<number>(() => readNumberSetting(themeSettings.value, 'homeHighLoadThreshold', 80, 1, 100))
-
-  const homeTrafficWarningThreshold = computed<number>(() => readNumberSetting(themeSettings.value, 'homeTrafficWarningThreshold', 80, 1, 100))
-
-  const homeExpiringDays = computed<number>(() => readNumberSetting(themeSettings.value, 'homeExpiringDays', 30, 1, 3650))
-
-  const diskPredictionEnabled = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'diskPredictionEnabled', false))
-
-  const diskPredictionThresholdDays = computed<number>(() => readNumberSetting(themeSettings.value, 'diskPredictionThresholdDays', 30, 1, 3650))
-
-  const chartDashboardTemplate = computed<ChartDashboardTemplate>(() => {
-    const settings = themeSettings.value
-
-    // 旧配置没有 preset 字段时继续以原 JSON/key 列表为准。
-    if (typeof settings.chartDashboardPreset !== 'string')
-      return parseChartDashboardTemplate(settings.chartDashboardTemplate)
-
-    const preset = parseChartDashboardPreset(settings.chartDashboardPreset)
-    if (preset === 'advanced')
-      return parseChartDashboardTemplate(settings.chartDashboardTemplate)
-
-    if (preset === 'custom') {
-      // 旧版托管设置使用 7 个独立卡位，升级后优先保留原有顺序。
-      const slotKeys = parseChartDashboardSlots(settings)
-      if (slotKeys.length > 0)
-        return { cards: slotKeys }
-
-      const customKeys = typeof settings.chartDashboardTemplate === 'string'
-        ? settings.chartDashboardTemplate.trim()
-        : ''
-      if (customKeys)
-        return parseChartDashboardTemplate(customKeys)
-
-      return { cards: [...DEFAULT_CHART_DASHBOARD_CARDS] }
-    }
-
-    return { cards: [...CHART_DASHBOARD_PRESETS[preset]] }
-  })
-
-  const hideAdminEntryWhenLoggedOut = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'hideAdminEntryWhenLoggedOut', false))
-
-  const hidePriceWhenLoggedOut = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'hidePriceWhenLoggedOut', false))
-
-  const providerAliases = computed<string>(() => readStringSetting(themeSettings.value, 'providerAliases'))
-
-  const exportSecondaryPassword = computed<string>(() => readStringSetting(themeSettings.value, 'exportSecondaryPassword'))
-
-  const disablePageAnimation = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'disablePageAnimation', false))
+  const disablePageAnimation = computed(() => derived.value.disablePageAnimation)
 
   // 计算属性：自定义背景配置
-  const backgroundEnabled = computed<boolean>(() => readBooleanSetting(themeSettings.value, 'backgroundEnabled', false))
+  const backgroundEnabled = computed(() => derived.value.backgroundEnabled)
 
-  const backgroundType = computed<'image' | 'video'>(() => {
-    const settings = themeSettings.value
-    if (typeof settings.backgroundType === 'string') {
-      const type = settings.backgroundType
-      if (type === 'image' || type === 'video') {
-        return type
-      }
-    }
-    return 'image'
-  })
+  const backgroundType = computed(() => derived.value.backgroundType)
 
-  const lightBackgroundUrl = computed<string>(() => {
-    return resolveBackgroundSource(themeSettings.value.lightBackgroundUrl)
-  })
+  const lightBackgroundUrl = computed(() => derived.value.lightBackgroundUrl)
 
-  const darkBackgroundUrl = computed<string>(() => {
-    return resolveBackgroundSource(themeSettings.value.darkBackgroundUrl)
-  })
+  const darkBackgroundUrl = computed(() => derived.value.darkBackgroundUrl)
 
-  const backgroundBlur = computed<number>(() => readNumberSetting(themeSettings.value, 'backgroundBlur', 0, 0, Number.MAX_SAFE_INTEGER))
+  const backgroundBlur = computed(() => derived.value.backgroundBlur)
 
-  const backgroundOverlay = computed<number>(() => readNumberSetting(themeSettings.value, 'backgroundOverlay', 0, -100, 100))
+  const backgroundOverlay = computed(() => derived.value.backgroundOverlay)
 
   // 当 publicSettings 加载后，如果 localStorage 没有保存过视图模式或值为非法值，使用默认值
   watch(publicSettings, (settings) => {
@@ -414,10 +217,7 @@ const useAppStore = defineStore('app', () => {
     }
   }, { immediate: true })
 
-  const managedThemeMode = computed<ManagedThemeMode>(() => {
-    const value = themeSettings.value.themeMode
-    return isValidManagedThemeMode(value) ? value : 'beijing'
-  })
+  const managedThemeMode = computed(() => derived.value.managedThemeMode)
 
   const isBeijingDaytime = computed<boolean>(() => {
     const hour = getBeijingHour(beijingTimeTick.value)

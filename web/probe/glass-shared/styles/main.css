@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/* Shared TS (cva variants) lives outside each app's Vite root. */
+@source '..';
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 * {

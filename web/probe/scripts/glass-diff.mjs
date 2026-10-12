@@ -8,7 +8,11 @@
 // fixture instant, fixed viewports, colour schemes and locale) and reports
 // pixel differences per image.
 //
-//   node scripts/glass-diff.mjs --ref <distA> --cand <distB> --out <dir> [--tolerate <n>] [--hide-canvas] [--no-dialog] [--only <variant,...>] [--scenes <scene,...>]
+//   node scripts/glass-diff.mjs --ref <distA> --cand <distB> --out <dir> [--tolerate <n>] [--hide-canvas] [--no-dialog] [--only <variant,...>] [--scenes <scene,...>] [--dom]
+//
+// --dom also writes a normalised DOM serialisation per screenshot and reports
+// the first differing lines, to explain pixel differences between a Vue and a
+// React build. It is diagnostic only and never affects the exit status.
 //
 // Scenes: home (card view, plus the latency dialog unless --no-dialog), list
 // (home in list view) and detail (#/instance/<id> with the load and ping charts).
@@ -32,7 +36,7 @@ const fixturePath = path.join(here, 'glass-fixture.json')
 
 // ---------------------------------------------------------------- CLI
 function parseArgs(argv) {
-  const opts = { ref: '', cand: '', out: '', tolerate: 0, refOnly: false, hideCanvas: false, dialog: true, only: null, scenes: ['home', 'list', 'detail'] }
+  const opts = { ref: '', cand: '', out: '', tolerate: 0, refOnly: false, hideCanvas: false, dialog: true, only: null, scenes: ['home', 'list', 'detail'], dom: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     const next = () => { if (i + 1 >= argv.length) throw new Error(`${a} needs a value`); return argv[++i] }
@@ -45,6 +49,7 @@ function parseArgs(argv) {
       case '--hide-canvas': opts.hideCanvas = true; break
       case '--no-dialog': opts.dialog = false; break
       case '--only': opts.only = next().split(',').map(v => v.trim()).filter(Boolean); break
+      case '--dom': opts.dom = true; break
       case '--scenes': opts.scenes = next().split(',').map(v => v.trim()).filter(Boolean); break
       case '-h': case '--help': usage(0); break
       default: throw new Error(`unknown argument ${a}`)
@@ -57,7 +62,7 @@ function parseArgs(argv) {
   return opts
 }
 function usage(code) {
-  console.error('usage: glass-diff.mjs --ref <dist> --cand <dist> --out <dir> [--tolerate <n>] [--hide-canvas] [--no-dialog] [--only <variant,...>] [--scenes <scene,...>]\n       glass-diff.mjs --ref <dist> --out <dir> --ref-only [--hide-canvas] [--no-dialog] [--only <variant,...>] [--scenes <scene,...>]\n       variants: desktop-light desktop-dark mobile-light mobile-dark\n       scenes: home (card view + latency dialog), list (list view), detail (instance page with load and ping charts)')
+  console.error('usage: glass-diff.mjs --ref <dist> --cand <dist> --out <dir> [--tolerate <n>] [--hide-canvas] [--no-dialog] [--only <variant,...>] [--scenes <scene,...>] [--dom]\n       glass-diff.mjs --ref <dist> --out <dir> --ref-only [--hide-canvas] [--no-dialog] [--only <variant,...>] [--scenes <scene,...>]\n       variants: desktop-light desktop-dark mobile-light mobile-dark\n       scenes: home (card view + latency dialog), list (list view), detail (instance page with load and ping charts)')
   process.exit(code)
 }
 
@@ -212,6 +217,42 @@ async function advance(page, inflight, ms) {
   await quiesce(page, inflight)
 }
 
+
+// Normalised DOM dump for --dom: one line per element/text, attributes sorted.
+// Vue's scope hashes (data-v-xxxxxxxx) and the React build's named scopes
+// (data-v-name) both become data-v; Vue comment anchors are dropped; generated
+// ids are reduced to their prefix; inline CSS variables named after scope
+// hashes are renamed.
+function dumpDom() {
+  const out = []
+  const origin = location.origin
+  const norm = v => v
+    .split(origin).join('<origin>')
+    .replace(/\b(reka-[a-z-]+?-)(?:v-\d+|_r_[0-9a-z]+_|«[^»]*»|:[^:]+:)/g, '$1ID')
+    .replace(/--v[0-9a-f]{8}\b|--v[0-9a-z]{6,10}\b/g, '--vbind')
+  const walk = (node, depth) => {
+    if (node.nodeType === 3) {
+      const text = node.textContent
+      if (text.trim()) out.push(`${'  '.repeat(depth)}"${text.replace(/\s+/g, ' ')}"`)
+      else if (text.length) out.push(`${'  '.repeat(depth)}" "`)
+      return
+    }
+    if (node.nodeType !== 1) return
+    const el = node
+    const attrs = [...el.attributes]
+      .filter(a => !/^data-v-/.test(a.name))
+      .map(a => a.name === '_echarts_instance_' ? { name: a.name, value: 'ec' } : a)
+      .map(a => `${a.name}=${JSON.stringify(norm(a.value))}`)
+      .sort()
+    if ([...el.attributes].some(a => /^data-v-/.test(a.name))) attrs.unshift('data-v')
+    out.push(`${'  '.repeat(depth)}<${el.tagName.toLowerCase()}${attrs.length ? ' ' + attrs.join(' ') : ''}>`)
+    if (el.tagName === 'svg' || el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return
+    for (const c of el.childNodes) walk(c, depth + 1)
+  }
+  for (const c of document.body.childNodes) walk(c, 0)
+  return out.join('\n')
+}
+
 const freezeCSS = `*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}
 [data-general-card-key="remainingValue"]{visibility:hidden!important}`
 const hideCanvasCSS = `canvas{visibility:hidden!important}`
@@ -298,6 +339,7 @@ async function captureScene(browser, base, variant, fixture, opts, outDir, side,
     const main = path.join(outDir, `${stem}-${side}.png`)
     await page.screenshot({ path: main, fullPage: true, animations: 'disabled', caret: 'hide' })
     shots[`${stem}.png`] = main
+    if (opts.dom) await writeFile(path.join(outDir, `${stem}-${side}.dom.txt`), await page.evaluate(dumpDom))
 
     if (scene === 'home' && opts.dialog) {
       // NodeCard.vue: the latency panel is a button labelled "<node name> 延迟监测"
@@ -313,6 +355,7 @@ async function captureScene(browser, base, variant, fixture, opts, outDir, side,
       const dlg = path.join(outDir, `${stem}-dialog-${side}.png`)
       await dialog.screenshot({ path: dlg, animations: 'disabled', caret: 'hide' })
       shots[`${stem}-dialog.png`] = dlg
+      if (opts.dom) await writeFile(path.join(outDir, `${stem}-dialog-${side}.dom.txt`), await page.evaluate(dumpDom))
     }
   } finally {
     await context.close()
@@ -331,6 +374,17 @@ async function capture(browser, base, variant, fixture, opts, outDir, side) {
 }
 
 // ---------------------------------------------------------------- diff
+async function domDiff(outDir, name) {
+  const stem = name.replace(/\.png$/, '')
+  const read = side => readFile(path.join(outDir, `${stem}-${side}.dom.txt`), 'utf8').then(t => t.split('\n')).catch(() => null)
+  const [a, b] = await Promise.all([read('ref'), read('cand')])
+  if (!a || !b) return 'missing'
+  if (a.join('\n') === b.join('\n')) return 'identical'
+  let i = 0
+  while (i < a.length && i < b.length && a[i] === b[i]) i++
+  return { firstDiffLine: i + 1, ref: a.slice(i, i + 3), cand: b.slice(i, i + 3), refLines: a.length, candLines: b.length }
+}
+
 async function readPNG(file) { return PNG.sync.read(await readFile(file)) }
 
 function compare(a, b) {
@@ -384,6 +438,7 @@ async function main() {
         const diffFile = path.join(outDir, name.replace(/\.png$/, '-diff.png'))
         await writeFile(diffFile, PNG.sync.write(r.diff))
         summary[name] = { size: r.size, native_size: r.native_size, over8: r.over8, mean: r.mean }
+        if (opts.dom) summary[name].dom = await domDiff(outDir, name)
       }
     }
   } finally {

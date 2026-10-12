@@ -29,6 +29,9 @@ type Deps struct {
 	// Page serves the built status SPA (index + assets) relative to "/".
 	Page      http.Handler
 	GlassPage http.Handler
+	// GlassReactPage is the React port of the glass page, selected by the
+	// "glass-react" preset while the two are built side by side.
+	GlassReactPage http.Handler
 }
 
 type handlers struct {
@@ -452,6 +455,9 @@ func optQuery(r *http.Request) string {
 }
 
 func (h *handlers) page(s store.ProbeSettings) http.Handler {
+	if s.Appearance != nil && s.Appearance.Preset == "glass-react" && h.GlassReactPage != nil {
+		return h.GlassReactPage
+	}
 	if s.Appearance != nil && s.Appearance.Preset == "glass" && h.GlassPage != nil {
 		return h.GlassPage
 	}

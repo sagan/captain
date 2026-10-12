@@ -33,6 +33,12 @@ func Probe() http.Handler { return spa(probeFS, "probe/dist", "/", "status page"
 // ProbeGlass serves the embedded Glassmorphism frontend at the same public mount.
 func ProbeGlass() http.Handler { return spa(probeFS, "probe/dist/glass", "/", "status page") }
 
+// ProbeGlassReact is the React port of the glass status page, built beside
+// the Vue one so the two can be diffed; the preset "glass-react" selects it.
+func ProbeGlassReact() http.Handler {
+	return spa(probeFS, "probe/dist/glass-react", "/", "status page")
+}
+
 // Injector returns operator HTML to add before </head> and </body>.
 type Injector func(r *http.Request) (head, body string)
 

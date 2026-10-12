@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { t } from '@shared/i18n'
 import { shows, snapshot } from '@/captain'
-import { formatNumber } from '@shared/utils/helper'
-import type { DetailMetricCardKey } from '@/stores/app'
 import type { CurrencyCode } from '@shared/utils/financeHelper'
 import { Icon } from '@iconify/vue'
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
@@ -18,15 +16,14 @@ import { LOAD_RECORD_MAX_COUNT } from '@shared/constants/load'
 import { loadNodeLoadRecords } from '@shared/services/history.service'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
-import { formatCityNameZh } from '@shared/utils/cityNameHelper'
 import { getCpuBenchmarkRating, getPassMarkCpuLookupUrl } from '@shared/utils/cpuBenchmark'
 import * as financeHelper from '@shared/utils/financeHelper'
-import { gpuUsageFromStatus } from '@shared/utils/gpuHelper'
-import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatUptimeWithFormat } from '@shared/utils/helper'
 import { getOSImage, getOSName } from '@shared/utils/osImageHelper'
 import { getRegionCode, getRegionDisplayName } from '@shared/utils/regionHelper'
 
-import { formatPrice, formatPriceWithCycle, getExpireStatus, getExpireText, isFreePrice, parseTags } from '@shared/utils/tagHelper'
+import { parseTags } from '@shared/utils/tagHelper'
+import type { DetailContext } from '@shared/views/instanceDetail'
+import { detailFormatters, hardwareSmallItems as sharedHardwareSmallItems, metricCards as sharedMetricCards, storageInfo as sharedStorageInfo, systemInfo as sharedSystemInfo } from '@shared/views/instanceDetail'
 
 const LoadChart = defineAsyncComponent(() => import('@/components/LoadChart.vue'))
 const PingChart = defineAsyncComponent(() => import('@/components/PingChart.vue'))
@@ -152,18 +149,6 @@ function toggleCurrentFavorite(): void {
 // 机房/厂商展示：城市 · 厂商 · ASN（缺项自动省略）
 const providerMetadata = computed(() => data.value ? getNodeProviderMetadata(data.value) : null)
 const vpsProvider = computed(() => providerMetadata.value?.provider ?? null)
-const providerDisplay = computed(() => {
-  const parts: string[] = []
-  const cityName = formatCityNameZh(providerMetadata.value?.geo?.city)
-  if (cityName)
-    parts.push(cityName)
-  if (providerMetadata.value?.provider?.displayName)
-    parts.push(providerMetadata.value.provider.displayName)
-  if (providerMetadata.value?.geo?.asn)
-    parts.push(providerMetadata.value.geo.asn)
-  return parts.length ? parts.join(' · ') : '-'
-})
-
 // 节点自定义标签
 const customTags = computed(() => parseTags(data.value?.tags).map(t => t.text))
 
@@ -183,243 +168,11 @@ const hasPeak = computed(() => peakNetOut.value > 0 || peakNetIn.value > 0)
 // 未登录且开启「未登录隐藏价格」时，屏蔽金额类指标（剩余时间为天数，仍显示）
 const showPrice = computed(() => appStore.privateFeaturesAllowed || !appStore.hidePriceWhenLoggedOut)
 
-const formatBytes = (bytes: number) => formatBytesWithConfig(bytes, appStore.byteDecimals)
-const formatBytesPerSecond = (bytes: number) => formatBytesPerSecondWithConfig(bytes, appStore.byteDecimals)
-const formatUptime = (seconds: number) => formatUptimeWithFormat(seconds, 'minute')
 const getRegionAltText = (region: string) => getRegionDisplayName(region) || getRegionCode(region)
-
-interface InfoItem {
-  label: string
-  value: string | undefined
-  icon?: string
-}
-
-interface MetricCard {
-  key: DetailMetricCardKey
-  label: string
-  value: string
-  unit?: string
-  icon: string
-  valueClass?: string
-  tooltip?: string
-}
-
-const MONTH_DAYS = 30
-const EXPIRES_IN_SUFFIX_REGEX = /^(\d+)\s*(天|days?)$/i
-const CURRENCY_SUFFIX_REGEX = /^(\S.*\S)\s+([A-Z]{3})$/
-
-function formatNodeAmount(amount: number, currency: string): string {
-  if (!Number.isFinite(amount) || amount <= 0)
-    return formatPrice(0, currency, appStore.lang)
-  const fractionDigits = Math.abs(amount) >= 100 ? 0 : 2
-  const normalizedAmount = Number(amount.toFixed(fractionDigits))
-  return formatPrice(normalizedAmount, currency, appStore.lang)
-}
-
-function calculateMonthlyAverageCost(price: number, billingCycle: number): number | null {
-  const normalizedPrice = Number(price)
-  const normalizedCycle = Number(billingCycle)
-  if (!Number.isFinite(normalizedPrice) || normalizedPrice <= 0)
-    return 0
-  if (!Number.isFinite(normalizedCycle) || normalizedCycle <= 0)
-    return null
-  return normalizedPrice / normalizedCycle * MONTH_DAYS
-}
-
-function splitMetricValue(value: string): { value: string, unit?: string } {
-  const cycleIndex = value.indexOf(' / ')
-  if (cycleIndex > -1)
-    return { value: value.slice(0, cycleIndex), unit: value.slice(cycleIndex) }
-  const expiresInMatch = value.match(EXPIRES_IN_SUFFIX_REGEX)
-  if (expiresInMatch)
-    return { value: expiresInMatch[1] ?? value, unit: expiresInMatch[2] ?? undefined }
-  const currencyMatch = value.match(CURRENCY_SUFFIX_REGEX)
-  if (currencyMatch)
-    return { value: currencyMatch[1] ?? value, unit: currencyMatch[2] ?? undefined }
-  return { value }
-}
-
-const nodePriceText = computed(() => {
-  if (!data.value)
-    return '-'
-  if (Number(data.value.price) <= 0)
-    return formatPrice(0, data.value.currency, appStore.lang)
-  return formatPriceWithCycle(data.value.price, data.value.billing_cycle, data.value.currency, appStore.lang)
-})
-
-const monthlyAverageCostText = computed(() => {
-  if (!data.value)
-    return '-'
-  if (isFreePrice(data.value.price))
-    return formatPrice(data.value.price, data.value.currency, appStore.lang)
-  const monthlyAverageCost = calculateMonthlyAverageCost(data.value.price, data.value.billing_cycle)
-  if (monthlyAverageCost === null)
-    return appStore.lang === 'zh-CN' ? '不适用' : 'N/A'
-  return `${formatNodeAmount(monthlyAverageCost, data.value.currency)} / 月`
-})
-
-const remainingTimeText = computed(() => {
-  if (!data.value?.expired_at)
-    return '-'
-  return getExpireText(data.value.expired_at, appStore.lang)
-})
-
-const remainingValueText = computed(() => {
-  if (!data.value)
-    return '-'
-  if (isFreePrice(data.value.price))
-    return appStore.lang === 'zh-CN' ? t('无') : 'N/A'
-  const remainingValueCNY = financeHelper.calculateRemainingValueCNY(data.value, exchangeRates.value)
-  const targetRate = exchangeRates.value[financeCurrency.value] || 1
-  const formattedValue = financeHelper.formatFinanceAmount(remainingValueCNY * targetRate, financeCurrency.value)
-  return `${formattedValue.symbol}${formattedValue.value}`
-})
-
-const remainingTimeValueClass = computed(() => {
-  if (!data.value?.expired_at)
-    return ''
-  const status = getExpireStatus(data.value.expired_at)
-  if (status === 'expired' || status === 'critical')
-    return 'text-destructive'
-  if (status === 'warning')
-    return 'text-orange-600 dark:text-orange-400'
-  if (status === 'long_term')
-    return 'text-muted-foreground'
-  return 'text-emerald-600 dark:text-emerald-400'
-})
-
-function usagePercentage(used: number, total: number): number | null {
-  if (!Number.isFinite(used) || !Number.isFinite(total) || total <= 0)
-    return null
-  return Math.min(100, Math.max(0, used / total * 100))
-}
-
-function splitMeasurement(value: string): { value: string, unit?: string } {
-  const separatorIndex = value.lastIndexOf(' ')
-  if (separatorIndex <= 0)
-    return { value }
-  return {
-    value: value.slice(0, separatorIndex),
-    unit: value.slice(separatorIndex + 1),
-  }
-}
-
-function getDetailMetricCard(key: DetailMetricCardKey): MetricCard {
-  const node = data.value
-  const masked = !showPrice.value
-  const nodePrice = splitMetricValue(nodePriceText.value)
-  const monthlyAverageCost = splitMetricValue(monthlyAverageCostText.value)
-  const remainingTime = splitMetricValue(remainingTimeText.value)
-  const remainingValue = splitMetricValue(remainingValueText.value)
-  const memoryUsage = usagePercentage(node?.ram ?? 0, node?.mem_total ?? 0)
-  const swapUsage = usagePercentage(node?.swap ?? 0, node?.swap_total ?? 0)
-  const diskUsage = usagePercentage(node?.disk ?? 0, node?.disk_total ?? 0)
-  const nodeTrafficUsed = snapshot.value?.nodes.find(n => String(n.id) === node?.uuid)?.traffic.used ?? Number.NaN
-  const nodeTrafficLimit = node?.traffic_limit ?? 0
-  const nodeHasTrafficLimit = nodeTrafficLimit > 0
-  const nodeTrafficPercentage = nodeHasTrafficLimit
-    ? Math.min(nodeTrafficUsed / nodeTrafficLimit * 100, 100)
-    : 0
-
-  switch (key) {
-    case 'nodePrice':
-      return { key, label: t('节点价格'), value: '—', icon: 'tabler:cash' }
-    case 'monthlyCost':
-      return { key, label: t('月均支出'), value: '—', icon: 'tabler:receipt-2' }
-    case 'remainingTime':
-      return { key, label: t('剩余时间'), value: remainingTime.value, unit: remainingTime.unit, icon: 'tabler:calendar-dollar', valueClass: remainingTimeValueClass.value }
-    case 'remainingValue':
-      return { key, label: t('剩余价值'), value: '—', icon: 'tabler:coins' }
-    case 'cpuUsage':
-      return { key, label: 'CPU 使用率', value: formatNumber(node?.cpu ?? Number.NaN, 1), unit: '%', icon: 'tabler:cpu' }
-    case 'gpuUsage': {
-      const gpu = gpuUsageFromStatus(node)
-      const hasGpu = Boolean(node?.gpu_name?.trim()) || gpu > 0
-      return { key, label: 'GPU 使用率', value: hasGpu ? gpu.toFixed(1) : '-', unit: hasGpu ? '%' : undefined, icon: 'tabler:device-desktop-analytics', tooltip: node?.gpu_name?.trim() || undefined }
-    }
-    case 'memoryUsage':
-      return { key, label: '内存使用率', value: memoryUsage === null ? '-' : memoryUsage.toFixed(1), unit: memoryUsage === null ? undefined : '%', icon: 'icon-park-outline:memory', tooltip: `${formatBytes(node?.ram ?? 0)} / ${formatBytes(node?.mem_total ?? 0)}` }
-    case 'swapUsage':
-      return { key, label: '交换内存', value: swapUsage === null ? '-' : swapUsage.toFixed(1), unit: swapUsage === null ? undefined : '%', icon: 'icon-park-outline:switch', tooltip: `${formatBytes(node?.swap ?? 0)} / ${formatBytes(node?.swap_total ?? 0)}` }
-    case 'diskUsage':
-      return { key, label: '硬盘使用率', value: diskUsage === null ? '-' : diskUsage.toFixed(1), unit: diskUsage === null ? undefined : '%', icon: 'tabler:server-2', tooltip: `${formatBytes(node?.disk ?? 0)} / ${formatBytes(node?.disk_total ?? 0)}` }
-    case 'load':
-      return { key, label: '系统负载', value: formatNumber(node?.load ?? Number.NaN, 2), unit: '1m', icon: 'tabler:chart-line', tooltip: `5m ${formatNumber(node?.load5 ?? Number.NaN, 2)} / 15m ${formatNumber(node?.load15 ?? Number.NaN, 2)}` }
-    case 'temperature': {
-      const temperature = node?.temp ?? 0
-      return { key, label: '系统温度', value: temperature > 0 ? temperature.toFixed(1) : '-', unit: temperature > 0 ? '°C' : undefined, icon: 'tabler:temperature' }
-    }
-    case 'processes':
-      return { key, label: '进程数', value: Math.round(node?.process ?? 0).toLocaleString('zh-CN'), icon: 'tabler:list-numbers' }
-    case 'connections':
-      return { key, label: t('连接数'), value: Math.round((node?.connections ?? 0) + (node?.connections_udp ?? 0)).toLocaleString('zh-CN'), icon: 'tabler:plug-connected', tooltip: `TCP ${node?.connections ?? 0} / UDP ${node?.connections_udp ?? 0}` }
-    case 'uptime':
-      return { key, label: t('运行时间'), value: formatUptime(node?.uptime ?? 0), icon: 'tabler:clock-up' }
-    case 'uploadSpeed': {
-      const speed = splitMeasurement(formatBytesPerSecond(node?.net_out ?? 0))
-      return { key, label: t('实时上行'), value: speed.value, unit: speed.unit, icon: 'tabler:chevrons-up' }
-    }
-    case 'downloadSpeed': {
-      const speed = splitMeasurement(formatBytesPerSecond(node?.net_in ?? 0))
-      return { key, label: t('实时下行'), value: speed.value, unit: speed.unit, icon: 'tabler:chevrons-down' }
-    }
-    case 'totalTraffic': {
-      const traffic = splitMeasurement(formatBytes((node?.net_total_up ?? Number.NaN) + (node?.net_total_down ?? Number.NaN)))
-      return { key, label: t('累计流量'), value: traffic.value, unit: traffic.unit, icon: 'tabler:arrows-transfer-up-down', tooltip: `${t('本周期出站')} ${formatBytes(node?.net_total_up ?? Number.NaN)} / ${t('本周期入站')} ${formatBytes(node?.net_total_down ?? Number.NaN)}\n${t('周期流量说明')}` }
-    }
-    case 'trafficQuota':
-      return {
-        key,
-        label: t('流量配额'),
-        value: nodeHasTrafficLimit ? nodeTrafficPercentage.toFixed(1) : '∞',
-        unit: nodeHasTrafficLimit ? '%' : undefined,
-        icon: 'tabler:gauge',
-        tooltip: nodeHasTrafficLimit ? `${formatBytes(nodeTrafficUsed)} / ${formatBytes(nodeTrafficLimit)}` : '无限流量',
-      }
-    default:
-      return { key: 'cpuUsage', label: 'CPU 使用率', value: formatNumber(node?.cpu ?? Number.NaN, 1), unit: '%', icon: 'tabler:cpu' }
-  }
-}
 
 // 硬件信息小卡：CPU 单独全宽展示，这里是其余小格。
 // - 「架构」格：登录后改显节点 IP（避免未登录访客扫到 IP），未登录或无 IP 时回退显示架构
 // - GPU：仅在节点确实有 GPU 时才显示
-const hardwareSmallItems = computed<InfoItem[]>(() => {
-  const node = data.value
-  const items: InfoItem[] = []
-
-  const ip = node?.ipv4 || node?.ipv6
-  if (appStore.privateFeaturesAllowed && ip)
-    items.push({ label: 'IP', value: ip, icon: 'tabler:world' })
-  else
-    items.push({ label: t('架构'), value: node?.arch ?? '-', icon: 'icon-park-outline:application-two' })
-
-  const physicalCores = node?.cpu_physical_cores
-  if (typeof physicalCores === 'number' && physicalCores > 0)
-    items.push({ label: '物理核心', value: `${physicalCores} 核`, icon: 'tabler:cpu' })
-
-  items.push({ label: t('虚拟化'), value: node?.virtualization ?? '-', icon: 'icon-park-outline:server' })
-
-  const gpu = node?.gpu_name?.trim()
-  if (gpu && gpu.toLowerCase() !== 'none')
-    items.push({ label: 'GPU', value: gpu, icon: 'icon-park-outline:video-one' })
-
-  return items
-})
-
-const systemInfo = computed<InfoItem[]>(() => [
-  { label: t('操作系统'), value: data.value?.os ?? '-', icon: 'icon-park-outline:computer' },
-  { label: t('内核版本'), value: data.value?.kernel_version ?? '-', icon: 'icon-park-outline:code' },
-  { label: t('运行时间'), value: formatUptime(data.value?.uptime ?? 0), icon: 'icon-park-outline:timer' },
-  { label: t('厂商'), value: providerDisplay.value, icon: vpsProvider.value?.primary.icon ?? 'icon-park-outline:server' },
-])
-
-const storageInfo = computed<InfoItem[]>(() => [
-  { label: t('内存'), value: formatBytes(data.value?.mem_total ?? 0), icon: 'icon-park-outline:memory' },
-  { label: t('内存交换'), value: formatBytes(data.value?.swap_total ?? 0), icon: 'icon-park-outline:switch' },
-  { label: t('硬盘'), value: formatBytes(data.value?.disk_total ?? 0), icon: 'icon-park-outline:hard-disk' },
-])
-
 const trafficUsed = computed(() => snapshot.value?.nodes.find(n => String(n.id) === data.value?.uuid)?.traffic.used ?? Number.NaN)
 
 const hasTrafficLimit = computed(() => (data.value?.traffic_limit ?? 0) > 0)
@@ -449,7 +202,26 @@ const trafficProgressClass = computed(() => {
   return 'bg-emerald-500/20'
 })
 
-const metricCards = computed<MetricCard[]>(() => appStore.detailMetricCardOrder.filter(key => shows(({cpuUsage:'cpu',memoryUsage:'memory',swapUsage:'memory',diskUsage:'disk',uploadSpeed:'network',downloadSpeed:'network',totalTraffic:'traffic',trafficQuota:'traffic',connections:'system',processes:'system',uptime:'system',load:'system',remainingTime:'system',nodePrice:'system',monthlyCost:'system',remainingValue:'system'} as Record<string,string>)[key] ?? 'system')).map(getDetailMetricCard))
+// Card values, labels and info rows come from the shared module.
+const detailContext = computed<DetailContext>(() => ({
+  data: data.value,
+  snapshot: snapshot.value,
+  lang: appStore.lang,
+  byteDecimals: appStore.byteDecimals,
+  privateFeaturesAllowed: appStore.privateFeaturesAllowed,
+  hidePriceWhenLoggedOut: appStore.hidePriceWhenLoggedOut,
+  exchangeRates: exchangeRates.value,
+  financeCurrency: financeCurrency.value,
+  providerMetadata: providerMetadata.value,
+}))
+const formatters = computed(() => detailFormatters(detailContext.value))
+const formatBytes = (bytes: number) => formatters.value.formatBytes(bytes)
+const formatBytesPerSecond = (bytes: number) => formatters.value.formatBytesPerSecond(bytes)
+const hardwareSmallItems = computed(() => sharedHardwareSmallItems(detailContext.value))
+const systemInfo = computed(() => sharedSystemInfo(detailContext.value))
+const storageInfo = computed(() => sharedStorageInfo(detailContext.value))
+const metricCards = computed(() => sharedMetricCards(detailContext.value, appStore.detailMetricCardOrder, shows))
+
 </script>
 
 <template>

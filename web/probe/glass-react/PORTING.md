@@ -72,6 +72,22 @@ passes the gate (see Verification).
 9. **Do not add behaviour.** No visitor IP lookups, external requests, analytics.
    Captain's public API only.
 
+## Checking text nodes against Vue's compiler
+
+To see exactly how Vue condensed every text node in a template, compile it and
+list the text expressions:
+
+```sh
+node -e "
+const {compileTemplate,parse}=require('vue/compiler-sfc');const fs=require('fs');
+const {descriptor}=parse(fs.readFileSync(process.argv[1],'utf8'));
+const r=compileTemplate({source:descriptor.template.content,filename:'x.vue',id:'x',compilerOptions:{mode:'module',whitespace:'condense'}});
+console.log(r.code)" glass/src/components/NodeCard.vue | grep -n '_toDisplayString\|_createTextVNode\|\" \"'
+```
+
+`_createTextVNode(" ")` is a single space between elements; `" foo "` string
+literals show leading/trailing spaces. Reproduce them exactly in JSX.
+
 ## Verification you must run
 
 From `web/probe`:

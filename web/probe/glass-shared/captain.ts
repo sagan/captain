@@ -6,6 +6,7 @@ import type { Snapshot, Node, Host, StatPoint, Sample, Validity } from '../src/l
 import type { NetworkHistory, NetworkPoint } from '../src/lib/network'
 // Re-exported so both component trees take these from one module.
 export type { Snapshot, Node, Host, StatPoint, Sample, Validity, NetworkHistory, NetworkPoint }
+export type { PublicPingTask } from '../src/lib/api'
 import type { Client, NodeStatus, StatusRecord, MetricQueryParams, MetricQueryResponse, MetricSeries, PingMetricStatsResponse } from './utils/rpc'
 
 export const snapshot = box<Snapshot | null>(null)

@@ -6,6 +6,8 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
+- **v1.19.0** (2026-10-13) — Replace the Glassmorphism status page's Vue frontend with a React port that reproduces the MIT Komari theme element for element, so all four embedded frontends share one framework. The `glass` preset, routes, public API use, local assets, licences and saved visitor preferences are unchanged. The port is verified against the previous Vue build pixel for pixel (16 screenshots: home with the latency dialog, list, node detail; light/dark; desktop/mobile) and step by step in behaviour (group tabs, filters, favourites, sorting, search, detail navigation, theme); the comparison scripts ship under `web/probe/scripts`. Vue-only dependencies are removed. No server changes beyond the build; no database migration.
+
 - **v1.18.0** (2026-10-11) — Add explicit monitor-only nodes, generated lightweight install commands, mode badges/filtering and administrator-controlled transitions with fresh agent acknowledgement. Preserve existing full nodes; refuse proxy writes/state while monitoring, require idle resources before switching, and keep monitoring and upgrades. Adds migration 72 and six-language controls (requires bosun v0.66.0+).
 
 - **v1.17.0** (2026-10-10) — Add optional host-managed Docker web upgrades through a dedicated Unix socket, with fixed official image sources, stopped-data backups, persisted progress and verification of the running application's target version. Keep Docker daemon access outside the web process.

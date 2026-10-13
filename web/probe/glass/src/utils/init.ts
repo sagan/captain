@@ -1,7 +1,7 @@
-import { useAppStore } from '@/stores/app'
-import { useNodesStore } from '@/stores/nodes'
+import { appStore } from '@/stores/app'
+import { nodesStore } from '@/stores/nodes'
 import { snapshot, readJSON, clientFor, statusFor, periodTraffic, shows, clearHistoryCache } from '@shared/captain'
-import type { Snapshot } from '../../../src/lib/api'
+import type { Snapshot } from '@shared/captain'
 import type { PublicSettings } from '@shared/utils/api'
 
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -10,7 +10,6 @@ let stopped = false
 const system = window.matchMedia('(prefers-color-scheme: dark)')
 
 async function refresh(): Promise<boolean> {
-  const app = useAppStore(), nodes = useNodesStore()
   controller?.abort()
   controller = new AbortController()
   try {
@@ -24,7 +23,7 @@ async function refresh(): Promise<boolean> {
     snapshot.value = s
     const scheme = s.appearance_scheme ?? s.appearance?.scheme ?? 'dark'
     document.title = s.title
-    app.publicSettings = {
+    appStore.setPublicSettings({
       sitename: s.title, description: '', allow_cors: false, custom_body: '', custom_head: '', disable_password_login: true, oauth_enable: false, oauth_provider: '', theme: 'glass', record_enabled: shows('history'), record_preserve_time: 720,
       ping_record_preserve_time: shows('latency') && shows('history') ? 720 : 0,
       visitor_audit_enabled: false, private_site: false,
@@ -36,28 +35,31 @@ async function refresh(): Promise<boolean> {
         // No billing/currency inference from Captain's free-form price strings.
         generalCardKeys: [...(shows('memory') ? ['memory'] : []), ...(shows('disk') ? ['disk'] : []), ...(shows('system') ? ['remainingValue'] : ['onlineNodes']), ...(shows('traffic') ? ['totalTraffic'] : []), ...(shows('network') ? ['uploadSpeed', 'downloadSpeed'] : [])].join(','),
       },
-    } as PublicSettings
-    nodes.updateNodeClients(Object.fromEntries(s.nodes.map((n, i) => [String(n.id), clientFor(n, i)])))
-    nodes.updateNodeStatuses(Object.fromEntries(s.nodes.map(n => [String(n.id), statusFor(n)])))
+    } as PublicSettings)
+    nodesStore.updateNodeClients(Object.fromEntries(s.nodes.map((n, i) => [String(n.id), clientFor(n, i)])))
+    nodesStore.updateNodeStatuses(Object.fromEntries(s.nodes.map(n => [String(n.id), statusFor(n)])))
     // Exact group labels; commas in Captain group names are not separators.
-    for (const n of nodes.nodes) {
-      n.captainTraffic = periodTraffic(s.nodes.find(v => String(v.id) === n.uuid)!).used
-      n.groups = s.nodes.find(v => String(v.id) === n.uuid)?.group ? [s.nodes.find(v => String(v.id) === n.uuid)!.group!] : []
-    }
-    app.connectionError = false
+    const byId = new Map(s.nodes.map(v => [String(v.id), v]))
+    nodesStore.patchNodes((n) => {
+      const source = byId.get(n.uuid)
+      if (!source)
+        return null
+      return { captainTraffic: periodTraffic(source).used, groups: source.group ? [source.group] : [] }
+    })
+    appStore.setConnectionError(false)
     return true
   } catch (error) {
     if (!stopped && !(error instanceof DOMException && error.name === 'AbortError')) {
-      app.connectionError = true
+      appStore.setConnectionError(true)
       if (error instanceof Error && ['401', '403', '404'].includes(error.message)) {
         snapshot.value = null
         clearHistoryCache()
-        nodes.nodes = []
+        nodesStore.clearNodes()
       }
     }
     return false
   } finally {
-    app.loading = false
+    appStore.setLoading(false)
     if (!stopped) timer = setTimeout(() => void refresh(), Math.max(5, snapshot.value?.beat_seconds ?? 15) * 1000)
   }
 }

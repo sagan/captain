@@ -1,0 +1,6 @@
+/* Scoped styles of the upstream NodeCard.vue, as compiled by Vue's
+ * SFC compiler (scope attribute data-v-<name>, see ./scope.ts). */
+.node-card[data-v-node-card] {
+  position: relative;
+  overflow: hidden;
+}

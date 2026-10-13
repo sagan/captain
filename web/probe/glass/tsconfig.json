@@ -1,15 +1,24 @@
 {
-  "extends": "@vue/tsconfig/tsconfig.dom.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "../node_modules/.tmp/glass.tsbuildinfo",
+    "target": "ES2023",
     "lib": [
       "ES2023",
       "DOM",
       "DOM.Iterable"
     ],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "composite": true,
+    "tsBuildInfoFile": "../node_modules/.tmp/glass.tsbuildinfo",
     "types": [
       "vite/client"
     ],
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
     "paths": {
       "@/*": [
         "./src/*"
@@ -17,16 +26,13 @@
       "@shared/*": [
         "../glass-shared/*"
       ]
-    },
-    "skipLibCheck": true
+    }
   },
   "include": [
-    "env.d.ts",
     "src/**/*.ts",
-    "src/**/*.vue",
-    "../glass-shared/**/*.ts"
-  ],
-  "exclude": [
-    "src/**/__tests__/*"
+    "src/**/*.tsx",
+    "../glass-shared/**/*.ts",
+    "../src/lib/**/*.ts",
+    "../src/appearance.ts"
   ]
 }

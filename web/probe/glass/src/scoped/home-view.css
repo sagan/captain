@@ -1,0 +1,61 @@
+/* Scoped styles of the upstream HomeView.vue, as compiled by Vue's
+ * SFC compiler (scope attribute data-v-<name>, see ./scope.ts). */
+.home-view--motion[data-v-home-view] {
+  animation: home-view-enter-home-view 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes home-view-enter-home-view {
+from {
+    opacity: 0;
+    transform: translateY(8px);
+}
+to {
+    opacity: 1;
+    transform: translateY(0);
+}
+}
+.home-controls-scroll[data-v-home-view] {
+  scrollbar-width: none;
+}
+.home-controls-scroll[data-v-home-view]::-webkit-scrollbar {
+  display: none;
+}
+.node-card-switch-enter-active[data-v-home-view],
+.node-card-switch-leave-active[data-v-home-view] {
+  transition:
+    opacity 180ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 180ms ease;
+}
+.node-card-switch-enter-active[data-v-home-view] {
+  transition-delay: var(--node-item-delay, 0ms);
+}
+.node-card-switch-move[data-v-home-view] {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.node-card-switch-enter-from[data-v-home-view] {
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+  filter: blur(3px);
+}
+.node-card-switch-leave-to[data-v-home-view] {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.99);
+  filter: blur(2px);
+}
+@media (prefers-reduced-motion: reduce) {
+.home-view--motion[data-v-home-view] {
+    animation: none;
+}
+.node-card-switch-enter-active[data-v-home-view],
+  .node-card-switch-leave-active[data-v-home-view],
+  .node-card-switch-move[data-v-home-view] {
+    transition: none;
+    transition-delay: 0ms;
+}
+.node-card-switch-enter-from[data-v-home-view],
+  .node-card-switch-leave-to[data-v-home-view] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+}
+}

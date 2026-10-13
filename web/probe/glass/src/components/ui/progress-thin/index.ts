@@ -1,1 +1,1 @@
-export { default as ProgressThin } from './ProgressThin.vue'
+export { ProgressThin } from './ProgressThin'

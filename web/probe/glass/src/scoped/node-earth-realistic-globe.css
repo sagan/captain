@@ -1,0 +1,39 @@
+/* Scoped styles of the upstream NodeEarthRealisticGlobe.vue, as compiled by Vue's
+ * SFC compiler (scope attribute data-v-<name>, see ./scope.ts). */
+.earth-fallback[data-v-node-earth-realistic-globe] {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background-size: auto 100%;
+  background-position: 65% center;
+  box-shadow: inset -24px -8px 45px rgb(0 0 0 / 65%), 0 0 28px rgb(96 165 250 / 35%);
+}
+.earth-globe-host[data-v-node-earth-realistic-globe] {
+  contain: layout paint;
+  background: transparent;
+}
+.earth-globe-host[data-v-node-earth-realistic-globe] canvas {
+  background: transparent !important;
+  outline: none;
+}
+.earth-globe-host[data-v-node-earth-realistic-globe] .scene-container {
+  background: transparent !important;
+}
+.earth-globe-host[data-v-node-earth-realistic-globe] .earth-label {
+  pointer-events: none;
+  position: relative;
+  transform: translate(-50%, -118%);
+  transition:
+    opacity 500ms ease,
+    filter 500ms ease;
+  will-change: opacity, filter;
+}
+.earth-globe-host[data-v-node-earth-realistic-globe] .earth-label-flag {
+  position: relative;
+  z-index: 2;
+  width: 1.2rem;
+  height: 1.2rem;
+  display: block;
+  border-radius: 0.18rem;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 24%);
+}

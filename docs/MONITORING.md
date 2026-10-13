@@ -615,10 +615,11 @@ current appearance. Only bundled options are accepted; themes do not execute
 remote code or custom CSS. Existing public-page visibility and section controls
 remain authoritative. GPU details are never exposed by a theme choice.
 
-**Glassmorphism** embeds the MIT-licensed public Vue frontend from
+**Glassmorphism** is a React port of the MIT-licensed public Vue frontend from
 [Komari Glassmorphism](https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism)
-(v3.3.7, commit `06999d5`). Cards, list, background, globe, details and charts use
-the upstream components and styles. Its visitor theme button can override the
+(v3.3.7, commit `06999d5`). Cards, list, background, globe, details and charts
+reproduce the upstream components and styles; the port was verified pixel for
+pixel against the Vue build. Its visitor theme button can override the
 configured default light/dark mode. The two twenty-segment latency/loss bars
 show weighted time buckets and open the original monitoring chart on click.
 Missing intervals stay grey; complete loss does not become zero latency.

@@ -1,4 +1,4 @@
-import { toast } from 'vue-sonner'
+import { toast } from 'sonner'
 
 export interface MessageApi {
   success: (msg: string) => void

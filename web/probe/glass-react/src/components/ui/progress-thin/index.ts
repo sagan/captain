@@ -1,1 +1,0 @@
-export { ProgressThin } from './ProgressThin'

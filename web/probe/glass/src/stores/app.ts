@@ -1,22 +1,30 @@
-import { useStorageAsync } from '@vueuse/core'
-import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
-import type { PermissionKey, VerifyLoginOptions } from '@shared/services/auth.service'
-import type { MeInfo, PublicSettings } from '@shared/utils/api'
-import type { ByteDecimalsConfig } from '@shared/utils/helper'
+// React counterpart of glass/src/stores/app.ts. Derivations come from the
+// shared deriveAppSettings() so both builds compute identical values; the
+// localStorage keys and formats match the Vue build's useStorageAsync.
+import { useMemo } from 'react'
+import type { AuthStatus, PermissionKey, VerifyLoginOptions } from '@shared/services/auth.service'
 import { getAuthSession, requirePermission, setAuthSessionFromLogin, verifyLogin } from '@shared/services/auth.service'
 import {
   BYTE_DECIMALS,
-  getBeijingHour,
-  isValidThemeMode,
   deriveAppSettings,
+  getBeijingHour,
+  isValidManagedThemeMode,
+  isValidThemeMode,
   normalizeThemeSettings,
 } from '@shared/stores/app-settings'
 import type {
+  DerivedAppSettings,
   Lang,
+  ManagedThemeMode,
   NodeViewMode,
   ThemeMode,
+  ThemeSettings,
 } from '@shared/stores/app-settings'
+import type { MeInfo, PublicSettings } from '@shared/utils/api'
+import type { ByteDecimalsConfig } from '@shared/utils/helper'
+import { createStore, shallowEqual, useSelector } from './store'
+import { onStoredChange, readStored, writeStored } from './storage'
+
 export type {
   ThemeMode,
   ManagedThemeMode,
@@ -29,332 +37,264 @@ export type {
 } from '@shared/stores/app-settings'
 export type { GlassCustomColors } from '@shared/types/theme'
 
-const useAppStore = defineStore('app', () => {
-  const loading = ref<boolean>(true)
+const KEY_THEME_MODE = 'themeMode'
+const KEY_GROUP = 'nodeSelectedGroup'
+const KEY_FAVORITES = 'theme:favorite-nodes:v1'
+const KEY_VIEW_MODE = 'nodeViewMode'
 
-  // 使用 VueUse 的 useStorageAsync 实现自动持久化
-  const themeMode = useStorageAsync<ThemeMode>('themeMode', 'auto', localStorage)
-  const lang = ref<Lang>('zh-CN')
-  const publicSettings = ref<PublicSettings>()
-  const nodeSelectedGroup = useStorageAsync<string>('nodeSelectedGroup', 'all', localStorage)
-  const favoriteNodeIds = useStorageAsync<string[]>('theme:favorite-nodes:v1', [], localStorage)
-  const isLoggedIn = ref<boolean>(getAuthSession().authenticated)
-  const authStatus = ref(getAuthSession().status)
-  const privateFeaturesAllowed = computed(() => authStatus.value === 'authenticated')
-  const connectionError = ref<boolean>(false)
-  const homeAdvancedToolsVisible = ref(false)
-  const favoriteNodeIdSet = computed(() => new Set(
-    (Array.isArray(favoriteNodeIds.value) ? favoriteNodeIds.value : [])
-      .filter((id): id is string => typeof id === 'string' && Boolean(id.trim())),
-  ))
+function isValidViewMode(value: string | null): value is NodeViewMode {
+  return value === 'card' || value === 'list'
+}
 
-  function isFavoriteNode(uuid: string): boolean {
-    return favoriteNodeIdSet.value.has(uuid)
-  }
+interface AppRawState {
+  loading: boolean
+  themeMode: ThemeMode
+  lang: Lang
+  publicSettings: PublicSettings | undefined
+  nodeSelectedGroup: string
+  favoriteNodeIds: string[]
+  isLoggedIn: boolean
+  authStatus: AuthStatus
+  connectionError: boolean
+  homeAdvancedToolsVisible: boolean
+  homeScrollPosition: number
+  storedViewMode: NodeViewMode | null
+  beijingTimeTick: number
+}
 
-  function toggleFavoriteNode(uuid: string): void {
-    const normalized = uuid.trim()
-    if (!normalized)
-      return
-    favoriteNodeIds.value = favoriteNodeIdSet.value.has(normalized)
-      ? [...favoriteNodeIdSet.value].filter(id => id !== normalized)
-      : [...favoriteNodeIdSet.value, normalized]
-  }
+const session = getAuthSession()
+const raw = createStore<AppRawState>({
+  loading: true,
+  themeMode: readStored<ThemeMode>(KEY_THEME_MODE, 'auto', 'string'),
+  lang: 'zh-CN',
+  publicSettings: undefined,
+  nodeSelectedGroup: readStored<string>(KEY_GROUP, 'all', 'string'),
+  favoriteNodeIds: readStored<string[]>(KEY_FAVORITES, [], 'json'),
+  isLoggedIn: session.authenticated,
+  authStatus: session.status,
+  connectionError: false,
+  homeAdvancedToolsVisible: false,
+  homeScrollPosition: 0,
+  storedViewMode: readStored<NodeViewMode | null>(KEY_VIEW_MODE, null, 'string'),
+  beijingTimeTick: Date.now(),
+})
 
-  const themeSettings = computed(() => normalizeThemeSettings(publicSettings.value?.theme_settings))
-  const visitorAuditSupported = computed(() => typeof publicSettings.value?.visitor_audit_enabled === 'boolean')
-  const visitorAuditEnabled = computed(() => publicSettings.value?.visitor_audit_enabled === true)
+onStoredChange<ThemeMode>(KEY_THEME_MODE, 'auto', 'string', v => raw.setState({ themeMode: v }))
+onStoredChange<string>(KEY_GROUP, 'all', 'string', v => raw.setState({ nodeSelectedGroup: v }))
+onStoredChange<string[]>(KEY_FAVORITES, [], 'json', v => raw.setState({ favoriteNodeIds: v }))
+onStoredChange<NodeViewMode | null>(KEY_VIEW_MODE, null, 'string', v => raw.setState({ storedViewMode: v }))
 
-  // 首页滚动位置记忆
-  const homeScrollPosition = ref<number>(0)
+if (typeof window !== 'undefined') {
+  window.setInterval(() => {
+    raw.setState({ beijingTimeTick: Date.now() })
+  }, 60 * 1000)
+}
 
-  // 使用 null 表示未设置，等待主题配置加载后决定
-  const storedViewMode = useStorageAsync<NodeViewMode | null>('nodeViewMode', null, localStorage)
+// Persisted fields write through on every change, like useStorageAsync.
+function persist(prev: AppRawState, next: AppRawState): void {
+  if (prev.themeMode !== next.themeMode)
+    writeStored(KEY_THEME_MODE, next.themeMode, 'string')
+  if (prev.nodeSelectedGroup !== next.nodeSelectedGroup)
+    writeStored(KEY_GROUP, next.nodeSelectedGroup, 'string')
+  if (prev.favoriteNodeIds !== next.favoriteNodeIds)
+    writeStored(KEY_FAVORITES, next.favoriteNodeIds, 'json')
+  if (prev.storedViewMode !== next.storedViewMode)
+    writeStored(KEY_VIEW_MODE, next.storedViewMode, 'string')
+}
 
-  const beijingTimeTick = ref(Date.now())
-  if (typeof window !== 'undefined') {
-    window.setInterval(() => {
-      beijingTimeTick.value = Date.now()
-    }, 60 * 1000)
-  }
+export interface AppState extends DerivedAppSettings {
+  loading: boolean
+  themeMode: ThemeMode
+  managedThemeMode: ManagedThemeMode
+  isBeijingDaytime: boolean
+  isDark: boolean
+  resolvedThemeMode: 'light' | 'dark'
+  lang: Lang
+  nodeSelectedGroup: string
+  favoriteNodeIds: string[]
+  favoriteNodeIdSet: Set<string>
+  nodeViewMode: NodeViewMode
+  byteDecimals: ByteDecimalsConfig
+  homeAdvancedToolsVisible: boolean
+  visitorAuditSupported: boolean
+  visitorAuditEnabled: boolean
+  currentBackgroundUrl: string
+  isLoggedIn: boolean
+  authStatus: AuthStatus
+  privateFeaturesAllowed: boolean
+  publicSettings: PublicSettings | undefined
+  connectionError: boolean
+  homeScrollPosition: number
+  themeSettings: ThemeSettings
+}
 
-  // 计算属性：从主题配置获取默认视图模式
-  const derived = computed(() => deriveAppSettings(themeSettings.value))
+const byteDecimals: ByteDecimalsConfig = { ...BYTE_DECIMALS }
 
-  const defaultViewMode = computed(() => derived.value.defaultViewMode)
+// Memoisation mirrors Vue's computed graph: each layer recomputes only when
+// its own inputs change, so selected values keep their identity.
+let lastPublicSettings: PublicSettings | undefined | null = null
+let lastThemeSettings: ThemeSettings = normalizeThemeSettings(undefined)
+let lastDerived: DerivedAppSettings = deriveAppSettings(lastThemeSettings)
+let lastFavoriteIds: string[] | null = null
+let lastFavoriteSet = new Set<string>()
+let lastRaw: AppRawState | null = null
+let lastState: AppState | null = null
 
-  // 校验视图模式是否为合法值
-  function isValidViewMode(value: string | null): value is NodeViewMode {
-    return value === 'card' || value === 'list'
-  }
-
-  const nodeCardSize = computed(() => derived.value.nodeCardSize)
-
-  // 当前实际使用的视图模式
-  const nodeViewMode = computed<NodeViewMode>({
-    get: () => {
-      // 校验 storedViewMode 是否为合法值，非法值时使用默认值
-      if (storedViewMode.value !== null && isValidViewMode(storedViewMode.value)) {
-        return storedViewMode.value
-      }
-      return defaultViewMode.value
-    },
-    set: (val) => {
-      storedViewMode.value = val
-    },
-  })
-
-  // 计算属性：从主题配置获取 RPC 连接模式
-  const rpcTransportMode = computed(() => derived.value.rpcTransportMode)
-
-  // 字节格式化精度（固定配置）
-  const byteDecimals: ByteDecimalsConfig = { ...BYTE_DECIMALS }
-
-  // 计算属性：公告配置
-  const alertEnabled = computed(() => derived.value.alertEnabled)
-
-  const alertTitle = computed(() => derived.value.alertTitle)
-
-  const alertContent = computed(() => derived.value.alertContent)
-
-  const dataUpdateInterval = computed(() => derived.value.dataUpdateInterval)
-
-  const stopEarth = computed(() => derived.value.stopEarth)
-
-  const earthRenderer = computed(() => derived.value.earthRenderer)
-
-  const hideEarth = computed(() => derived.value.hideEarth)
-
-  const hideGeneralCard = computed(() => derived.value.hideGeneralCard)
-
-  const visitorInfoEnabled = computed(() => derived.value.visitorInfoEnabled)
-
-  const generalCardEnabledMap = computed(() => derived.value.generalCardEnabledMap)
-
-  const generalCardOrder = computed(() => derived.value.generalCardOrder)
-
-  const homeToolsEnabled = computed(() => derived.value.homeToolsEnabled)
-
-  const glassColorPreset = computed(() => derived.value.glassColorPreset)
-
-  const glassCustomColors = computed(() => derived.value.glassCustomColors)
-
-  const colorVisionMode = computed(() => derived.value.colorVisionMode)
-
-  const colorVisionFriendly = computed(() => derived.value.colorVisionFriendly)
-
-  const homeQuickControlsEnabled = computed(() => derived.value.homeQuickControlsEnabled)
-
-  const homeQuickControlOrder = computed(() => derived.value.homeQuickControlOrder)
-
-  const nodeListMetadataEnabled = computed(() => derived.value.nodeListMetadataEnabled)
-
-  const nodeListMetadataFields = computed(() => derived.value.nodeListMetadataFields)
-
-  const nodeListCustomTagsVisible = computed(() => derived.value.nodeListCustomTagsVisible)
-
-  const nodeDetailSectionTabsEnabled = computed(() => derived.value.nodeDetailSectionTabsEnabled)
-
-  const gpuChartEnabled = computed(() => derived.value.gpuChartEnabled)
-
-  const detailMetricCardOrder = computed(() => derived.value.detailMetricCardOrder)
-
-  const offlineNodesLast = computed(() => derived.value.offlineNodesLast)
-
-  const homeHighLoadThreshold = computed(() => derived.value.homeHighLoadThreshold)
-
-  const homeTrafficWarningThreshold = computed(() => derived.value.homeTrafficWarningThreshold)
-
-  const homeExpiringDays = computed(() => derived.value.homeExpiringDays)
-
-  const diskPredictionEnabled = computed(() => derived.value.diskPredictionEnabled)
-
-  const diskPredictionThresholdDays = computed(() => derived.value.diskPredictionThresholdDays)
-
-  const chartDashboardTemplate = computed(() => derived.value.chartDashboardTemplate)
-
-  const hideAdminEntryWhenLoggedOut = computed(() => derived.value.hideAdminEntryWhenLoggedOut)
-
-  const hidePriceWhenLoggedOut = computed(() => derived.value.hidePriceWhenLoggedOut)
-
-  const providerAliases = computed(() => derived.value.providerAliases)
-
-  const exportSecondaryPassword = computed(() => derived.value.exportSecondaryPassword)
-
-  const disablePageAnimation = computed(() => derived.value.disablePageAnimation)
-
-  // 计算属性：自定义背景配置
-  const backgroundEnabled = computed(() => derived.value.backgroundEnabled)
-
-  const backgroundType = computed(() => derived.value.backgroundType)
-
-  const lightBackgroundUrl = computed(() => derived.value.lightBackgroundUrl)
-
-  const darkBackgroundUrl = computed(() => derived.value.darkBackgroundUrl)
-
-  const backgroundBlur = computed(() => derived.value.backgroundBlur)
-
-  const backgroundOverlay = computed(() => derived.value.backgroundOverlay)
-
-  // 当 publicSettings 加载后，如果 localStorage 没有保存过视图模式或值为非法值，使用默认值
-  watch(publicSettings, (settings) => {
-    if (settings && !isValidViewMode(storedViewMode.value)) {
-      // 触发 computed setter，会自动保存到 localStorage
-      storedViewMode.value = defaultViewMode.value
+function derive(state: AppRawState): AppState {
+  if (lastRaw === state && lastState)
+    return lastState
+  if (state.publicSettings !== lastPublicSettings) {
+    lastPublicSettings = state.publicSettings
+    const themeSettings = normalizeThemeSettings(state.publicSettings?.theme_settings)
+    if (themeSettings !== lastThemeSettings) {
+      lastThemeSettings = themeSettings
+      lastDerived = deriveAppSettings(themeSettings)
     }
-  }, { immediate: true })
-
-  watch(themeMode, (mode) => {
-    if (!isValidThemeMode(mode)) {
-      themeMode.value = 'auto'
-    }
-  }, { immediate: true })
-
-  const managedThemeMode = computed(() => derived.value.managedThemeMode)
-
-  const isBeijingDaytime = computed<boolean>(() => {
-    const hour = getBeijingHour(beijingTimeTick.value)
-    return hour >= 7 && hour < 19
-  })
-
-  // 计算当前是否为暗色模式。本机按钮选择 auto 时跟随后台托管设置；手动选择浅色/深色时仅覆盖当前浏览器。
-  const isDark = computed(() => {
-    const localMode = isValidThemeMode(themeMode.value) ? themeMode.value : 'auto'
-    if (localMode === 'light')
-      return false
-    if (localMode === 'dark')
-      return true
-
-    if (managedThemeMode.value === 'beijing')
-      return !isBeijingDaytime.value
-
-    return managedThemeMode.value === 'dark'
-  })
-
-  const resolvedThemeMode = computed<'light' | 'dark'>(() => isDark.value ? 'dark' : 'light')
-
-  // 计算属性：当前主题模式下的背景 URL
-  const currentBackgroundUrl = computed<string>(() => {
-    if (resolvedThemeMode.value === 'dark') {
-      return darkBackgroundUrl.value
-    }
-    return lightBackgroundUrl.value
-  })
-
-  function updateThemeMode(mode?: ThemeMode) {
-    if (mode) {
-      themeMode.value = isValidThemeMode(mode) ? mode : 'auto'
-      return
-    }
-
-    const nextMode: Record<ThemeMode, ThemeMode> = {
-      auto: 'light',
-      light: 'dark',
-      dark: 'auto',
-    }
-
-    const currentMode = isValidThemeMode(themeMode.value) ? themeMode.value : 'auto'
-    themeMode.value = nextMode[currentMode]
   }
-
-  function syncAuthState() {
-    const session = getAuthSession()
-    isLoggedIn.value = session.authenticated
-    authStatus.value = session.status
-    return session
+  if (state.favoriteNodeIds !== lastFavoriteIds) {
+    lastFavoriteIds = state.favoriteNodeIds
+    lastFavoriteSet = new Set(
+      (Array.isArray(state.favoriteNodeIds) ? state.favoriteNodeIds : [])
+        .filter((id): id is string => typeof id === 'string' && Boolean(id.trim())),
+    )
   }
-
-  function updateLoginState(loggedIn: boolean, user?: MeInfo | null) {
-    setAuthSessionFromLogin(loggedIn, user ?? null)
-    syncAuthState()
-  }
-
-  async function verifyLoginState(options?: VerifyLoginOptions): Promise<boolean> {
-    await verifyLogin(options)
-    return syncAuthState().authenticated
-  }
-
-  async function requireLoginPermission(permission: PermissionKey, options?: VerifyLoginOptions): Promise<boolean> {
-    const result = await requirePermission(permission, options)
-    syncAuthState()
-    return result.granted
-  }
-
-  return {
-    loading,
-    themeMode,
+  const derived = lastDerived
+  const managedThemeMode: ManagedThemeMode = isValidManagedThemeMode(lastThemeSettings.themeMode) ? lastThemeSettings.themeMode : 'beijing'
+  const hour = getBeijingHour(state.beijingTimeTick)
+  const isBeijingDaytime = hour >= 7 && hour < 19
+  // 本机按钮选择 auto 时跟随后台托管设置；手动选择浅色/深色时仅覆盖当前浏览器。
+  const localMode = isValidThemeMode(state.themeMode) ? state.themeMode : 'auto'
+  const isDark = localMode === 'light'
+    ? false
+    : localMode === 'dark'
+      ? true
+      : managedThemeMode === 'beijing' ? !isBeijingDaytime : managedThemeMode === 'dark'
+  const resolvedThemeMode = isDark ? 'dark' : 'light'
+  const nodeViewMode = state.storedViewMode !== null && isValidViewMode(state.storedViewMode)
+    ? state.storedViewMode
+    : derived.defaultViewMode
+  const next: AppState = {
+    ...derived,
+    loading: state.loading,
+    themeMode: state.themeMode,
     managedThemeMode,
     isBeijingDaytime,
     isDark,
     resolvedThemeMode,
-    lang,
-    nodeSelectedGroup,
-    favoriteNodeIds,
-    favoriteNodeIdSet,
-    isFavoriteNode,
-    toggleFavoriteNode,
+    lang: state.lang,
+    nodeSelectedGroup: state.nodeSelectedGroup,
+    favoriteNodeIds: state.favoriteNodeIds,
+    favoriteNodeIdSet: lastFavoriteSet,
     nodeViewMode,
-    defaultViewMode,
-    nodeCardSize,
-    rpcTransportMode,
     byteDecimals,
-    alertEnabled,
-    alertTitle,
-    alertContent,
-    dataUpdateInterval,
-    stopEarth,
-    earthRenderer,
-    hideEarth,
-    hideGeneralCard,
-    visitorInfoEnabled,
-    generalCardEnabledMap,
-    generalCardOrder,
-    homeToolsEnabled,
-    homeAdvancedToolsVisible,
-    glassColorPreset,
-    glassCustomColors,
-    colorVisionMode,
-    colorVisionFriendly,
-    visitorAuditSupported,
-    visitorAuditEnabled,
-    homeQuickControlsEnabled,
-    homeQuickControlOrder,
-    nodeListMetadataEnabled,
-    nodeListMetadataFields,
-    nodeListCustomTagsVisible,
-    nodeDetailSectionTabsEnabled,
-    gpuChartEnabled,
-    detailMetricCardOrder,
-    offlineNodesLast,
-    homeHighLoadThreshold,
-    homeTrafficWarningThreshold,
-    homeExpiringDays,
-    diskPredictionEnabled,
-    diskPredictionThresholdDays,
-    chartDashboardTemplate,
-    hideAdminEntryWhenLoggedOut,
-    hidePriceWhenLoggedOut,
-    providerAliases,
-    exportSecondaryPassword,
-    disablePageAnimation,
-    backgroundEnabled,
-    backgroundType,
-    lightBackgroundUrl,
-    darkBackgroundUrl,
-    currentBackgroundUrl,
-    backgroundBlur,
-    backgroundOverlay,
-    isLoggedIn,
-    authStatus,
-    privateFeaturesAllowed,
-    publicSettings,
-    connectionError,
-    homeScrollPosition,
-    updateThemeMode,
-    updateLoginState,
-    verifyLoginState,
-    requireLoginPermission,
+    homeAdvancedToolsVisible: state.homeAdvancedToolsVisible,
+    visitorAuditSupported: typeof state.publicSettings?.visitor_audit_enabled === 'boolean',
+    visitorAuditEnabled: state.publicSettings?.visitor_audit_enabled === true,
+    currentBackgroundUrl: resolvedThemeMode === 'dark' ? derived.darkBackgroundUrl : derived.lightBackgroundUrl,
+    isLoggedIn: state.isLoggedIn,
+    authStatus: state.authStatus,
+    privateFeaturesAllowed: state.authStatus === 'authenticated',
+    publicSettings: state.publicSettings,
+    connectionError: state.connectionError,
+    homeScrollPosition: state.homeScrollPosition,
+    themeSettings: lastThemeSettings,
   }
-})
+  lastRaw = state
+  lastState = next
+  return next
+}
 
-export { useAppStore }
+function setRaw(patch: Partial<AppRawState>): void {
+  const prev = raw.getState()
+  raw.setState(patch)
+  const next = raw.getState()
+  if (next !== prev)
+    persist(prev, next)
+}
+
+// Same post-load fix-ups as the Vue store's immediate watchers.
+function normalise(): void {
+  const s = raw.getState()
+  if (!isValidThemeMode(s.themeMode))
+    setRaw({ themeMode: 'auto' })
+  if (s.publicSettings && !isValidViewMode(s.storedViewMode))
+    setRaw({ storedViewMode: derive(raw.getState()).defaultViewMode })
+}
+normalise()
+
+function syncAuthState() {
+  const current = getAuthSession()
+  setRaw({ isLoggedIn: current.authenticated, authStatus: current.status })
+  return current
+}
+
+export const appStore = {
+  getState: (): AppState => derive(raw.getState()),
+  subscribe: raw.subscribe,
+
+  setLoading(loading: boolean) { setRaw({ loading }) },
+  setPublicSettings(publicSettings: PublicSettings | undefined) {
+    setRaw({ publicSettings })
+    normalise()
+  },
+  setConnectionError(connectionError: boolean) { setRaw({ connectionError }) },
+  setNodeSelectedGroup(nodeSelectedGroup: string) { setRaw({ nodeSelectedGroup }) },
+  setNodeViewMode(mode: NodeViewMode) { setRaw({ storedViewMode: mode }) },
+  setHomeScrollPosition(homeScrollPosition: number) { setRaw({ homeScrollPosition }) },
+  setHomeAdvancedToolsVisible(homeAdvancedToolsVisible: boolean) { setRaw({ homeAdvancedToolsVisible }) },
+
+  isFavoriteNode(uuid: string): boolean {
+    return derive(raw.getState()).favoriteNodeIdSet.has(uuid)
+  },
+  toggleFavoriteNode(uuid: string): void {
+    const normalized = uuid.trim()
+    if (!normalized)
+      return
+    const set = derive(raw.getState()).favoriteNodeIdSet
+    setRaw({
+      favoriteNodeIds: set.has(normalized)
+        ? [...set].filter(id => id !== normalized)
+        : [...set, normalized],
+    })
+  },
+
+  updateThemeMode(mode?: ThemeMode) {
+    if (mode) {
+      setRaw({ themeMode: isValidThemeMode(mode) ? mode : 'auto' })
+      return
+    }
+    const nextMode: Record<ThemeMode, ThemeMode> = { auto: 'light', light: 'dark', dark: 'auto' }
+    const current = raw.getState().themeMode
+    setRaw({ themeMode: nextMode[isValidThemeMode(current) ? current : 'auto'] })
+  },
+  updateLoginState(loggedIn: boolean, user?: MeInfo | null) {
+    setAuthSessionFromLogin(loggedIn, user ?? null)
+    syncAuthState()
+  },
+  async verifyLoginState(options?: VerifyLoginOptions): Promise<boolean> {
+    await verifyLogin(options)
+    return syncAuthState().authenticated
+  },
+  async requireLoginPermission(permission: PermissionKey, options?: VerifyLoginOptions): Promise<boolean> {
+    const result = await requirePermission(permission, options)
+    syncAuthState()
+    return result.granted
+  },
+}
+
+const readApp = () => appStore.getState()
+
+/** Selects one value (or a shallow-equal object of values) from the app store. */
+export function useApp<S>(select: (state: AppState) => S): S {
+  return useSelector(appStore.subscribe, readApp, select, shallowEqual)
+}
+
+/** The whole derived state; re-renders on any change. */
+export function useAppState(): AppState {
+  return useSelector(appStore.subscribe, readApp, s => s)
+}
+
+/** Stable action bag, for components that only call methods. */
+export function useAppActions() {
+  return useMemo(() => appStore, [])
+}

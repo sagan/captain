@@ -1,1 +1,1 @@
-export { default as DataTooltip } from './DataTooltip.vue'
+export { DataTooltip } from './DataTooltip'

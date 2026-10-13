@@ -1,0 +1,35 @@
+/* Scoped styles of the upstream NodeGeneralCards.vue, as compiled by Vue's
+ * SFC compiler (scope attribute data-v-<name>, see ./scope.ts). */
+.metric-switch-enter-active[data-v-node-general-cards],
+.metric-switch-leave-active[data-v-node-general-cards] {
+  transition:
+    opacity 160ms ease,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 180ms ease;
+}
+.metric-switch-enter-active[data-v-node-general-cards] {
+  transition-delay: var(--metric-switch-delay, 0ms);
+}
+.metric-switch-enter-from[data-v-node-general-cards] {
+  opacity: 0;
+  transform: translateY(6px);
+  filter: blur(3px);
+}
+.metric-switch-leave-to[data-v-node-general-cards] {
+  opacity: 0;
+  transform: translateY(-4px);
+  filter: blur(2px);
+}
+@media (prefers-reduced-motion: reduce) {
+.metric-switch-enter-active[data-v-node-general-cards],
+  .metric-switch-leave-active[data-v-node-general-cards] {
+    transition: none;
+    transition-delay: 0ms;
+}
+.metric-switch-enter-from[data-v-node-general-cards],
+  .metric-switch-leave-to[data-v-node-general-cards] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+}
+}

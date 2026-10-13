@@ -76,7 +76,7 @@ const mime = {
 }
 
 // Window and step mirror captain/internal/http/probe/probe.go rangeOf(): the
-// page only ever asks for 1h/24h/7d/30d (see rangeFor in glass/src/captain.ts).
+// page only ever asks for 1h/24h/7d/30d (see rangeFor in glass-shared/captain.ts).
 function rangeWindow(range) {
   switch (range) {
     case '24h': return { res: 'm', window: 24 * 3600, step: 60 }
@@ -342,7 +342,7 @@ async function captureScene(browser, base, variant, fixture, opts, outDir, side,
     if (opts.dom) await writeFile(path.join(outDir, `${stem}-${side}.dom.txt`), await page.evaluate(dumpDom))
 
     if (scene === 'home' && opts.dialog) {
-      // NodeCard.vue: the latency panel is a button labelled "<node name> 延迟监测"
+      // NodeCard: the latency panel is a button labelled "<node name> 延迟监测"
       // (literal, not translated) that emits pingClick → HomeView opens PingMonitorDialog.
       const firstNode = fixture.snapshot.nodes.find(n => (n.ping_tasks ?? []).length > 0)
       const trigger = page.getByRole('button', { name: `${firstNode.name} 延迟监测`, exact: true }).first()

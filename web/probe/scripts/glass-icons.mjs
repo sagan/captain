@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 const require = createRequire(import.meta.url)
 function files(dir) { return readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? files(`${dir}/${e.name}`) : [`${dir}/${e.name}`]) }
-const names = new Set(files('glass/src').filter(p => /\.(vue|ts)$/.test(p)).flatMap(p => [...readFileSync(p,'utf8').matchAll(/['"`]([a-z][a-z0-9-]+:[a-z][a-z0-9-]*)['"`]/g)].map(m => m[1])))
+const names = new Set([...files('glass/src'), ...files('glass-shared')].filter(p => /\.tsx?$/.test(p)).flatMap(p => [...readFileSync(p,'utf8').matchAll(/['"`]([a-z][a-z0-9-]+:[a-z][a-z0-9-]*)['"`]/g)].map(m => m[1])))
 const collections = {}, licenses = {}
 for (const full of names) {
  const [prefix, name] = full.split(':')

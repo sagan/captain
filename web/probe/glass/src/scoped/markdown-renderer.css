@@ -1,0 +1,5 @@
+/* Scoped styles of the upstream MarkdownRenderer.vue, as compiled by Vue's
+ * SFC compiler (scope attribute data-v-<name>, see ./scope.ts). */
+.markdown-content[data-v-markdown-renderer] {
+  line-height: 1.6;
+}

@@ -1,0 +1,39 @@
+/* Scoped styles of the upstream NodeList.vue, as compiled by Vue's
+ * SFC compiler (scope attribute data-v-<name>, see ./scope.ts). */
+.node-row-switch-enter-active[data-v-node-list],
+.node-row-switch-leave-active[data-v-node-list] {
+  transition:
+    opacity 170ms ease,
+    transform 210ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 170ms ease;
+}
+.node-row-switch-enter-active[data-v-node-list] {
+  transition-delay: var(--node-row-delay, 0ms);
+}
+.node-row-switch-move[data-v-node-list] {
+  transition: transform 210ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.node-row-switch-enter-from[data-v-node-list] {
+  opacity: 0;
+  transform: translateY(8px);
+  filter: blur(3px);
+}
+.node-row-switch-leave-to[data-v-node-list] {
+  opacity: 0;
+  transform: translateY(-5px);
+  filter: blur(2px);
+}
+@media (prefers-reduced-motion: reduce) {
+.node-row-switch-enter-active[data-v-node-list],
+  .node-row-switch-leave-active[data-v-node-list],
+  .node-row-switch-move[data-v-node-list] {
+    transition: none;
+    transition-delay: 0ms;
+}
+.node-row-switch-enter-from[data-v-node-list],
+  .node-row-switch-leave-to[data-v-node-list] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+}
+}

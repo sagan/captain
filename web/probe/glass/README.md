@@ -1,12 +1,30 @@
 # Glassmorphism public frontend
 
-This frontend vendors the public Vue UI from
+This frontend is a React port of the public Vue UI from
 [sanrokamlan-prog/komari-theme-Glassmorphism](https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism),
 version 3.3.7, commit `06999d5a77ebe521a02fd3e383e67a064e345e7e` (MIT; see LICENSE).
-It preserves the upstream templates, Tailwind styles, background, icons, globe,
-node cards/list, details and ECharts components. The footer identifies Captain
-as the server and retains the theme attribution. The Komari admin application
-is not included.
+It reproduces the upstream templates, Tailwind styles, background, icons, globe,
+node cards/list, details and ECharts components element for element. The footer
+identifies Captain as the server and retains the theme attribution. The Komari
+admin application is not included.
+
+The port is held to the previous Vue build pixel for pixel:
+`scripts/glass-diff.mjs` renders both under Playwright's virtual clock and
+compares 16 screenshots (home with the latency dialog, list view, node detail;
+light/dark; desktop/mobile) at zero tolerance, with `--dom` to explain any
+difference. Framework-neutral logic (Captain adapter, stores' settings,
+chart options, card builders) lives in `../glass-shared` and was shared with the
+Vue build while both existed, so the two produced identical values. Vue's
+compiled scoped styles are kept as plain CSS in `src/scoped/`, with the same
+`data-v-<name>` scope attributes set by the components. `src/components/EChart.tsx`
+mirrors vue-echarts 8.3.2, including its vendored update planner, and
+`src/components/Transition*.tsx` mirror Vue's transition class sequence.
+
+Not ported, because Captain can never show them: the cobe and tiled earth
+renderers (Captain never sets `earthRenderer`), the visitor-info widget
+(disabled on Captain), the finance details dialog (no card opens it) and the
+admin-only home tools (topology, provider value, health, export, audit log;
+Captain's public page is never logged in). The node comparison tool is ported.
 
 The three-carrier panels and their colour thresholds additionally derive from
 [vlongx/komari-theme-Glassmorphism-three-network](https://github.com/vlongx/komari-theme-Glassmorphism-three-network),
@@ -15,13 +33,13 @@ The base frontend remains the newer upstream version above.
 
 Captain adaptations:
 
-- `src/captain.ts` is a read-only adapter to `/api/probe` and its per-node history
-  endpoints. `utils/init.ts` initializes the original stores and polls Captain.
+- `../glass-shared/captain.ts` is a read-only adapter to `/api/probe` and its per-node history
+  endpoints. `src/utils/init.ts` fills the stores and polls Captain.
   No Komari server, agent, RPC endpoint, or additional port is required.
-- `ping-summary.ts` translates counted Captain samples into the original twenty
+- `../glass-shared/ping-summary.ts` translates counted Captain samples into the original twenty
   latency/loss bars. Null gaps, weighted attempts and successful latency are
   preserved. The metric adapter does not invent raw attempts or quantiles.
-- `ping-selection.ts` selects the configured data source. With carrier monitoring
+- `../glass-shared/ping-selection.ts` selects the configured data source. With carrier monitoring
   enabled and CT/CU/CM configured, cards show the original two panels with three
   carrier rows. The list uses three compact pairs of twenty-segment bars with
   carrier dots and tooltips, fitting the upstream 64px row and its virtual-scroll
@@ -52,7 +70,7 @@ Captain adaptations:
 - Core public labels have six-language dictionaries. Language follows Captain's
   saved `i18nextLng` preference, then the browser language.
 
-Run `pnpm build` from `web/probe`; it tests the adapter and builds both frontends.
+Run `pnpm build` from `web/probe`; it tests the adapter and builds both status pages.
 `pnpm dev:glass` starts this frontend with the existing local API proxy. The
 embedded handler selects this build when `appearance.preset` is `glass`.
 

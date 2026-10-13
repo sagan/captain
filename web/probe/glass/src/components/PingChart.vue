@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { escapeHTML } from '@shared/utils/html'
 import { t } from '@shared/i18n'
-import type { MetricSeries, PingMetricTaskStats, PingRecord, PingTaskInfo } from '@shared/utils/rpc'
+import type { PingRecord, PingTaskInfo } from '@shared/utils/rpc'
 import { Icon } from '@iconify/vue'
 import dayjs from 'dayjs'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch, watchEffect } from 'vue'
@@ -14,12 +13,12 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { PING_RECORD_MAX_COUNT } from '@shared/constants/load'
 import { loadPingRecordsWithTasks } from '@shared/services/history.service'
-import { loadPingMetricStats, loadPublicPingTasks, queryMetrics } from '@shared/services/metrics.service'
 import { useAppStore } from '@/stores/app'
-import { ACCESSIBLE_LINE_TYPES, getChartSeriesPalette } from '@shared/utils/chartPalette'
-import { isPingMetric, normalizeMetricSeriesList, orderPingTasksByBackend, PING_LATENCY_METRIC, pingTaskId, pingTaskName } from '@shared/utils/metricSeries'
-import { cutPeakValues, interpolateNullsLinear } from '@shared/utils/recordHelper'
+import { getChartSeriesPalette } from '@shared/utils/chartPalette'
+import { cutPeakValues } from '@shared/utils/recordHelper'
 import '@shared/utils/echarts' // 共享 ECharts 配置
+import type { CustomRange } from '@shared/charts/ping'
+import { buildLatestValues, buildPingChartOption, buildPingViews, loadMetricPingPayload, mergePingRecords } from '@shared/charts/ping'
 
 const props = defineProps<{
   uuid: string
@@ -28,24 +27,7 @@ const props = defineProps<{
 const appStore = useAppStore()
 const isDark = computed(() => appStore.isDark)
 
-interface CustomRange {
-  start: dayjs.Dayjs
-  end: dayjs.Dayjs
-  hours: number
-}
-
 // 图表主题相关颜色
-const chartThemeColors = computed(() => ({
-  text: isDark.value ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.85)',
-  textSecondary: isDark.value ? 'rgba(255, 255, 255, 0.55)' : 'rgba(0, 0, 0, 0.55)',
-  textTertiary: isDark.value ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.35)',
-  borderColor: isDark.value ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
-  splitLineColor: isDark.value ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)',
-  tooltipBg: isDark.value ? 'rgba(40, 40, 40, 0.95)' : 'rgba(255, 255, 255, 0.8)',
-  tooltipShadow: isDark.value ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.06)',
-  crosshairColor: isDark.value ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-}))
-
 const chartColors = reactive(getChartSeriesPalette(appStore.colorVisionFriendly))
 
 watchEffect(() => {
@@ -66,33 +48,7 @@ const CUSTOM_VIEW_LABEL = t('自定义')
 const DEFAULT_CUSTOM_RANGE_HOURS = 24
 
 // 可用视图列表
-const availableViews = computed(() => {
-  const views: { label: string, hours?: number }[] = []
-  const maxHours = maxPingRecordPreserveTime.value
-
-  for (const v of presetViews) {
-    if (maxHours >= v.hours) {
-      views.push(v)
-    }
-  }
-
-  const maxPreset = presetViews.at(-1)
-  if (maxPreset && maxHours > maxPreset.hours) {
-    const label = maxHours % 24 === 0
-      ? `${Math.floor(maxHours / 24)} 天`
-      : `${maxHours} 小时`
-    views.push({ label, hours: maxHours })
-  }
-  else if (maxHours > 1 && !presetViews.some(v => v.hours === maxHours)) {
-    const label = maxHours % 24 === 0
-      ? `${Math.floor(maxHours / 24)} 天`
-      : `${maxHours} 小时`
-    views.push({ label, hours: maxHours })
-  }
-
-  views.push({ label: CUSTOM_VIEW_LABEL })
-  return views
-})
+const availableViews = computed(() => buildPingViews(maxPingRecordPreserveTime.value, presetViews, CUSTOM_VIEW_LABEL))
 
 // 当前选中的视图
 const selectedView = ref<string>('')
@@ -162,7 +118,6 @@ const isTouchTooltipMode = ref(false)
 const activeTaskTooltipId = ref<number | null>(null)
 const smoothInfoTooltipOpen = ref(false)
 
-const chartMargin = { top: 30, right: 24, bottom: 52, left: 56 }
 let coarsePointerMediaQuery: MediaQueryList | null = null
 let fetchRecordsSequence = 0
 
@@ -199,130 +154,6 @@ function toggleSmoothInfoTooltip() {
   }
 }
 
-function normalizeMetricTaskId(taskId: string): number {
-  if (!taskId.trim())
-    return Number.NaN
-
-  const numericTaskId = Number(taskId)
-  if (Number.isFinite(numericTaskId))
-    return numericTaskId
-
-  let hash = 0
-  for (let index = 0; index < taskId.length; index++)
-    hash = (hash * 31 + taskId.charCodeAt(index)) | 0
-  return Math.abs(hash)
-}
-
-function normalizeMetricTask(stat: PingMetricTaskStats): PingTaskInfo {
-  return {
-    id: normalizeMetricTaskId(stat.task_id),
-    name: stat.name?.trim() || pingTaskName(stat) || `Task ${stat.task_id}`,
-    interval: stat.interval ?? 0,
-    loss: stat.loss,
-    min: stat.min,
-    max: stat.max,
-    avg: stat.avg,
-    latest: stat.latest,
-    p50: stat.p50,
-    p99: stat.p99,
-    p99_p50_ratio: stat.p99_p50_ratio,
-    stddev: stat.stddev,
-    total: stat.total,
-    valid: stat.valid,
-    loss_approximate: stat.loss_approximate,
-    type: stat.type,
-  }
-}
-
-function buildMetricRecords(seriesList: MetricSeries[]): PingRecord[] {
-  const records: PingRecord[] = []
-  const normalizedSeriesList = normalizeMetricSeriesList(seriesList).filter(isPingMetric)
-
-  for (const series of normalizedSeriesList) {
-    const taskId = normalizeMetricTaskId(pingTaskId(series))
-    if (!Number.isFinite(taskId))
-      continue
-
-    for (const point of series.points) {
-
-      records.push({
-        client: series.entity_id,
-        task_id: taskId,
-        time: point.time,
-        value: point.value ?? Number.NaN,
-      })
-    }
-  }
-
-  return records.sort((a, b) => dayjs(a.time).valueOf() - dayjs(b.time).valueOf())
-}
-
-async function loadMetricPingPayload(nodeUuid: string): Promise<{ records: PingRecord[], tasks: PingTaskInfo[] } | null> {
-  const range = appliedCustomRange.value
-  const metricRangeParams = isCustomRange.value && range
-    ? { start: range.start.toDate().toISOString(), end: range.end.toDate().toISOString() }
-    : { hours: selectedHours.value }
-
-  const [statsResult, metricsResult, backendTasksResult] = await Promise.allSettled([
-    loadPingMetricStats({ entity_id: nodeUuid, ...metricRangeParams, max_points: PING_RECORD_MAX_COUNT }),
-    queryMetrics({
-      metric_keys: [PING_LATENCY_METRIC],
-      entity_id: nodeUuid,
-      ...metricRangeParams,
-      downsample: true,
-      fill_empty: true,
-      max_points: PING_RECORD_MAX_COUNT,
-      aggregation: 'avg',
-    }),
-    loadPublicPingTasks(),
-  ])
-
-  const metricStats = statsResult.status === 'fulfilled'
-    ? (statsResult.value.stats ?? []).filter(stat => stat.entity_id === nodeUuid)
-    : []
-  const metricRecords = metricsResult.status === 'fulfilled'
-    ? buildMetricRecords(metricsResult.value.series)
-    : []
-
-  const metricTaskIds = new Set(metricRecords.map(record => record.task_id))
-  const exactStatTaskIds = new Set(
-    metricStats
-      .filter(stat => stat.total > 0 && !stat.loss_approximate && Number.isFinite(stat.loss))
-      .map(stat => normalizeMetricTaskId(stat.task_id)),
-  )
-  if (!metricRecords.length || [...metricTaskIds].some(taskId => !exactStatTaskIds.has(taskId)))
-    return null
-
-  const taskMap = new Map<number, PingTaskInfo>()
-  for (const stat of metricStats) {
-    const task = normalizeMetricTask(stat)
-    taskMap.set(task.id, task)
-  }
-
-  for (const series of normalizeMetricSeriesList(
-    metricsResult.status === 'fulfilled' ? metricsResult.value.series : [],
-  ).filter(isPingMetric)) {
-    const taskId = normalizeMetricTaskId(pingTaskId(series))
-    if (!taskId || taskMap.has(taskId))
-      continue
-
-    taskMap.set(taskId, {
-      id: taskId,
-      name: pingTaskName(series) || `Task ${taskId}`,
-      interval: series.interval_seconds ?? 0,
-      loss: 0,
-    })
-  }
-
-  return {
-    records: metricRecords,
-    tasks: orderPingTasksByBackend(
-      [...taskMap.values()],
-      backendTasksResult.status === 'fulfilled' ? backendTasksResult.value : [],
-    ),
-  }
-}
-
 // ==================== 数据获取 ====================
 
 async function fetchRecords() {
@@ -346,7 +177,7 @@ async function fetchRecords() {
   error.value = null
 
   try {
-    const metricPayload = await loadMetricPingPayload(requestedUuid).catch(() => null)
+    const metricPayload = await loadMetricPingPayload(requestedUuid, appliedCustomRange.value, isCustomRange.value, selectedHours.value).catch(() => null)
     if (sequence !== fetchRecordsSequence || requestedUuid !== props.uuid)
       return
 
@@ -389,85 +220,7 @@ async function fetchRecords() {
 
 // ==================== 数据处理 ====================
 
-const mergedData = computed(() => {
-  const data = remoteData.value
-  if (!data.length)
-    return []
-
-  const taskList = tasks.value
-
-  const taskIntervals = taskList
-    .map(t => t.interval)
-    .filter((v): v is number => typeof v === 'number' && v > 0)
-
-  const fallbackIntervalSec = taskIntervals.length ? Math.min(...taskIntervals) : 60
-  const toleranceMs = Math.min(
-    6000,
-    Math.max(800, Math.floor(fallbackIntervalSec * 1000 * 0.25)),
-  )
-
-  const grouped: Map<number, Record<string, unknown>> = new Map()
-  const anchors: number[] = []
-
-  for (const rec of data) {
-    const ts = dayjs(rec.time).valueOf()
-    let anchor: number | null = null
-
-    for (let index = anchors.length - 1; index >= 0; index--) {
-      const a = anchors[index]
-      if (a === undefined || ts - a > toleranceMs)
-        break
-      if (Math.abs(a - ts) <= toleranceMs) {
-        anchor = a
-        break
-      }
-    }
-
-    const useTs = anchor ?? ts
-    if (!grouped.has(useTs)) {
-      grouped.set(useTs, { time: dayjs(useTs).toISOString() })
-      if (anchor === null) {
-        anchors.push(useTs)
-      }
-    }
-
-    const group = grouped.get(useTs)!
-    group[rec.task_id] = Number.isFinite(rec.value) && rec.value >= 0 ? rec.value : null
-  }
-
-  const merged = Array.from(grouped.values()).sort(
-    (a, b) => dayjs(a.time as string).valueOf() - dayjs(b.time as string).valueOf(),
-  )
-
-  const range = appliedCustomRange.value
-  if (isCustomRange.value && range) {
-    const fromTs = range.start.valueOf()
-    const toTs = range.end.valueOf()
-    return merged.filter((item) => {
-      const timestamp = dayjs(item.time as string).valueOf()
-      return timestamp >= fromTs && timestamp <= toTs
-    })
-  }
-
-  const hours = selectedHours.value
-  const lastItem = merged.at(-1)
-  const lastTs = lastItem ? dayjs(lastItem.time as string).valueOf() : dayjs().valueOf()
-  const fromTs = lastTs - hours * 3600_000
-
-  let startIdx = 0
-  for (let i = 0; i < merged.length; i++) {
-    const item = merged[i]
-    if (!item)
-      continue
-    const ts = dayjs(item.time as string).valueOf()
-    if (ts >= fromTs) {
-      startIdx = Math.max(0, i - 1)
-      break
-    }
-  }
-
-  return merged.slice(startIdx)
-})
+const mergedData = computed(() => mergePingRecords(remoteData.value, tasks.value, appliedCustomRange.value, isCustomRange.value, selectedHours.value))
 
 const chartData = computed(() => {
   let data = mergedData.value
@@ -487,58 +240,10 @@ const chartData = computed(() => {
 
 // ==================== 工具函数 ====================
 
-function formatTime(time: string, showDate: boolean): string {
-  const date = dayjs(time)
-  if (showDate) {
-    return date.format('M/D HH:mm')
-  }
-  return date.format('HH:mm')
-}
-
-function formatTimeForTooltip(time: string, hours: number): string {
-  const date = dayjs(time)
-  if (hours < 24) {
-    return date.format('HH:mm:ss')
-  }
-  return date.format('MM/DD HH:mm')
-}
-
-const showDateInAxis = computed(() => selectedHours.value >= 24)
-
 // ==================== 任务选择 ====================
 
-// 获取任务颜色（根据任务在完整列表中的索引）
-function getTaskColor(taskId: number): string {
-  const taskIndex = tasks.value.findIndex(t => t.id === taskId)
-  const safeIndex = Math.max(0, taskIndex % chartColors.length)
-  return chartColors[safeIndex]!
-}
-
 // 最新值统计（从服务端 tasks 获取，保持颜色顺序）
-const latestValues = computed(() => {
-  if (!tasks.value.length)
-    return []
-
-  const latestMap = new Map<number, number | null>()
-  for (const task of tasks.value) {
-    for (let i = remoteData.value.length - 1; i >= 0; i--) {
-      const rec = remoteData.value[i]
-      if (rec && rec.task_id === task.id && rec.value >= 0) {
-        latestMap.set(task.id, rec.value)
-        break
-      }
-    }
-  }
-
-  return tasks.value.map((task, idx) => {
-    const safeIdx = Math.max(0, idx % chartColors.length)
-    return {
-      ...task,
-      latestValue: latestMap.get(task.id) ?? null,
-      color: chartColors[safeIdx]!,
-    }
-  })
-})
+const latestValues = computed(() => buildLatestValues(tasks.value, remoteData.value, chartColors))
 
 const selectedTasks = computed(() => {
   return tasks.value.filter(t => selectedTaskIds.value.includes(t.id))
@@ -564,150 +269,16 @@ function hideAllTasks() {
 
 // ==================== 图表配置 ====================
 
-// 通用 Tooltip 配置
-const baseTooltipConfig = computed(() => ({
-  trigger: 'axis' as const,
-  confine: false,
-  backgroundColor: chartThemeColors.value.tooltipBg,
-  borderColor: 'transparent',
-  borderWidth: 0,
-  borderRadius: 6,
-  textStyle: {
-    color: chartThemeColors.value.text,
-    fontSize: 12,
-    lineHeight: 20,
-  },
-  extraCssText: `backdrop-filter: blur(5px);z-index:9;box-shadow:0 0 0 1px ${chartThemeColors.value.tooltipShadow}, 0 0 16px ${chartThemeColors.value.tooltipShadow}`,
-  axisPointer: {
-    type: 'cross' as const,
-    crossStyle: {
-      color: chartThemeColors.value.textTertiary,
-    },
-    lineStyle: {
-      color: chartThemeColors.value.crosshairColor,
-      width: 1,
-      type: 'dashed' as const,
-    },
-    shadowStyle: {
-      color: chartThemeColors.value.crosshairColor,
-    },
-  },
+const pingChartOption = computed(() => buildPingChartOption({
+  selectedTasks: selectedTasks.value,
+  chartData: chartData.value,
+  selectedHours: selectedHours.value,
+  colorVisionFriendly: appStore.colorVisionFriendly,
+  cutPeak: cutPeak.value,
+  tasks: tasks.value,
+  chartColors,
+  isDark: isDark.value,
 }))
-
-const pingChartOption = computed(() => {
-  const taskList = selectedTasks.value
-  const data = chartData.value
-  const hours = selectedHours.value
-
-  // 构建 series，确保颜色与卡片一致
-  const series = taskList.map((task, index) => {
-    const color = getTaskColor(task.id)
-    const lineType = appStore.colorVisionFriendly
-      ? (ACCESSIBLE_LINE_TYPES[index % ACCESSIBLE_LINE_TYPES.length] ?? 'solid')
-      : 'solid'
-    return {
-      name: task.name,
-      type: 'line' as const,
-      data: data.map(d => d[task.id] as number | null ?? null),
-      smooth: cutPeak.value ? 0.6 : 0.1,
-      showSymbol: false,
-      connectNulls: false,
-      lineStyle: { width: 1.5, color, cap: 'round' as const, type: lineType },
-      itemStyle: { color }, // 确保 symbol 颜色一致
-    }
-  })
-
-  // 颜色映射表（用于 Tooltip）
-  const colorMap = new Map<number, string>()
-  tasks.value.forEach((task, idx) => {
-    const safeIdx = Math.max(0, idx % chartColors.length)
-    colorMap.set(task.id, chartColors[safeIdx]!)
-  })
-
-  return {
-    animation: false,
-    // 全局颜色设置（用于图例等）
-    color: tasks.value.map((_, idx) => {
-      const safeIdx = Math.max(0, idx % chartColors.length)
-      return chartColors[safeIdx]!
-    }),
-    tooltip: {
-      ...baseTooltipConfig.value,
-      formatter: (params: unknown) => {
-        const p = params as Array<{ seriesName: string, value: number | null, dataIndex: number }>
-        if (!p.length)
-          return ''
-        const firstParam = p[0]
-        if (!firstParam)
-          return ''
-        const rowData = data[firstParam.dataIndex]
-        if (!rowData)
-          return ''
-
-        const time = rowData.time as string
-        const timeStr = formatTimeForTooltip(time, hours)
-        let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-        html += '<div style="display:flex;flex-direction:column;gap:4px">'
-
-        // 按延迟值排序显示
-        const sortedParams = [...p].sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
-
-        for (const item of sortedParams) {
-          if (item.value !== null && item.value !== undefined) {
-            // 通过任务名找到对应的任务ID，再获取颜色
-            const task = tasks.value.find(t => t.name === item.seriesName)
-            const color = task ? colorMap.get(task.id) || chartColors[0] : chartColors[0]
-            const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:8px;flex-shrink:0"></span>`
-            html += `<div style="display:flex;align-items:center">${colorDot}<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(item.seriesName)}</span><span style="margin-left:auto;font-weight:600;margin-left:16px;font-variant-numeric:tabular-nums">${Math.round(item.value)} ms</span></div>`
-          }
-        }
-        html += '</div>'
-        return html
-      },
-    },
-    legend: {
-      type: 'scroll',
-      bottom: 0,
-      itemWidth: 12,
-      itemHeight: 12,
-      itemGap: 16,
-      icon: 'roundRect',
-      textStyle: { fontSize: 11, color: chartThemeColors.value.textSecondary },
-      data: taskList.map(t => t.name),
-    },
-    grid: chartMargin,
-    xAxis: {
-      type: 'category',
-      data: data.map(d => formatTime(d.time as string, showDateInAxis.value)),
-      axisLabel: {
-        fontSize: 11,
-        color: chartThemeColors.value.textSecondary,
-        margin: 12,
-      },
-      axisLine: {
-        show: true,
-        lineStyle: { color: chartThemeColors.value.borderColor, width: 1 },
-      },
-      axisTick: { show: false },
-      boundaryGap: false,
-    },
-    yAxis: {
-      type: 'value',
-      name: '延迟 (ms)',
-      nameTextStyle: { color: chartThemeColors.value.textSecondary },
-      axisLabel: { fontSize: 11, color: chartThemeColors.value.textSecondary, formatter: '{value}' },
-      axisLine: { show: false },
-      axisTick: { show: false },
-      splitLine: {
-        lineStyle: {
-          color: chartThemeColors.value.splitLineColor,
-          type: 'dashed' as const,
-        },
-      },
-    },
-    series,
-  }
-})
 
 // ==================== 生命周期 ====================
 

@@ -7,8 +7,6 @@ import type { PublicSettings } from '@shared/utils/api'
 let timer: ReturnType<typeof setTimeout> | undefined
 let controller: AbortController | undefined
 let stopped = false
-// The React bundle is served under its own preset until it replaces the Vue one.
-const GLASS_PRESETS = new Set(['glass', 'glass-react'])
 const system = window.matchMedia('(prefers-color-scheme: dark)')
 
 async function refresh(): Promise<boolean> {
@@ -17,7 +15,7 @@ async function refresh(): Promise<boolean> {
   try {
     const s = await readJSON<Snapshot>('/api/probe', controller.signal)
     if (stopped) return false
-    if (snapshot.value && (!GLASS_PRESETS.has(s.appearance?.preset ?? '') || JSON.stringify(snapshot.value.public_sections) !== JSON.stringify(s.public_sections))) {
+    if (snapshot.value && (s.appearance?.preset !== 'glass' || JSON.stringify(snapshot.value.public_sections) !== JSON.stringify(s.public_sections))) {
       // Clear component-local chart caches when publication permissions change.
       window.location.reload()
       return false

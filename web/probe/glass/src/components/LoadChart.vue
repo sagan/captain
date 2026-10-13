@@ -31,6 +31,8 @@ import { comparePingTaskOrder, createPingTaskOrderMap, metricTags, normalizeMetr
 import { fillMissingTimePoints } from '@shared/utils/recordHelper'
 import { getSharedRpc } from '@shared/utils/rpc'
 import '@shared/utils/echarts' // 共享 ECharts 配置
+import { LOAD_METRIC_KEYS, createLoadChartModel } from '@shared/charts/load'
+import type { LoadMetricKey, MetricChartSeriesData } from '@shared/charts/load'
 
 const props = defineProps<{
   uuid: string
@@ -54,48 +56,16 @@ watchEffect(() => {
   Object.assign(chartColors, getLoadChartPalette(appStore.colorVisionFriendly))
 })
 
-const LOAD_METRIC_KEYS = [
-  'cpu.usage',
-  'load.average',
-  'memory.used',
-  'memory.total',
-  'swap.used',
-  'swap.total',
-  'temperature',
-  'disk.used',
-  'disk.total',
-  'net.in.rate',
-  'net.out.rate',
-  'net.total.down',
-  'net.total.up',
-  'traffic.down',
-  'traffic.up',
-  'process.count',
-  'connections.tcp',
-  'connections.udp',
-  'gpu.usage',
-  'gpu.device.usage',
-  'gpu.memory.used',
-  'gpu.memory.total',
-  'gpu.temperature',
-  'ping.latency_ms',
-  'ping.loss',
-] as const
+
 
 const CUSTOM_VIEW_LABEL = t('自定义')
 const PING_METRIC_KEYS = ['ping.latency_ms', 'ping.loss'] as const
 const METRIC_HISTORY_MAX_POINTS = 700
 const REALTIME_METRIC_REFRESH_MS = 30_000
 
-interface MetricChartSeriesData {
-  name: string
-  color: string
-  kind: 'bytes' | 'bytesPerSecond' | 'count' | 'milliseconds' | 'percent' | 'temperature'
-  data: Array<[string, number | null]>
-  dashed?: boolean
-}
 
-type LoadMetricKey = typeof LOAD_METRIC_KEYS[number]
+
+
 
 interface CustomRange {
   start: dayjs.Dayjs
@@ -104,52 +74,6 @@ interface CustomRange {
 }
 
 // 图表主题相关颜色
-const chartThemeColors = computed(() => ({
-  text: isDark.value ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.85)',
-  textSecondary: isDark.value ? 'rgba(255, 255, 255, 0.55)' : 'rgba(0, 0, 0, 0.55)',
-  textTertiary: isDark.value ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.35)',
-  borderColor: isDark.value ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-  splitLineColor: isDark.value ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)',
-  tooltipBg: isDark.value ? 'rgba(40, 40, 40, 0.95)' : 'rgba(255, 255, 255, 0.8)',
-  tooltipShadow: isDark.value ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.06)',
-  crosshairColor: isDark.value ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-}))
-
-// 通用 Tooltip 配置
-const baseTooltipConfig = computed(() => ({
-  trigger: 'axis' as const,
-  confine: false,
-  backgroundColor: chartThemeColors.value.tooltipBg,
-  borderColor: 'transparent',
-  borderWidth: 0,
-  borderRadius: 6,
-  textStyle: {
-    color: chartThemeColors.value.text,
-    fontSize: 12,
-    lineHeight: 20,
-  },
-  extraCssText: `backdrop-filter: blur(5px);z-index:9;box-shadow:0 0 0 1px ${chartThemeColors.value.tooltipShadow}, 0 0 16px ${chartThemeColors.value.tooltipShadow}`,
-  axisPointer: {
-    type: 'cross' as const,
-    crossStyle: {
-      color: chartThemeColors.value.textTertiary,
-    },
-    lineStyle: {
-      color: chartThemeColors.value.crosshairColor,
-      width: 1,
-      type: 'dashed' as const,
-    },
-    shadowStyle: {
-      color: chartThemeColors.value.crosshairColor,
-    },
-  },
-}))
-
-// 图表边距配置
-const chartMargin = { top: 30, right: 24, bottom: 32, left: 56 }
-const chartMarginWithLegend = { top: 30, right: 24, bottom: 52, left: 56 }
-
-// 视图选项
 const presetViews = [
   { label: t('4 小时'), hours: 4 },
   { label: t('1 天'), hours: 24 },
@@ -270,278 +194,17 @@ const rpc = getSharedRpc()
 
 // ==================== 数据获取 ====================
 
-function gpuDetailsFromStatus(record: StatusRecord): RecordFormat['gpu_detailed'] {
-  if (!record.gpu_detailed_info?.length)
-    return undefined
 
-  const details: NonNullable<RecordFormat['gpu_detailed']> = {}
-  record.gpu_detailed_info.forEach((item, index) => {
-    const deviceIndex = item.device_index ?? index
-    const memUsed = metricValue(item.memory_used)
-    const memTotal = metricValue(item.memory_total)
-    details[deviceIndex] = {
-      usage: metricValue(item.utilization ?? item.usage),
-      memory: memUsed != null && memTotal && memTotal > 0 ? memUsed / memTotal * 100 : null,
-      temperature: metricValue(item.temperature),
-      device_index: deviceIndex,
-      device_name: item.device_name || item.name,
-      mem_total: memTotal ?? undefined,
-      mem_used: memUsed ?? undefined,
-    }
-  })
-  return details
-}
 
-function averageGpuMemoryPercent(details: NonNullable<RecordFormat['gpu_detailed']>): number | null {
-  const percents = Object.values(details)
-    .map(detail => detail.memory)
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
-  if (!percents.length)
-    return null
-  return percents.reduce((sum, value) => sum + value, 0) / percents.length
-}
 
-function statusToRecordFormat(records: StatusRecord[]): RecordFormat[] {
-  return records.map((r) => {
-    const gpuDetailed = gpuDetailsFromStatus(r)
-    const gpu = metricValue(gpuUsageFromStatus(r))
-    return {
-      client: r.client,
-      time: r.time,
-      cpu: metricValue(r.cpu),
-      gpu,
-      gpu_usage: gpu,
-      gpu_memory: gpuDetailed
-        ? averageGpuMemoryPercent(gpuDetailed)
-        : null,
-      gpu_detailed: gpuDetailed,
-      ram: metricValue(r.ram),
-      ram_total: metricValue(r.ram_total),
-      swap: metricValue(r.swap),
-      swap_total: metricValue(r.swap_total),
-      load: metricValue(r.load),
-      temp: metricValue(r.temp),
-      disk: metricValue(r.disk),
-      disk_total: metricValue(r.disk_total),
-      net_in: metricValue(r.net_in),
-      net_out: metricValue(r.net_out),
-      net_total_up: metricValue(r.net_total_up),
-      net_total_down: metricValue(r.net_total_down),
-      traffic_up: metricValue(r.traffic_up),
-      traffic_down: metricValue(r.traffic_down),
-      process: metricValue(r.process),
-      connections: metricValue(r.connections),
-      connections_udp: metricValue(r.connections_udp),
-    }
-  })
-}
 
-function metricValue(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
 
-function getMetricDeviceKey(series: MetricSeries): string {
-  const tags = metricTags(series)
-  const index = tags.device_index ?? tags.gpu_index ?? tags.index
-  const name = tags.device_name ?? tags.gpu_name ?? tags.name
-  return String(index ?? name ?? '0')
-}
 
-function getMetricDeviceIndex(series: MetricSeries): number {
-  const tags = metricTags(series)
-  const rawIndex = tags.device_index ?? tags.gpu_index ?? tags.index
-  const numericIndex = Number(rawIndex)
-  return Number.isFinite(numericIndex) ? numericIndex : Math.abs(getMetricDeviceKey(series).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0))
-}
 
-function getMetricDeviceName(series: MetricSeries): string | undefined {
-  const tags = metricTags(series)
-  const name = tags.device_name ?? tags.gpu_name ?? tags.name
-  return typeof name === 'string' && name.trim() ? name.trim() : undefined
-}
 
-function ensureMetricRow(rows: Map<string, RecordFormat>, time: string): RecordFormat {
-  const existing = rows.get(time)
-  if (existing)
-    return existing
 
-  const node = nodeInfo.value
-  const row: RecordFormat = {
-    client: props.uuid,
-    time,
-    cpu: null,
-    gpu: null,
-    gpu_usage: null,
-    gpu_memory: null,
-    ram: null,
-    ram_total: node?.mem_total ?? null,
-    swap: null,
-    swap_total: node?.swap_total ?? null,
-    load: null,
-    temp: null,
-    disk: null,
-    disk_total: node?.disk_total ?? null,
-    net_in: null,
-    net_out: null,
-    net_total_up: null,
-    net_total_down: null,
-    traffic_up: null,
-    traffic_down: null,
-    process: null,
-    connections: null,
-    connections_udp: null,
-  }
-  rows.set(time, row)
-  return row
-}
 
-function applyMetricPoint(row: RecordFormat, key: LoadMetricKey, value: number | null, series: MetricSeries): void {
-  switch (key) {
-    case 'cpu.usage':
-      row.cpu = value
-      break
-    case 'load.average':
-      row.load = value
-      break
-    case 'memory.used':
-      row.ram = value
-      break
-    case 'memory.total':
-      row.ram_total = value
-      break
-    case 'swap.used':
-      row.swap = value
-      break
-    case 'swap.total':
-      row.swap_total = value
-      break
-    case 'temperature':
-      row.temp = value
-      break
-    case 'disk.used':
-      row.disk = value
-      break
-    case 'disk.total':
-      row.disk_total = value
-      break
-    case 'net.in.rate':
-      row.net_in = value
-      break
-    case 'net.out.rate':
-      row.net_out = value
-      break
-    case 'net.total.down':
-      row.net_total_down = value
-      break
-    case 'net.total.up':
-      row.net_total_up = value
-      break
-    case 'traffic.down':
-      row.traffic_down = value
-      break
-    case 'traffic.up':
-      row.traffic_up = value
-      break
-    case 'process.count':
-      row.process = value
-      break
-    case 'connections.tcp':
-      row.connections = value
-      break
-    case 'connections.udp':
-      row.connections_udp = value
-      break
-    case 'gpu.usage':
-      row.gpu = value
-      row.gpu_usage = value
-      break
-    case 'gpu.device.usage': {
-      const deviceIndex = getMetricDeviceIndex(series)
-      row.gpu_detailed ??= {}
-      row.gpu_detailed[deviceIndex] ??= { usage: null, memory: null, temperature: null, device_index: deviceIndex, device_name: getMetricDeviceName(series) }
-      row.gpu_detailed[deviceIndex].usage = value
-      row.gpu_usage = row.gpu_usage ?? value
-      row.gpu = row.gpu ?? value
-      break
-    }
-    case 'gpu.memory.used': {
-      const deviceIndex = getMetricDeviceIndex(series)
-      row.gpu_detailed ??= {}
-      row.gpu_detailed[deviceIndex] ??= { usage: null, memory: null, temperature: null, device_index: deviceIndex, device_name: getMetricDeviceName(series) }
-      row.gpu_detailed[deviceIndex].mem_used = value ?? undefined
-      break
-    }
-    case 'gpu.memory.total': {
-      const deviceIndex = getMetricDeviceIndex(series)
-      row.gpu_detailed ??= {}
-      row.gpu_detailed[deviceIndex] ??= { usage: null, memory: null, temperature: null, device_index: deviceIndex, device_name: getMetricDeviceName(series) }
-      row.gpu_detailed[deviceIndex].mem_total = value ?? undefined
-      break
-    }
-    case 'gpu.temperature': {
-      const deviceIndex = getMetricDeviceIndex(series)
-      row.gpu_detailed ??= {}
-      row.gpu_detailed[deviceIndex] ??= { usage: null, memory: null, temperature: null, device_index: deviceIndex, device_name: getMetricDeviceName(series) }
-      row.gpu_detailed[deviceIndex].temperature = value
-      break
-    }
-  }
-}
 
-function finalizeGpuRows(rows: RecordFormat[]): RecordFormat[] {
-  for (const row of rows) {
-    if (!row.gpu_detailed)
-      continue
-
-    const usages: number[] = []
-    const memories: number[] = []
-    for (const detail of Object.values(row.gpu_detailed)) {
-      if (detail.mem_used != null && detail.mem_total && detail.mem_total > 0)
-        detail.memory = detail.mem_used / detail.mem_total * 100
-      if (typeof detail.usage === 'number' && Number.isFinite(detail.usage))
-        usages.push(detail.usage)
-      if (typeof detail.memory === 'number' && Number.isFinite(detail.memory))
-        memories.push(detail.memory)
-    }
-
-    if (row.gpu_usage == null && usages.length)
-      row.gpu_usage = usages.reduce((sum, value) => sum + value, 0) / usages.length
-    row.gpu ??= row.gpu_usage
-    if (row.gpu_memory == null && memories.length)
-      row.gpu_memory = memories.reduce((sum, value) => sum + value, 0) / memories.length
-  }
-  return rows
-}
-
-function getGpuDeviceNames(record: RecordFormat | null): string {
-  if (!record?.gpu_detailed)
-    return nodeInfo.value?.gpu_name || ''
-  return Object.values(record.gpu_detailed)
-    .map(detail => detail.device_name || (detail.device_index === undefined ? '' : `GPU ${detail.device_index}`))
-    .filter(Boolean)
-    .join(' / ')
-}
-
-function metricSeriesToRecordFormat(seriesList: MetricSeries[]): RecordFormat[] {
-  const rows = new Map<string, RecordFormat>()
-  const normalizedSeriesList = normalizeMetricSeriesList(seriesList)
-
-  for (const series of normalizedSeriesList) {
-    if (!LOAD_METRIC_KEYS.includes(series.metric_key as LoadMetricKey))
-      continue
-
-    const key = series.metric_key as LoadMetricKey
-    if (key === 'ping.latency_ms' || key === 'ping.loss')
-      continue
-
-    for (const point of series.points) {
-      const row = ensureMetricRow(rows, point.time)
-      applyMetricPoint(row, key, metricValue(point.value), series)
-    }
-  }
-
-  return finalizeGpuRows([...rows.values()].sort((a, b) => dayjs(a.time).valueOf() - dayjs(b.time).valueOf()))
-}
 
 interface MetricHistoryData {
   records: RecordFormat[]
@@ -718,16 +381,8 @@ async function fetchData() {
 
 // ==================== 数据处理 ====================
 
-const chartData = computed(() => metricData.value ?? statusToRecordFormat(remoteData.value))
 
-const latestStatus = computed(() => {
-  const data = chartData.value
-  if (!data.length)
-    return null
-  return data.at(-1) ?? null
-})
 
-const hasGpuData = computed(() => chartData.value.some(record => record.gpu != null || record.gpu_usage != null || record.gpu_memory != null || record.gpu_detailed))
 
 const metricSeriesColors = reactive(getChartSeriesPalette(appStore.colorVisionFriendly))
 
@@ -735,786 +390,99 @@ watchEffect(() => {
   metricSeriesColors.splice(0, metricSeriesColors.length, ...getChartSeriesPalette(appStore.colorVisionFriendly))
 })
 
-const pingTaskMap = computed(() => new Map(pingTasks.value.map(task => [String(task.id), task])))
-const pingTaskOrder = computed(() => createPingTaskOrderMap(pingTasks.value))
 
-function seriesHasData(series: MetricChartSeriesData): boolean {
-  return series.data.some(([, value]) => value !== null && Number.isFinite(value))
-}
 
-function recordMetricSeries(
-  name: string,
-  color: string,
-  kind: MetricChartSeriesData['kind'],
-  getter: (record: RecordFormat) => number | null | undefined,
-  dashed = false,
-): MetricChartSeriesData {
-  return {
-    name,
-    color,
-    kind,
-    dashed,
-    data: chartData.value.map(record => [record.time, metricValue(getter(record))]),
-  }
-}
 
-function gpuDeviceEntries(): Array<{ index: number, name: string }> {
-  const devices = new Map<number, string>()
-  for (const record of chartData.value) {
-    for (const [rawIndex, detail] of Object.entries(record.gpu_detailed ?? {})) {
-      const index = detail.device_index ?? Number(rawIndex)
-      devices.set(index, detail.device_name || `GPU ${index + 1}`)
-    }
-  }
-  return [...devices.entries()]
-    .sort(([left], [right]) => left - right)
-    .map(([index, name]) => ({ index, name }))
-}
 
-const trafficChartSeries = computed<MetricChartSeriesData[]>(() => [
-  recordMetricSeries('累计下载', chartColors.quinary, 'bytes', record => record.net_total_down),
-  recordMetricSeries('累计上传', chartColors.quaternary, 'bytes', record => record.net_total_up),
-  recordMetricSeries('周期下载', chartColors.tertiary, 'bytes', record => record.traffic_down, true),
-  recordMetricSeries('周期上传', chartColors.secondary, 'bytes', record => record.traffic_up, true),
-].filter(seriesHasData))
 
-const gpuMemoryChartSeries = computed<MetricChartSeriesData[]>(() => gpuDeviceEntries().flatMap((device, index) => {
-  const used = recordMetricSeries(
-    `${device.name} 已用`,
-    metricSeriesColors[index * 2 % metricSeriesColors.length]!,
-    'bytes',
-    record => record.gpu_detailed?.[device.index]?.mem_used,
-  )
-  const total = recordMetricSeries(
-    `${device.name} 总量`,
-    metricSeriesColors[(index * 2 + 1) % metricSeriesColors.length]!,
-    'bytes',
-    record => record.gpu_detailed?.[device.index]?.mem_total,
-    true,
-  )
-  return [used, total].filter(seriesHasData)
-}))
 
-const temperatureChartSeries = computed<MetricChartSeriesData[]>(() => {
-  const series = [recordMetricSeries('系统温度', chartColors.secondary, 'temperature', record => record.temp)]
-  if (appStore.gpuChartEnabled) {
-    series.push(...gpuDeviceEntries().map((device, index) => recordMetricSeries(
-      `${device.name} 温度`,
-      metricSeriesColors[index % metricSeriesColors.length]!,
-      'temperature',
-      record => record.gpu_detailed?.[device.index]?.temperature,
-    )))
-  }
-  return series.filter(seriesHasData)
-})
 
-function pingSeries(metricKey: 'ping.latency_ms' | 'ping.loss'): MetricChartSeriesData[] {
-  return rawMetricSeries.value
-    .filter(series => series.metric_key === metricKey)
-    .sort((left, right) => comparePingTaskOrder(metricTags(left), metricTags(right), pingTaskOrder.value))
-    .map<MetricChartSeriesData>((series, index) => {
-      const tags = metricTags(series)
-      const taskId = String(tags.task_id ?? tags.task ?? '')
-      const taskName = pingTaskMap.value.get(taskId)?.name || (taskId ? `任务 ${taskId}` : `Ping ${index + 1}`)
-      return {
-        name: taskName,
-        color: metricSeriesColors[index % metricSeriesColors.length]!,
-        kind: metricKey === 'ping.loss' ? 'percent' : 'milliseconds',
-        dashed: appStore.colorVisionFriendly && index % 2 === 1,
-        data: series.points.map(point => [
-          point.time,
-          point.value === null || !Number.isFinite(point.value)
-            ? null
-            : metricKey === 'ping.loss' ? point.value * 100 : point.value,
-        ] as [string, number | null]),
-      }
-    })
-    .filter(seriesHasData)
-}
 
-const pingChartSeries = computed<MetricChartSeriesData[]>(() => pingSeries('ping.latency_ms'))
-const pingLossChartSeries = computed<MetricChartSeriesData[]>(() => pingSeries('ping.loss'))
 
-const hasTrafficData = computed(() => trafficChartSeries.value.length > 0)
-const hasGpuMemoryData = computed(() => gpuMemoryChartSeries.value.length > 0)
-const hasTemperatureData = computed(() => temperatureChartSeries.value.length > 0)
-const hasPingData = computed(() => pingChartSeries.value.length > 0)
-const hasPingLossData = computed(() => pingLossChartSeries.value.length > 0)
 
 // ==================== 工具函数 ====================
 
-function formatTime(time: string, showDate: boolean): string {
-  const date = dayjs(time)
-  if (showDate) {
-    return date.format('M/D HH:mm')
-  }
-  return date.format('HH:mm')
-}
 
-function formatTimeForTooltip(time: string, hours: number): string {
-  const date = dayjs(time)
-  if (hours < 24) {
-    return date.format('HH:mm:ss')
-  }
-  return date.format('MM/DD HH:mm')
-}
 
-const showDateInAxis = computed(() => (effectiveHistoryHours.value) >= 24)
-
-// 通用 X 轴配置
-const baseXAxisConfig = computed(() => ({
-  type: 'category' as const,
-  data: chartData.value.map(r => formatTime(r.time, showDateInAxis.value)),
-  axisLabel: {
-    fontSize: 11,
-    color: chartThemeColors.value.textSecondary,
-    margin: 12,
-  },
-  axisLine: {
-    show: true,
-    lineStyle: { color: chartThemeColors.value.borderColor, width: 1 },
-  },
-  axisTick: { show: false },
-  boundaryGap: false,
-}))
-
-// 通用 Y 轴配置
-const baseYAxisConfig = computed(() => ({
-  type: 'value' as const,
-  axisLabel: {
-    fontSize: 11,
-    color: chartThemeColors.value.textSecondary,
-  },
-  axisLine: { show: false },
-  axisTick: { show: false },
-  splitLine: {
-    lineStyle: {
-      color: chartThemeColors.value.splitLineColor,
-      type: 'dashed' as const,
-    },
-  },
-}))
 
 // ==================== 图表配置 ====================
 
 // CPU 图表
-const cpuChartOption = computed(() => ({
-  animation: false,
-  // 全局颜色配置（确保 Tooltip 圆点颜色与线条一致）
-  color: [chartColors.primary, chartColors.secondary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
 
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
 
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        if (item.seriesName === 'CPU') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>CPU</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${item.value?.toFixed(1) ?? '-'}%</span></div>`
-        }
-        else if (item.seriesName === t('负载')) {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>系统负载</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${item.value?.toFixed(2) ?? '-'}</span></div>`
-        }
-      }
-      html += '</div>'
-      return html
-    },
-  },
-  grid: chartMargin,
-  xAxis: baseXAxisConfig.value,
-  yAxis: [
-    {
-      ...baseYAxisConfig.value,
-      name: 'CPU %',
-      nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-      min: 0,
-      max: 100,
-      axisLabel: { ...baseYAxisConfig.value.axisLabel, formatter: '{value}%' },
-    },
-    {
-      ...baseYAxisConfig.value,
-      name: t('负载'),
-      nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 0, 0, 40] },
-      min: 0,
-      splitLine: { show: false },
-    },
-  ],
-  series: [
-    {
-      name: 'CPU',
-      type: 'line',
-      data: chartData.value.map(r => r.cpu),
 
-      showSymbol: false,
-      yAxisIndex: 0,
-      lineStyle: { width: 1.5, color: chartColors.primary, cap: 'round' as const },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: chartColors.primaryAreaStrong },
-            { offset: 1, color: chartColors.primaryAreaFaint },
-          ],
-        },
-      },
-    },
-    {
-      name: t('负载'),
-      type: 'line',
-      data: chartData.value.map(r => r.load),
 
-      showSymbol: false,
-      yAxisIndex: 1,
-      lineStyle: { width: 1.5, color: chartColors.secondary, cap: 'round' as const },
-    },
-  ],
-}))
 
-// 内存图表
-const memoryChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.primary, chartColors.quinary, chartColors.secondary, chartColors.quaternary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const ramUsed = record.ram ?? 0
-      const ramTotal = record.ram_total ?? nodeInfo.value?.mem_total ?? 0
-      const swapUsed = record.swap ?? 0
-      const swapTotal = record.swap_total ?? nodeInfo.value?.swap_total ?? 0
-      const ramPercent = ramTotal > 0 ? ((ramUsed / ramTotal) * 100).toFixed(1) : '0'
-      const swapPercent = swapTotal > 0 ? ((swapUsed / swapTotal) * 100).toFixed(1) : '0'
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        if (item.seriesName === 'RAM') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>RAM</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(ramUsed)} (${ramPercent}%)</span></div>`
-        }
-        else if (item.seriesName === 'Swap') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>Swap</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(swapUsed)} (${swapPercent}%)</span></div>`
-        }
-        else if (item.seriesName === 'RAM 总量') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>RAM 总量</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(ramTotal)}</span></div>`
-        }
-        else if (item.seriesName === 'Swap 总量') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>Swap 总量</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(swapTotal)}</span></div>`
-        }
-      }
-      html += '</div>'
-      return html
-    },
-  },
-  legend: {
-    data: ['RAM', 'RAM 总量', 'Swap', 'Swap 总量'],
-    bottom: 4,
-    itemWidth: 10,
-    itemHeight: 8,
-    textStyle: { fontSize: 10, color: chartThemeColors.value.textSecondary },
-  },
-  grid: chartMarginWithLegend,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: t('内存'),
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    axisLabel: {
-      ...baseYAxisConfig.value.axisLabel,
-      formatter: (val: number) => formatBytes(val),
-    },
-  },
-  series: [
-    {
-      name: 'RAM',
-      type: 'line',
-      data: chartData.value.map(r => r.ram),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.primary, cap: 'round' as const },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: chartColors.primaryAreaStrong },
-            { offset: 1, color: chartColors.primaryAreaFaint },
-          ],
-        },
-      },
-    },
-    {
-      name: 'RAM 总量',
-      type: 'line',
-      data: chartData.value.map(r => r.ram_total ?? nodeInfo.value?.mem_total ?? null),
-      showSymbol: false,
-      lineStyle: { width: 1.2, type: 'dashed' as const, color: chartColors.quinary, cap: 'round' as const },
-    },
-    {
-      name: 'Swap',
-      type: 'line',
-      data: chartData.value.map(r => r.swap),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.secondary, cap: 'round' as const },
-    },
-    {
-      name: 'Swap 总量',
-      type: 'line',
-      data: chartData.value.map(r => r.swap_total ?? nodeInfo.value?.swap_total ?? null),
-      showSymbol: false,
-      lineStyle: { width: 1.2, type: 'dashed' as const, color: chartColors.quaternary, cap: 'round' as const },
-    },
-  ],
-}))
-
-// 磁盘图表
-const diskChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.tertiary, chartColors.quinary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const diskUsed = record.disk ?? 0
-      const diskTotal = record.disk_total ?? nodeInfo.value?.disk_total ?? 0
-      const diskPercent = diskTotal > 0 ? ((diskUsed / diskTotal) * 100).toFixed(1) : '0'
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        const text = item.seriesName === '磁盘总量' ? formatBytes(diskTotal) : `${formatBytes(diskUsed)} (${diskPercent}%)`
-        html += `<div style="display:flex;align-items:center">${colorDot}<span>${escapeHTML(item.seriesName)}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${text}</span></div>`
-      }
-      html += '</div>'
-      return html
-    },
-  },
-  legend: {
-    data: ['磁盘已用', '磁盘总量'],
-    bottom: 4,
-    itemWidth: 10,
-    itemHeight: 8,
-    textStyle: { fontSize: 10, color: chartThemeColors.value.textSecondary },
-  },
-  grid: chartMarginWithLegend,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: t('磁盘'),
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    axisLabel: {
-      ...baseYAxisConfig.value.axisLabel,
-      formatter: (val: number) => formatBytes(val),
-    },
-  },
-  series: [
-    {
-      name: '磁盘已用',
-      type: 'line',
-      data: chartData.value.map(r => r.disk),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.tertiary, cap: 'round' as const },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: chartColors.tertiaryAreaStrong },
-            { offset: 1, color: chartColors.tertiaryAreaFaint },
-          ],
-        },
-      },
-    },
-    {
-      name: '磁盘总量',
-      type: 'line',
-      data: chartData.value.map(r => r.disk_total ?? nodeInfo.value?.disk_total ?? null),
-      showSymbol: false,
-      lineStyle: { width: 1.2, type: 'dashed' as const, color: chartColors.quinary, cap: 'round' as const },
-    },
-  ],
-}))
-
-// 网络图表
-const networkChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.quinary, chartColors.quaternary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        const label = item.seriesName === '下载' ? '↓ 下载' : '↑ 上传'
-        html += `<div style="display:flex;align-items:center">${colorDot}<span>${label}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(item.value)}/s</span></div>`
-      }
-      html += '</div>'
-      return html
-    },
-  },
-  legend: {
-    data: ['下载', '上传'],
-    bottom: 4,
-    itemWidth: 12,
-    itemHeight: 12,
-    itemGap: 20,
-    icon: 'roundRect',
-    textStyle: { fontSize: 11, color: chartThemeColors.value.textSecondary },
-  },
-  grid: chartMarginWithLegend,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: '速度',
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    axisLabel: {
-      ...baseYAxisConfig.value.axisLabel,
-      formatter: (val: number) => formatBytes(val),
-    },
-  },
-  series: [
-    {
-      name: '下载',
-      type: 'line',
-      data: chartData.value.map(r => r.net_in ?? 0),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.quinary, cap: 'round' as const },
-    },
-    {
-      name: '上传',
-      type: 'line',
-      data: chartData.value.map(r => r.net_out ?? 0),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.quaternary, cap: 'round' as const },
-    },
-  ],
-}))
-
-const gpuDeviceUsageEChartSeries = computed(() => gpuDeviceEntries().map((device, index) => ({
-  name: device.name,
-  type: 'line',
-  data: chartData.value.map(record => record.gpu_detailed?.[device.index]?.usage ?? null),
-  showSymbol: false,
-  lineStyle: {
-    width: 1.2,
-    type: 'dashed' as const,
-    color: metricSeriesColors[index % metricSeriesColors.length]!,
-    cap: 'round' as const,
-  },
-})).filter(series => series.data.some(value => value !== null)))
-
-// GPU 图表
-const gpuChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.senary, chartColors.quaternary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        html += `<div style="display:flex;align-items:center">${colorDot}<span>${escapeHTML(item.seriesName)}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${item.value?.toFixed(1) ?? '-'}%</span></div>`
-      }
-
-      if (record.gpu_detailed) {
-        html += `<div style="margin-top:4px;padding-top:4px;border-top:1px solid ${chartThemeColors.value.splitLineColor}">`
-        for (const detail of Object.values(record.gpu_detailed)) {
-          const name = detail.device_name || (detail.device_index === undefined ? 'GPU' : `GPU ${detail.device_index}`)
-          const usage = detail.usage == null ? '-' : `${detail.usage.toFixed(1)}%`
-          const memory = detail.memory == null ? '-' : `${detail.memory.toFixed(1)}%`
-          const temp = detail.temperature == null ? '' : ` · ${Math.round(detail.temperature)}℃`
-          html += `<div style="display:flex;align-items:center;gap:8px;color:${chartThemeColors.value.textSecondary}"><span>${escapeHTML(name)}</span><span style="margin-left:auto">${usage} / ${memory}${temp}</span></div>`
-        }
-        html += '</div>'
-      }
-
-      html += '</div>'
-      return html
-    },
-  },
-  legend: {
-    data: ['GPU 使用率', '显存使用率', ...gpuDeviceUsageEChartSeries.value.map(series => series.name)],
-    bottom: 4,
-    itemWidth: 12,
-    itemHeight: 12,
-    itemGap: 20,
-    icon: 'roundRect',
-    textStyle: { fontSize: 11, color: chartThemeColors.value.textSecondary },
-  },
-  grid: chartMarginWithLegend,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: 'GPU %',
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    min: 0,
-    max: 100,
-    axisLabel: { ...baseYAxisConfig.value.axisLabel, formatter: '{value}%' },
-  },
-  series: [
-    {
-      name: 'GPU 使用率',
-      type: 'line',
-      data: chartData.value.map(r => r.gpu_usage ?? r.gpu),
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.senary, cap: 'round' as const },
-    },
-    {
-      name: '显存使用率',
-      type: 'line',
-      data: chartData.value.map(r => r.gpu_memory),
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.quaternary, cap: 'round' as const },
-    },
-    ...gpuDeviceUsageEChartSeries.value,
-  ],
-}))
-
-const chartDashboardCards = computed(() => appStore.chartDashboardTemplate.cards)
-
-function isChartCardEnabled(key: ChartDashboardCardKey): boolean {
-  if (!shows(({cpu:'cpu',memory:'memory',disk:'disk',network:'network',traffic:'network',connections:'system',processes:'system',ping:'latency',pingLoss:'latency',gpu:'gpu',gpuMemory:'gpu',temperature:'system'} as Record<string,string>)[key] ?? 'system')) return false
-  if (!chartDashboardCards.value.includes(key))
-    return false
-
-  switch (key) {
-    case 'gpu':
-      return appStore.gpuChartEnabled && hasGpuData.value
-    case 'gpuMemory':
-      return appStore.gpuChartEnabled && hasGpuMemoryData.value
-    case 'traffic':
-      return hasTrafficData.value
-    case 'temperature':
-      return hasTemperatureData.value
-    case 'ping':
-      return hasPingData.value
-    case 'pingLoss':
-      return hasPingLossData.value
-    default:
-      return true
-  }
-}
-
-function getChartCardOrder(key: ChartDashboardCardKey): number {
-  const index = chartDashboardCards.value.indexOf(key)
-  return index < 0 ? 99 : index
-}
-
-function getChartCardStyle(key: ChartDashboardCardKey): Record<string, string> {
-  return { order: String(getChartCardOrder(key)) }
-}
-
-// 连接数图表
-const connectionsChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.primary, chartColors.tertiary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        const displayValue = item.value != null ? Math.round(item.value) : '-'
-        html += `<div style="display:flex;align-items:center">${colorDot}<span>${escapeHTML(item.seriesName)}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${displayValue}</span></div>`
-      }
-      html += '</div>'
-      return html
-    },
-  },
-  legend: {
-    data: ['TCP', 'UDP'],
-    bottom: 4,
-    itemWidth: 12,
-    itemHeight: 12,
-    itemGap: 20,
-    icon: 'roundRect',
-    textStyle: { fontSize: 11, color: chartThemeColors.value.textSecondary },
-  },
-  grid: chartMarginWithLegend,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: t('连接数'),
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    min: 0,
-    axisLabel: {
-      ...baseYAxisConfig.value.axisLabel,
-      formatter: (val: number) => Math.round(val).toString(),
-    },
-  },
-  series: [
-    {
-      name: 'TCP',
-      type: 'line',
-      data: chartData.value.map(r => r.connections ?? 0),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.primary, cap: 'round' as const },
-    },
-    {
-      name: 'UDP',
-      type: 'line',
-      data: chartData.value.map(r => r.connections_udp ?? 0),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.tertiary, cap: 'round' as const },
-    },
-  ],
-}))
-
-// 进程数图表
-const processChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.quaternary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${firstParam.color};margin-right:8px;flex-shrink:0"></span>`
-      const displayValue = firstParam.value != null ? Math.round(firstParam.value) : '-'
-
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-      html += `<div style="display:flex;align-items:center">${colorDot}<span>进程数</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${displayValue}</span></div>`
-      html += '</div>'
-      return html
-    },
-  },
-  grid: chartMargin,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: t('进程'),
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    min: 0,
-    axisLabel: {
-      ...baseYAxisConfig.value.axisLabel,
-      formatter: (val: number) => Math.round(val).toString(),
-    },
-  },
-  series: [
-    {
-      name: '进程数',
-      type: 'line',
-      data: chartData.value.map(r => r.process ?? 0),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.quaternary, cap: 'round' as const },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(167, 139, 250, 0.25)' },
-            { offset: 1, color: 'rgba(167, 139, 250, 0.02)' },
-          ],
-        },
-      },
-    },
-  ],
-}))
 
 // ==================== 实时更新 ====================
+
+
+// Chart series and options come from the shared model (glass-shared/charts/load.ts).
+const loadChartModel = computed(() => createLoadChartModel({
+  uuid: props.uuid,
+  isDark: isDark.value,
+  remoteData: remoteData.value,
+  metricData: metricData.value,
+  rawMetricSeries: rawMetricSeries.value,
+  pingTasks: pingTasks.value,
+  effectiveHistoryHours: effectiveHistoryHours.value,
+  nodeInfo: nodeInfo.value,
+  chartColors,
+  metricSeriesColors,
+  colorVisionFriendly: appStore.colorVisionFriendly,
+  gpuChartEnabled: appStore.gpuChartEnabled,
+  chartDashboardTemplate: appStore.chartDashboardTemplate,
+}))
+const chartThemeColors = computed(() => loadChartModel.value.chartThemeColors)
+const baseTooltipConfig = computed(() => loadChartModel.value.baseTooltipConfig)
+const chartData = computed(() => loadChartModel.value.chartData)
+const latestStatus = computed(() => loadChartModel.value.latestStatus)
+const hasGpuData = computed(() => loadChartModel.value.hasGpuData)
+const pingTaskMap = computed(() => loadChartModel.value.pingTaskMap)
+const pingTaskOrder = computed(() => loadChartModel.value.pingTaskOrder)
+const trafficChartSeries = computed(() => loadChartModel.value.trafficChartSeries)
+const gpuMemoryChartSeries = computed(() => loadChartModel.value.gpuMemoryChartSeries)
+const temperatureChartSeries = computed(() => loadChartModel.value.temperatureChartSeries)
+const pingChartSeries = computed(() => loadChartModel.value.pingChartSeries)
+const pingLossChartSeries = computed(() => loadChartModel.value.pingLossChartSeries)
+const hasTrafficData = computed(() => loadChartModel.value.hasTrafficData)
+const hasGpuMemoryData = computed(() => loadChartModel.value.hasGpuMemoryData)
+const hasTemperatureData = computed(() => loadChartModel.value.hasTemperatureData)
+const hasPingData = computed(() => loadChartModel.value.hasPingData)
+const hasPingLossData = computed(() => loadChartModel.value.hasPingLossData)
+const showDateInAxis = computed(() => loadChartModel.value.showDateInAxis)
+const baseXAxisConfig = computed(() => loadChartModel.value.baseXAxisConfig)
+const baseYAxisConfig = computed(() => loadChartModel.value.baseYAxisConfig)
+const cpuChartOption = computed(() => loadChartModel.value.cpuChartOption)
+const memoryChartOption = computed(() => loadChartModel.value.memoryChartOption)
+const diskChartOption = computed(() => loadChartModel.value.diskChartOption)
+const networkChartOption = computed(() => loadChartModel.value.networkChartOption)
+const gpuDeviceUsageEChartSeries = computed(() => loadChartModel.value.gpuDeviceUsageEChartSeries)
+const gpuChartOption = computed(() => loadChartModel.value.gpuChartOption)
+const chartDashboardCards = computed(() => loadChartModel.value.chartDashboardCards)
+const connectionsChartOption = computed(() => loadChartModel.value.connectionsChartOption)
+const processChartOption = computed(() => loadChartModel.value.processChartOption)
+const gpuDetailsFromStatus: ReturnType<typeof createLoadChartModel>['gpuDetailsFromStatus'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['gpuDetailsFromStatus']>) => (loadChartModel.value.gpuDetailsFromStatus as (...a: unknown[]) => never)(...args)
+const averageGpuMemoryPercent: ReturnType<typeof createLoadChartModel>['averageGpuMemoryPercent'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['averageGpuMemoryPercent']>) => (loadChartModel.value.averageGpuMemoryPercent as (...a: unknown[]) => never)(...args)
+const statusToRecordFormat: ReturnType<typeof createLoadChartModel>['statusToRecordFormat'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['statusToRecordFormat']>) => (loadChartModel.value.statusToRecordFormat as (...a: unknown[]) => never)(...args)
+const metricValue: ReturnType<typeof createLoadChartModel>['metricValue'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['metricValue']>) => (loadChartModel.value.metricValue as (...a: unknown[]) => never)(...args)
+const getMetricDeviceKey: ReturnType<typeof createLoadChartModel>['getMetricDeviceKey'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['getMetricDeviceKey']>) => (loadChartModel.value.getMetricDeviceKey as (...a: unknown[]) => never)(...args)
+const getMetricDeviceIndex: ReturnType<typeof createLoadChartModel>['getMetricDeviceIndex'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['getMetricDeviceIndex']>) => (loadChartModel.value.getMetricDeviceIndex as (...a: unknown[]) => never)(...args)
+const getMetricDeviceName: ReturnType<typeof createLoadChartModel>['getMetricDeviceName'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['getMetricDeviceName']>) => (loadChartModel.value.getMetricDeviceName as (...a: unknown[]) => never)(...args)
+const ensureMetricRow: ReturnType<typeof createLoadChartModel>['ensureMetricRow'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['ensureMetricRow']>) => (loadChartModel.value.ensureMetricRow as (...a: unknown[]) => never)(...args)
+const applyMetricPoint: ReturnType<typeof createLoadChartModel>['applyMetricPoint'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['applyMetricPoint']>) => (loadChartModel.value.applyMetricPoint as (...a: unknown[]) => never)(...args)
+const finalizeGpuRows: ReturnType<typeof createLoadChartModel>['finalizeGpuRows'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['finalizeGpuRows']>) => (loadChartModel.value.finalizeGpuRows as (...a: unknown[]) => never)(...args)
+const getGpuDeviceNames: ReturnType<typeof createLoadChartModel>['getGpuDeviceNames'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['getGpuDeviceNames']>) => (loadChartModel.value.getGpuDeviceNames as (...a: unknown[]) => never)(...args)
+const metricSeriesToRecordFormat: ReturnType<typeof createLoadChartModel>['metricSeriesToRecordFormat'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['metricSeriesToRecordFormat']>) => (loadChartModel.value.metricSeriesToRecordFormat as (...a: unknown[]) => never)(...args)
+const seriesHasData: ReturnType<typeof createLoadChartModel>['seriesHasData'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['seriesHasData']>) => (loadChartModel.value.seriesHasData as (...a: unknown[]) => never)(...args)
+const recordMetricSeries: ReturnType<typeof createLoadChartModel>['recordMetricSeries'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['recordMetricSeries']>) => (loadChartModel.value.recordMetricSeries as (...a: unknown[]) => never)(...args)
+const gpuDeviceEntries: ReturnType<typeof createLoadChartModel>['gpuDeviceEntries'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['gpuDeviceEntries']>) => (loadChartModel.value.gpuDeviceEntries as (...a: unknown[]) => never)(...args)
+const pingSeries: ReturnType<typeof createLoadChartModel>['pingSeries'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['pingSeries']>) => (loadChartModel.value.pingSeries as (...a: unknown[]) => never)(...args)
+const formatTime: ReturnType<typeof createLoadChartModel>['formatTime'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['formatTime']>) => (loadChartModel.value.formatTime as (...a: unknown[]) => never)(...args)
+const formatTimeForTooltip: ReturnType<typeof createLoadChartModel>['formatTimeForTooltip'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['formatTimeForTooltip']>) => (loadChartModel.value.formatTimeForTooltip as (...a: unknown[]) => never)(...args)
+const isChartCardEnabled: ReturnType<typeof createLoadChartModel>['isChartCardEnabled'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['isChartCardEnabled']>) => (loadChartModel.value.isChartCardEnabled as (...a: unknown[]) => never)(...args)
+const getChartCardOrder: ReturnType<typeof createLoadChartModel>['getChartCardOrder'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['getChartCardOrder']>) => (loadChartModel.value.getChartCardOrder as (...a: unknown[]) => never)(...args)
+const getChartCardStyle: ReturnType<typeof createLoadChartModel>['getChartCardStyle'] = (...args: Parameters<ReturnType<typeof createLoadChartModel>['getChartCardStyle']>) => (loadChartModel.value.getChartCardStyle as (...a: unknown[]) => never)(...args)
 
 // 使用 VueUse 的 useIntervalFn 自动管理定时器
 const { pause: pauseRealtimeUpdate, resume: resumeRealtimeUpdate } = useIntervalFn(

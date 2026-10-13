@@ -1,5 +1,6 @@
 import type { CSSProperties, Ref } from 'react'
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { asyncComponent } from '@/lib/asyncComponent'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { t } from '@shared/i18n'
 import type { PermissionKey } from '@shared/services/auth.service'
@@ -25,16 +26,16 @@ import { appStore, useApp } from '@/stores/app'
 import type { NodeData } from '@/stores/nodes'
 import { useNodes } from '@/stores/nodes'
 
-const AuditLogPanel = lazy(() => import('@/components/AuditLogPanel'))
-const HealthSummaryPanel = lazy(() => import('@/components/HealthSummaryPanel'))
-const NodeCard = lazy(() => import('@/components/NodeCard'))
-const NodeGeneralCards = lazy(() => import('@/components/NodeGeneralCards'))
-const NodeList = lazy(() => import('@/components/NodeList'))
-const NodeComparePanel = lazy(() => import('@/components/NodeComparePanel'))
-const PingMonitorDialog = lazy(() => import('@/components/PingMonitorDialog'))
-const NodeTopologyPanel = lazy(() => import('@/components/NodeTopologyPanel'))
-const ProviderValuePanel = lazy(() => import('@/components/ProviderValuePanel'))
-const SnapshotExportPanel = lazy(() => import('@/components/SnapshotExportPanel'))
+const AuditLogPanel = asyncComponent(() => import('@/components/AuditLogPanel'))
+const HealthSummaryPanel = asyncComponent(() => import('@/components/HealthSummaryPanel'))
+const NodeCard = asyncComponent(() => import('@/components/NodeCard'))
+const NodeGeneralCards = asyncComponent(() => import('@/components/NodeGeneralCards'))
+const NodeList = asyncComponent(() => import('@/components/NodeList'))
+const NodeComparePanel = asyncComponent(() => import('@/components/NodeComparePanel'))
+const PingMonitorDialog = asyncComponent(() => import('@/components/PingMonitorDialog'))
+const NodeTopologyPanel = asyncComponent(() => import('@/components/NodeTopologyPanel'))
+const ProviderValuePanel = asyncComponent(() => import('@/components/ProviderValuePanel'))
+const SnapshotExportPanel = asyncComponent(() => import('@/components/SnapshotExportPanel'))
 
 const s = scope('home-view')
 
@@ -419,14 +420,14 @@ export default function HomeView({ ref }: { ref?: Ref<HTMLDivElement> }) {
       )}
 
       {!app.hideGeneralCard && (
-        <Suspense>
+        <>
           <NodeGeneralCards
             {...s}
             nodes={groupNodeList}
             globeNodes={groupNodeList}
             transitionKey={app.nodeSelectedGroup}
           />
-        </Suspense>
+        </>
       )}
 
       <div {...s} className={`node-info p-4 pt-0 flex flex-col gap-4 relative z-1 pointer-events-none${app.hideGeneralCard ? ' pt-4' : ''}`}>
@@ -557,7 +558,7 @@ export default function HomeView({ ref }: { ref?: Ref<HTMLDivElement> }) {
                     {`${activeToolTitle} · 当前分组：${g.tab}（${groupNodeList.length} 台） `}
                   </div>
                 )}
-                <Suspense>
+                <>
                   {activeHomeTool === 'topology'
                     ? <NodeTopologyPanel {...s} nodes={groupNodeList} />
                     : activeHomeTool === 'nodeCompare'
@@ -621,14 +622,14 @@ export default function HomeView({ ref }: { ref?: Ref<HTMLDivElement> }) {
                                         <Empty {...s} description={emptyDescription} />
                                       </div>
                                     )}
-                </Suspense>
+                </>
               </TabsContent>
             ))}
           </Tabs>
         </div>
       </div>
       {pingDialogNode && (
-        <Suspense>
+        <>
           <PingMonitorDialog
             {...s}
             open={Boolean(pingDialogNode)}
@@ -639,7 +640,7 @@ export default function HomeView({ ref }: { ref?: Ref<HTMLDivElement> }) {
                 setPingDialogNode(null)
             }}
           />
-        </Suspense>
+        </>
       )}
     </div>
   )

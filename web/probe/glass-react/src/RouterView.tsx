@@ -11,7 +11,8 @@
 // by component). Here HomeView lives in a React <Activity> that is hidden
 // while another route shows; the enter/leave classes run on each view's root
 // through the same hooks as <Transition>, in out-in order.
-import { Activity, lazy, Suspense, useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { asyncComponent } from '@/lib/asyncComponent'
+import { Activity, useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { Ref } from 'react'
 import { beforeEnter, enter, leave, resolveClasses } from '@/lib/transition'
 import type { TransitionClassProps } from '@/lib/transition'
@@ -19,8 +20,8 @@ import { ActiveContext, useRoute } from '@/lib/router'
 import type { RouteName } from '@/lib/router'
 import { useApp } from '@/stores/app'
 
-const HomeView = lazy(() => import('@/views/HomeView'))
-const InstanceDetail = lazy(() => import('@/views/InstanceDetail'))
+const HomeView = asyncComponent(() => import('@/views/HomeView'))
+const InstanceDetail = asyncComponent(() => import('@/views/InstanceDetail'))
 
 const ROUTE_TRANSITION: TransitionClassProps = {
   enterActiveClass: 'transition-all duration-300 ease-out',
@@ -112,13 +113,13 @@ export default function RouterView() {
   const detailVisible = shown === 'instance-detail' || leaving === 'instance-detail'
 
   return (
-    <Suspense>
+    <>
       <Activity mode={homeVisible ? 'visible' : 'hidden'}>
         <ActiveContext.Provider value={shown === 'home' && leaving !== 'home'}>
           <HomeView ref={setRoot('home') as Ref<HTMLDivElement>} />
         </ActiveContext.Provider>
       </Activity>
       {detailVisible && <InstanceDetail ref={setRoot('instance-detail') as Ref<HTMLDivElement>} />}
-    </Suspense>
+    </>
   )
 }

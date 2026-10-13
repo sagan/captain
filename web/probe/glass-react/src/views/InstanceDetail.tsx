@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { asyncComponent } from '@/lib/asyncComponent'
 import type { ChangeEvent, Ref } from 'react'
 import { Icon } from '@iconify/react'
 import { t } from '@shared/i18n'
@@ -25,8 +26,8 @@ import { useRoute, useRouter } from '@/lib/router'
 import { appStore, useApp } from '@/stores/app'
 import { useNodes } from '@/stores/nodes'
 
-const LoadChart = lazy(() => import('@/components/LoadChart'))
-const PingChart = lazy(() => import('@/components/PingChart'))
+const LoadChart = asyncComponent(() => import('@/components/LoadChart'))
+const PingChart = asyncComponent(() => import('@/components/PingChart'))
 
 const CPU_TIER_PERCENT = { 'S': 92, 'A': 76, 'B': 58, 'C': 38, 'D': 20, '?': 0 } as const
 const CPU_TIER_TEXT = { 'S': 'text-yellow-500', 'A': 'text-blue-500', 'B': 'text-green-500', 'C': 'text-orange-500', 'D': 'text-red-400', '?': 'text-muted-foreground' } as const
@@ -506,10 +507,10 @@ export default function InstanceDetail({ ref }: { ref?: Ref<HTMLDivElement> }) {
                 </div>
               )}
 
-              <Suspense>
+              <>
                 {shows('history') && (!app.nodeDetailSectionTabsEnabled || activeDetailSection === 'load') && <LoadChart uuid={data.uuid} className="px-4" />}
                 {shows('history') && shows('latency') && (!app.nodeDetailSectionTabsEnabled || activeDetailSection === 'ping') && <PingChart uuid={data.uuid} className="px-4" />}
-              </Suspense>
+              </>
             </>
           )}
     </div>

@@ -1,5 +1,6 @@
 // Pure parts of the glass MetricSeriesChartCard, shared by both builds.
 import { formatBytes } from '@shared/utils/helper'
+import { escapeHTML } from '@shared/utils/html'
 import type { MetricChartSeriesData } from '@shared/charts/load'
 
 type MetricValueKind = MetricChartSeriesData['kind']
@@ -55,9 +56,9 @@ export function buildMetricSeriesChartOption(p: { series: MetricChartSeriesData[
       const rows = items.map((item) => {
         const source = p.series[item.seriesIndex]
         const kind = source?.kind ?? primaryKind
-        return `<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:2px;background:${item.color};flex:none"></span><span>${item.seriesName}</span><strong style="margin-left:auto;padding-left:12px">${formatMetricValue(item.data?.[1], kind)}</strong></div>`
+        return `<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:2px;background:${item.color};flex:none"></span><span>${escapeHTML(item.seriesName)}</span><strong style="margin-left:auto;padding-left:12px">${formatMetricValue(item.data?.[1], kind)}</strong></div>`
       }).join('')
-      return `<div style="margin-bottom:6px;color:var(--color-muted-foreground)">${items[0]?.axisValueLabel ?? ''}</div><div style="display:flex;flex-direction:column;gap:4px">${rows}</div>`
+      return `<div style="margin-bottom:6px;color:var(--color-muted-foreground)">${escapeHTML(items[0]?.axisValueLabel ?? '')}</div><div style="display:flex;flex-direction:column;gap:4px">${rows}</div>`
     },
   },
   legend: {

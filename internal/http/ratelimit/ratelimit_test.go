@@ -20,7 +20,7 @@ func TestLimiter(t *testing.T) {
 	if ok, wait := l.Allow("1.1.1.1"); ok || wait <= 0 {
 		t.Fatalf("third failure should lock: %v %v", ok, wait)
 	}
-	if ok, _ := l.Allow("2.2.2.2"); !ok {
+	if ok, _ := l.Allow("198.51.100.20"); !ok {
 		t.Fatal("other addresses unaffected")
 	}
 	l.Reset("1.1.1.1")
@@ -45,8 +45,8 @@ func TestClientIP(t *testing.T) {
 func TestClientIPIgnoresClientSuppliedHops(t *testing.T) {
 	r := httptest.NewRequest("GET", "/", nil)
 	r.RemoteAddr = "172.18.0.3:4444"
-	// The client sent "1.2.3.4"; nginx appended the real address.
-	r.Header.Set("X-Forwarded-For", "1.2.3.4, 203.0.113.9")
+	// The client sent "192.0.2.10"; nginx appended the real address.
+	r.Header.Set("X-Forwarded-For", "192.0.2.10, 203.0.113.9")
 	if got := ClientIP(r); got != "203.0.113.9" {
 		t.Fatalf("attacker-chosen first hop must not win: %s", got)
 	}

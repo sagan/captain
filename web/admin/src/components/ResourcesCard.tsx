@@ -1,6 +1,6 @@
 import { Badge, Card, Group, Progress, SimpleGrid, Stack, Table, Tabs, Text, Title } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { GPUResources } from './GPUResources'
 import { bytes } from '../lib/format'
 import type { ResourceHost } from '../lib/resources'
@@ -18,6 +18,8 @@ function Rows({ headers, children }: { headers: string[]; children: ReactNode })
 // Kept in sync with Captain's resource card. Detail is visible only to admins.
 export function ResourcesCard({ host }: { host?: ResourceHost | null }) {
   const { t } = useTranslation()
+  // One clock read per mount keeps render pure; data refetches refresh it.
+  const [renderedAt] = useState(() => Date.now())
   const r = host?.resources
   const valid = (key: keyof NonNullable<ResourceHost['valid']>) => !!host && (!host.valid || host.valid[key])
   const empty = <Text c="dimmed" size="sm">{t('resources.unavailable')}</Text>
@@ -32,7 +34,7 @@ export function ResourcesCard({ host }: { host?: ResourceHost | null }) {
   return <Card mb="lg">
     <Group justify="space-between" align="flex-start" mb="sm">
       <div><Title order={5}>{t('resources.title')}</Title><Text c="dimmed" size="xs">{t('resources.hint')}</Text></div>
-      {r && <Text c="dimmed" size="xs">{t('resources.sampled')}: {new Date(r.at).toLocaleString()}{Date.now() - r.at > 90_000 && <Badge ml="xs" color="orange">{t('resources.stale')}</Badge>}</Text>}
+      {r && <Text c="dimmed" size="xs">{t('resources.sampled')}: {new Date(r.at).toLocaleString()}{renderedAt - r.at > 90_000 && <Badge ml="xs" color="orange">{t('resources.stale')}</Badge>}</Text>}
     </Group>
     <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} mb="md">{summary.map((s) => <div key={s.label}><Text size="xs" c="dimmed">{s.label}</Text><Text size="sm" fw={500}>{s.value}</Text></div>)}</SimpleGrid>
     {!r ? <Text size="sm" c="dimmed">{t('resources.legacy')}</Text> : <Tabs defaultValue="network" keepMounted={false}>

@@ -393,13 +393,13 @@ func TestDeviceLimit(t *testing.T) {
 
 	uuid := u["uuid"].(string)
 	// Two devices: fine.
-	agent.do("POST", "/api/agent/report", agentproto.Report{Online: map[string][]string{uuid: {"1.1.1.1", "2.2.2.2"}}}, nil)
+	agent.do("POST", "/api/agent/report", agentproto.Report{Online: map[string][]string{uuid: {"1.1.1.1", "198.51.100.20"}}}, nil)
 	_, b, _ = agent.do("GET", "/api/agent/state", nil, nil)
 	if stt := mustJSON[agentproto.State](t, b); len(stt.Users) != 1 {
 		t.Fatalf("two devices should be allowed: %+v", stt.Users)
 	}
 	// Third device: the user is withheld from nodes until the extra IP ages out.
-	_, b, _ = agent.do("POST", "/api/agent/report", agentproto.Report{Online: map[string][]string{uuid: {"3.3.3.3"}}}, nil)
+	_, b, _ = agent.do("POST", "/api/agent/report", agentproto.Report{Online: map[string][]string{uuid: {"203.0.113.30"}}}, nil)
 	if rr := mustJSON[agentproto.ReportResponse](t, b); !rr.StateChanged {
 		t.Fatal("exceeding the device limit should change state")
 	}
@@ -408,7 +408,7 @@ func TestDeviceLimit(t *testing.T) {
 		t.Fatalf("over-limit user still provisioned: %+v", stt.Users)
 	}
 	_, b, _ = c.do("GET", "/api/admin/users/"+itoa(int64(u["id"].(float64))), nil, nil)
-	if !strings.Contains(string(b), `"3.3.3.3"`) {
+	if !strings.Contains(string(b), `"203.0.113.30"`) {
 		t.Fatalf("devices missing from user detail: %s", b)
 	}
 	// Age the IPs out and the user returns.
@@ -1029,15 +1029,15 @@ func TestRegistrationLimits(t *testing.T) {
 
 	// Per-IP cap: 2 per window from the same address; another address is fine.
 	put(map[string]any{"ip_limit": 2, "ip_window_hours": 1})
-	reg("b@test", "2.2.2.2", "", "")
-	reg("c@test", "2.2.2.2", "", "")
-	if code, b := reg("d@test", "2.2.2.2", "", ""); code != 403 || !strings.Contains(b, "address") {
+	reg("b@test", "198.51.100.20", "", "")
+	reg("c@test", "198.51.100.20", "", "")
+	if code, b := reg("d@test", "198.51.100.20", "", ""); code != 403 || !strings.Contains(b, "address") {
 		t.Fatalf("ip cap: %d %s", code, b)
 	}
-	if code, _ := reg("d@test", "3.3.3.3", "", ""); code != 200 {
+	if code, _ := reg("d@test", "203.0.113.30", "", ""); code != 200 {
 		t.Fatal("other ip should pass")
 	}
-	if n, _ := st.RegistrationsFromIP(context.Background(), "2.2.2.2", time.Now().Add(-time.Hour)); n != 2 {
+	if n, _ := st.RegistrationsFromIP(context.Background(), "198.51.100.20", time.Now().Add(-time.Hour)); n != 2 {
 		t.Fatalf("count %d", n)
 	}
 
@@ -1047,10 +1047,10 @@ func TestRegistrationLimits(t *testing.T) {
 	if !strings.Contains(string(b), `"invite_only":true`) {
 		t.Fatalf("policy: %s", b)
 	}
-	if code, b := reg("e@test", "4.4.4.4", "", ""); code != 403 || !strings.Contains(b, "invite") {
+	if code, b := reg("e@test", "192.0.2.10", "", ""); code != 403 || !strings.Contains(b, "invite") {
 		t.Fatalf("invite only: %d %s", code, b)
 	}
-	if code, b := reg("e@test", "4.4.4.4", "nope", ""); code != 403 {
+	if code, b := reg("e@test", "192.0.2.10", "nope", ""); code != 403 {
 		t.Fatalf("bad invite: %d %s", code, b)
 	}
 	ac.do("PUT", "/api/admin/settings/invite", map[string]any{"enabled": true, "percent": 10}, nil)
@@ -1062,7 +1062,7 @@ func TestRegistrationLimits(t *testing.T) {
 		Code string `json:"code"`
 	}
 	_ = json.Unmarshal(b, &inv)
-	if code, b := reg("e@test", "4.4.4.4", inv.Code, ""); code != 200 {
+	if code, b := reg("e@test", "192.0.2.10", inv.Code, ""); code != 200 {
 		t.Fatalf("with invite: %d %s", code, b)
 	}
 
@@ -1088,16 +1088,16 @@ func TestRegistrationLimits(t *testing.T) {
 	if !strings.Contains(string(b), `"captcha":{"provider":"turnstile","site_key":"sk2"}`) {
 		t.Fatalf("policy captcha: %s", b)
 	}
-	if code, b := reg("f@test", "5.5.5.5", "", ""); code != 403 || !strings.Contains(b, "captcha required") {
+	if code, b := reg("f@test", "198.51.100.5", "", ""); code != 403 || !strings.Contains(b, "captcha required") {
 		t.Fatalf("missing captcha: %d %s", code, b)
 	}
-	if code, _ := reg("f@test", "5.5.5.5", "", "bad"); code != 403 {
+	if code, _ := reg("f@test", "198.51.100.5", "", "bad"); code != 403 {
 		t.Fatal("bad captcha should fail")
 	}
-	if code, b := reg("f@test", "5.5.5.5", "", "good"); code != 200 {
+	if code, b := reg("f@test", "198.51.100.5", "", "good"); code != 200 {
 		t.Fatalf("good captcha: %d %s", code, b)
 	}
-	if len(seen) != 2 || seen[1] != "turnstile:sec:good:5.5.5.5" {
+	if len(seen) != 2 || seen[1] != "turnstile:sec:good:198.51.100.5" {
 		t.Fatalf("verify calls: %v", seen)
 	}
 }
@@ -1906,7 +1906,7 @@ func TestExternalNodesAndRouting(t *testing.T) {
 	// Port forwards: validated (inbound port collision, bad target), stripped
 	// of panel-only fields in the state, statuses reported back by the node.
 	ac.do("POST", "/api/admin/nodes/"+nodeID+"/inbounds", map[string]any{"Tag": "land", "Protocol": "mieru", "Port": 443, "Settings": map[string]any{"mieru_transport": "TCP"}}, nil)
-	if code, b, _ := ac.do("PUT", "/api/admin/nodes/"+nodeID+"/forwards", map[string]any{"Forwards": []map[string]any{{"port": 443, "target": "1.2.3.4:443"}}}, nil); code != 400 || !strings.Contains(string(b), "already used") {
+	if code, b, _ := ac.do("PUT", "/api/admin/nodes/"+nodeID+"/forwards", map[string]any{"Forwards": []map[string]any{{"port": 443, "target": "203.0.113.30:443"}}}, nil); code != 400 || !strings.Contains(string(b), "already used") {
 		t.Fatalf("forward on inbound port: %d %s", code, b)
 	}
 	if code, _, _ := ac.do("PUT", "/api/admin/nodes/"+nodeID+"/forwards", map[string]any{"Forwards": []map[string]any{{"port": 10443, "target": "nohost"}}}, nil); code != 400 {
@@ -2882,7 +2882,7 @@ func TestDeviceLimitRelay(t *testing.T) {
 		t.Fatalf("relay address should be marked: %s", b)
 	}
 	// A second direct client makes three.
-	_, b, _ = agent.do("POST", "/api/agent/report", agentproto.Report{Online: map[string][]string{uuid: {"2.2.2.2"}}}, nil)
+	_, b, _ = agent.do("POST", "/api/agent/report", agentproto.Report{Online: map[string][]string{uuid: {"203.0.113.77"}}}, nil)
 	if rr := mustJSON[agentproto.ReportResponse](t, b); !rr.StateChanged {
 		t.Fatal("third device should change state")
 	}

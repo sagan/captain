@@ -77,7 +77,7 @@ func TestNodeReportScopedToItsUsers(t *testing.T) {
 	if code, _, _ := c.do("POST", "/api/admin/nodes/"+nodeID+"/inbounds", map[string]any{"Tag": "x\"\n}", "Protocol": "vless", "Port": 1}, nil); code != 400 {
 		t.Fatalf("hostile tag accepted: %d", code)
 	}
-	if code, _, _ := c.do("POST", "/api/admin/nodes/"+nodeID+"/inbounds", map[string]any{"Tag": "ok", "Protocol": "vless", "Port": 1, "Listen": "1.2.3.4 tcp dport 22 drop"}, nil); code != 400 {
+	if code, _, _ := c.do("POST", "/api/admin/nodes/"+nodeID+"/inbounds", map[string]any{"Tag": "ok", "Protocol": "vless", "Port": 1, "Listen": "203.0.113.30 tcp dport 22 drop"}, nil); code != 400 {
 		t.Fatalf("hostile listen accepted: %d", code)
 	}
 	if code, _, _ := c.do("PUT", "/api/admin/nodes/"+nodeID+"/forwards", map[string]any{"Forwards": []map[string]any{{"tag": "a\"b", "port": 10445, "target": "198.51.100.20:443"}}}, nil); code != 400 {

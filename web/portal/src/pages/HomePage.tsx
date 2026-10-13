@@ -26,6 +26,8 @@ function importLinks(url: string) {
 
 export default function HomePage() {
   const { t } = useTranslation()
+  // One clock read per mount keeps render pure; data refetches refresh it.
+  const [renderedAt] = useState(() => Date.now())
   const [copied, setCopied] = useState(false)
   const qc = useQueryClient()
   const notice = useQuery({ queryKey: ['notice'], queryFn: () => api.get<{ enabled: boolean; title?: string; body?: string }>('/api/portal/notice') })
@@ -39,7 +41,7 @@ export default function HomePage() {
   const subs = me.subscriptions ?? []
   const sub = me.subscription
   const anyUsable = subs.some((s) => s.usable)
-  const daysOf = (iso: string | null) => (iso ? Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000)) : null)
+  const daysOf = (iso: string | null) => (iso ? Math.max(0, Math.ceil((new Date(iso).getTime() - renderedAt) / 86400000)) : null)
   return (
     <Stack gap="lg">
       {notice.data?.enabled && <Alert color="blue" title={notice.data.title}><Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{notice.data.body}</Text></Alert>}

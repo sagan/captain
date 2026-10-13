@@ -89,12 +89,61 @@ func (r *Runner) Run(ctx context.Context) {
 }
 
 // Tick runs every job once.
+//
+// Only the database housekeeping runs under the Accounts read lock. Anything
+// that talks to the network (external subscription sync, mail and bot
+// reminders, webhooks, certificate renewal, the heartbeat, backup upload)
+// runs after the lock is released: a renumbering or site reset takes the
+// write lock, and a pending writer blocks every new reader, so a slow
+// upload under the read lock would stall every request in the panel.
 func (r *Runner) Tick(ctx context.Context) {
 	r.infraReminders(ctx, time.Now())
-	r.Store.Accounts.RLock()
-	defer r.Store.Accounts.RUnlock()
 	now := time.Now()
 	log := r.Log.With("component", "jobs")
+	r.housekeeping(ctx, now, log)
+	if r.External != nil && now.Sub(r.lastSync) >= time.Hour {
+		r.lastSync = now
+		r.External.SyncAll(ctx, now)
+	}
+	if r.External != nil && now.Sub(r.lastProbe) >= 10*time.Minute {
+		r.lastProbe = now
+		if up, total := r.External.ProbeAll(ctx, now); total > 0 {
+			log.Info("external nodes probed", "up", up, "total", total)
+		}
+	}
+	if r.Probe != nil {
+		r.Probe.CheckOffline(ctx, now)
+	}
+	// Tell the outside world the panel is still alive. After the
+	// housekeeping on purpose: a beat means "this process completed a
+	// cycle of work".
+	if r.Heartbeat != nil {
+		r.Heartbeat.Tick(ctx, now)
+	}
+	if r.Mail != nil && now.Sub(r.lastReminders) >= time.Hour {
+		r.lastReminders = now
+		r.reminders(ctx, now, log)
+	}
+	if r.Certs != nil {
+		r.Certs.RenewDue(ctx)
+	}
+	if r.Backups != nil {
+		r.Backups.Tick(ctx)
+	} else if r.BackupDir != "" {
+		if made, err := r.backup(ctx, now); err != nil {
+			log.Error("backup failed", "err", err)
+		} else if made != "" {
+			log.Info("database backed up", "file", made)
+		}
+	}
+}
+
+// housekeeping is the database-only part of a tick. It holds the Accounts
+// read lock because it resolves and rewrites account IDs (expiry, resets,
+// queued starts) and must not interleave with a renumbering.
+func (r *Runner) housekeeping(ctx context.Context, now time.Time, log *slog.Logger) {
+	r.Store.Accounts.RLock()
+	defer r.Store.Accounts.RUnlock()
 	report := func(name string, n int64, err error) {
 		if err != nil {
 			log.Error(name+" failed", "err", err)
@@ -123,16 +172,6 @@ func (r *Runner) Tick(ctx context.Context) {
 	report("purged sessions", n, err)
 	n, err = r.Store.PurgeOnline(ctx, now.Add(-r.OnlineRetain))
 	report("purged online devices", n, err)
-	if r.External != nil && now.Sub(r.lastSync) >= time.Hour {
-		r.lastSync = now
-		r.External.SyncAll(ctx, now)
-	}
-	if r.External != nil && now.Sub(r.lastProbe) >= 10*time.Minute {
-		r.lastProbe = now
-		if up, total := r.External.ProbeAll(ctx, now); total > 0 {
-			log.Info("external nodes probed", "up", up, "total", total)
-		}
-	}
 	if now.Sub(r.lastHist) >= 24*time.Hour {
 		r.lastHist = now
 		n, err = r.Store.PruneHistory(ctx, now, 400)
@@ -140,14 +179,6 @@ func (r *Runner) Tick(ctx context.Context) {
 	}
 	if r.Invalidate != nil {
 		r.Invalidate()
-	}
-	if r.Probe != nil {
-		r.Probe.CheckOffline(ctx, now)
-	}
-	// Tell the outside world the panel is still alive. Last in the tick on
-	// purpose: a beat means "this process completed a cycle of work".
-	if r.Heartbeat != nil {
-		r.Heartbeat.Tick(ctx, now)
 	}
 	// The hourly cleanup runs whether or not the probe is configured: the
 	// tables below grow from subscription fetches and node reports.
@@ -205,22 +236,6 @@ func (r *Runner) Tick(ctx context.Context) {
 			log.Error("prune audit log", "err", err)
 		} else if n > 0 {
 			log.Info("pruned audit log", "rows", n)
-		}
-	}
-	if r.Mail != nil && now.Sub(r.lastReminders) >= time.Hour {
-		r.lastReminders = now
-		r.reminders(ctx, now, log)
-	}
-	if r.Certs != nil {
-		r.Certs.RenewDue(ctx)
-	}
-	if r.Backups != nil {
-		r.Backups.Tick(ctx)
-	} else if r.BackupDir != "" {
-		if made, err := r.backup(ctx, now); err != nil {
-			log.Error("backup failed", "err", err)
-		} else if made != "" {
-			log.Info("database backed up", "file", made)
 		}
 	}
 }

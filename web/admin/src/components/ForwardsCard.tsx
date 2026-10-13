@@ -1,7 +1,7 @@
 import { ActionIcon, Badge, Button, Card, Code, Group, Modal, NumberInput, Select, Stack, Text, TextInput, Title, Tooltip, Box, Switch, SimpleGrid } from '@mantine/core'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { IconArrowsSplit, IconLink, IconPlus, IconTrash } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type Inbound, type Ingress, type Node } from '../lib/api'
 import { firstFreeIngressPort, ingressPort, forwardTargetAddress, forwardTargetProtocol } from '../lib/ingress'
@@ -28,10 +28,13 @@ export function ForwardsCard({ node, ingresses = [], embedded }: { node: Node; i
   const nodes = useQuery({ queryKey: ['nodes'], queryFn: () => api.get<Node[]>('/api/admin/nodes') })
   const details = useQueries({ queries: (nodes.data ?? []).filter((n) => n.id !== node.id).map((n) => ({ queryKey: ['node', String(n.id)], queryFn: () => api.get<{ node: Node; inbounds: Inbound[]; ingresses?: Ingress[] }>(`/api/admin/nodes/${n.id}`) })) })
   const targets = details.flatMap((d) => (d.data ? d.data.inbounds.map((ib) => ({ ib, node: d.data!.node, ingress: (d.data!.ingresses ?? []).find((g) => g.id === ib.IngressID) })) : []))
-  const [dirty, setDirty] = useState(false)
-  const [list, setList] = useState<Forward[]>([])
-  useEffect(() => { if (q.data && !dirty) setList(q.data.forwards ?? []) }, [q.data, dirty])
-  const save = useMutation({ mutationFn: (v: Forward[]) => api.put<{ forwards: Forward[] }>(`/api/admin/nodes/${node.id}/forwards`, { Forwards: v }), onSuccess: r => { toast.ok(t('common.saved')); qc.setQueryData(['forwards', node.id], { ...q.data, forwards: r.forwards }); setList(r.forwards); setDirty(false) }, onError: toast.err })
+  // Unsaved edits overlay the loaded list; a save (or discard) clears them.
+  const [edited, setEdited] = useState<Forward[] | null>(null)
+  const list = edited ?? q.data?.forwards ?? []
+  const dirty = edited !== null
+  const setList = (f: (cur: Forward[]) => Forward[]) => setEdited(f(list))
+  const setDirty = (on: boolean) => { if (!on) setEdited(null) }
+  const save = useMutation({ mutationFn: (v: Forward[]) => api.put<{ forwards: Forward[] }>(`/api/admin/nodes/${node.id}/forwards`, { Forwards: v }), onSuccess: r => { toast.ok(t('common.saved')); qc.setQueryData(['forwards', node.id], { ...q.data, forwards: r.forwards }); setDirty(false) }, onError: toast.err })
   const [ingressID, setIngressID] = useState('')
   const publicAddress = (f: Forward) => { const g = ingresses.find(g => String(g.id) === f.ingress_id); return { host: g ? g.entry_domain || g.entry_host : node.domain || node.public_addr, port: g ? ingressPort(g, f.port) : f.port } }
 

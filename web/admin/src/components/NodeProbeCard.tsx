@@ -8,7 +8,7 @@ import type { ResourceHost, ResourceOptions } from '../lib/resources'
 import { Button, Card, Group, NumberInput, Progress, Select, SimpleGrid, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { bytes } from '../lib/format'
@@ -26,9 +26,9 @@ export function NodeProbeCard({ nodeID, reportedHost }: { nodeID: number; report
   const { t } = useTranslation()
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['node-probe', nodeID], queryFn: () => api.get<NodeProbe>(`/api/admin/nodes/${nodeID}/probe`), refetchInterval: 10_000 })
-  const [loaded, setLoaded] = useState(false)
+  const loaded = useRef(false)
   const form = useForm({ initialValues: { Resources: {} as ResourceOptions, Hidden: false, region: '', provider: '', provider_url: '', price: '', expires_at: '', note: '', LimitGB: 0, ResetDay: 1, Mode: 'sum' } })
-  useEffect(() => { const p = q.data?.probe; if (p && !loaded) { setLoaded(true); form.setValues({ Resources: p.resources ?? {}, Hidden: p.hidden, region: p.info.region ?? '', provider: p.info.provider ?? '', provider_url: p.info.provider_url ?? '', price: p.info.price ?? '', expires_at: p.info.expires_at ?? '', note: p.info.note ?? '', LimitGB: +(p.limit_bytes / 2 ** 30).toFixed(0), ResetDay: p.reset_day, Mode: p.mode }) } }, [q.data, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const p = q.data?.probe; if (p && !loaded.current) { loaded.current = true; form.setValues({ Resources: p.resources ?? {}, Hidden: p.hidden, region: p.info.region ?? '', provider: p.info.provider ?? '', provider_url: p.info.provider_url ?? '', price: p.info.price ?? '', expires_at: p.info.expires_at ?? '', note: p.info.note ?? '', LimitGB: +(p.limit_bytes / 2 ** 30).toFixed(0), ResetDay: p.reset_day, Mode: p.mode }) } }, [q.data, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
   const save = useMutation({ mutationFn: (v: typeof form.values) => api.put(`/api/admin/nodes/${nodeID}/probe`, { Hidden: v.Hidden, Info: { region: v.region.toUpperCase(), provider: v.provider, provider_url: v.provider_url, price: v.price, expires_at: v.expires_at, note: v.note }, LimitBytes: Math.round(v.LimitGB * 2 ** 30), ResetDay: v.ResetDay, Mode: v.Mode, Resources: v.Resources }), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['node-probe', nodeID] }) }, onError: toast.err })
   const reset = useMutation({ mutationFn: () => api.post(`/api/admin/nodes/${nodeID}/probe/reset-traffic`), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['node-probe', nodeID] }) }, onError: toast.err })
   const p = q.data?.probe

@@ -1,7 +1,7 @@
 import { ActionIcon, Badge, Button, Card, Code, Group, Select, Stack, Switch, Table, Text, TextInput, Textarea, Tooltip } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { toast } from '../lib/notify'
@@ -22,8 +22,8 @@ export function ResponseRules() {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['response-rules'], queryFn: () => api.get<Rule[]>('/api/admin/settings/response-rules') })
+  // null = no local edits: the list shown is whatever the server has.
   const [rules, setRules] = useState<Rule[] | null>(null)
-  useEffect(() => { if (q.data && rules === null) setRules(q.data) }, [q.data, rules])
   const list = rules ?? q.data ?? []
   const dirty = rules !== null && JSON.stringify(rules) !== JSON.stringify(q.data ?? [])
   const save = useMutation({ mutationFn: () => api.put('/api/admin/settings/response-rules', list), onSuccess: () => { toast.ok(t('common.saved')); setRules(null); qc.invalidateQueries({ queryKey: ['response-rules'] }) }, onError: toast.err })

@@ -14,6 +14,8 @@ interface Token { id: number; name: string; scope: string; scopes: string[] | nu
 // shown once; the token carries the owner's role.
 export function TokensCard() {
   const { t } = useTranslation()
+  // One clock read per mount keeps render pure; data refetches refresh it.
+  const [renderedAt] = useState(() => Date.now())
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['api-tokens'], queryFn: () => api.get<Token[]>('/api/admin/tokens') })
   const [name, setName] = useState('')
@@ -47,7 +49,7 @@ export function TokensCard() {
       )}
       {(q.data ?? []).length > 0 && (
         <Table.ScrollContainer minWidth={600}><Table fz="sm"><Table.Tbody>
-          {q.data!.map((tk) => <Table.Tr key={tk.id}><Table.Td><Group gap={6}><Text fw={600}>{tk.name}</Text>{tk.scopes !== null && <Badge size="xs" title={(tk.scopes ?? []).join(', ')}>{t('tokens.restricted')}</Badge>}{tk.scope === 'read' && <Badge size="xs" variant="light">{t('tokens.scopeRead')}</Badge>}{tk.expires_at && <Badge size="xs" variant="light" color={new Date(tk.expires_at) < new Date() ? 'red' : 'gray'}>{new Date(tk.expires_at) < new Date() ? t('tokens.expired') : `${t('tokens.expires')} ${when(tk.expires_at)}`}</Badge>}</Group></Table.Td><Table.Td><Text size="xs" c="dimmed">{t('tokens.created')} {when(tk.created_at)}</Text></Table.Td><Table.Td><Text size="xs" c="dimmed">{tk.last_used_at ? `${t('tokens.lastUsed')} ${when(tk.last_used_at)}` : t('tokens.neverUsed')}</Text></Table.Td><Table.Td><ActionIcon variant="subtle" color="red" onClick={() => del.mutate(tk.id)}><IconTrash size={14} /></ActionIcon></Table.Td></Table.Tr>)}
+          {q.data!.map((tk) => <Table.Tr key={tk.id}><Table.Td><Group gap={6}><Text fw={600}>{tk.name}</Text>{tk.scopes !== null && <Badge size="xs" title={(tk.scopes ?? []).join(', ')}>{t('tokens.restricted')}</Badge>}{tk.scope === 'read' && <Badge size="xs" variant="light">{t('tokens.scopeRead')}</Badge>}{tk.expires_at && <Badge size="xs" variant="light" color={new Date(tk.expires_at).getTime() < renderedAt ? 'red' : 'gray'}>{new Date(tk.expires_at).getTime() < renderedAt ? t('tokens.expired') : `${t('tokens.expires')} ${when(tk.expires_at)}`}</Badge>}</Group></Table.Td><Table.Td><Text size="xs" c="dimmed">{t('tokens.created')} {when(tk.created_at)}</Text></Table.Td><Table.Td><Text size="xs" c="dimmed">{tk.last_used_at ? `${t('tokens.lastUsed')} ${when(tk.last_used_at)}` : t('tokens.neverUsed')}</Text></Table.Td><Table.Td><ActionIcon variant="subtle" color="red" onClick={() => del.mutate(tk.id)}><IconTrash size={14} /></ActionIcon></Table.Td></Table.Tr>)}
         </Table.Tbody></Table></Table.ScrollContainer>
       )}
       <Text size="xs" fw={600} mt="sm">{t('tokens.mcp')}</Text>

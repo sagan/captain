@@ -1,6 +1,6 @@
 import { Alert, Anchor, Button, Card, Center, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Divider, Group } from '@mantine/core'
 import { Link, useNavigate } from 'react-router-dom'
@@ -14,9 +14,8 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const nav = useNavigate()
   const { refresh } = useAuth()
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(() => new URLSearchParams(window.location.search).get('error') ?? '')
   const oauth = useQuery({ queryKey: ['oauth-providers'], queryFn: () => api.get<{ providers: { id: string; name: string }[]; password_login: boolean }>('/api/oauth/providers') })
-  useEffect(() => { const e = new URLSearchParams(window.location.search).get('error'); if (e) setError(e) }, [])
   const providers = oauth.data?.providers ?? []
   const policy = useQuery({ queryKey: ['register-policy'], refetchInterval: 30_000, queryFn: () => api.get<{ open: boolean; verify: boolean; reset: boolean; invite_only: boolean; email_suffixes: string[]; captcha?: { provider: string; site_key: string } }>('/api/portal/register/policy') })
   const registering = mode === 'register'

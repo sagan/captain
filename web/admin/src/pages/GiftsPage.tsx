@@ -21,6 +21,8 @@ const empty: Values = { Batch: '', Prefix: 'GIFT-', Kind: 'balance', Count: 10, 
 // after generation and can be copied as a list.
 export default function GiftsPage() {
   const { t } = useTranslation()
+  // One clock read per mount keeps render pure; data refetches refresh it.
+  const [renderedAt] = useState(() => Date.now())
   const qc = useQueryClient()
   const batches = useQuery({ queryKey: ['gift-batches'], queryFn: () => api.get<Batch[]>('/api/admin/gifts/batches') })
   const plans = useQuery({ queryKey: ['plans'], queryFn: () => api.get<Plan[]>('/api/admin/plans') })
@@ -68,7 +70,7 @@ export default function GiftsPage() {
               <Table.Tr key={g.id}>
                 <Table.Td><Code>{g.code}</Code></Table.Td>
                 <Table.Td><Text size="sm">{describe(g)}</Text></Table.Td>
-                <Table.Td>{g.redeemed_at ? <Text size="xs">{g.redeemed_email} · {when(g.redeemed_at)}</Text> : g.expires_at && new Date(g.expires_at) < new Date() ? <Badge color="gray">{t('gifts.expired')}</Badge> : <Badge color="teal">{t('gifts.unused')}</Badge>}</Table.Td>
+                <Table.Td>{g.redeemed_at ? <Text size="xs">{g.redeemed_email} · {when(g.redeemed_at)}</Text> : g.expires_at && new Date(g.expires_at).getTime() < renderedAt ? <Badge color="gray">{t('gifts.expired')}</Badge> : <Badge color="teal">{t('gifts.unused')}</Badge>}</Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>

@@ -1,6 +1,6 @@
 import { Button, Card, Group, JsonInput, SimpleGrid, Text, Title } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from '../lib/notify'
 
@@ -14,8 +14,10 @@ export function OverridesCard({ queryKey, load, save, readOnly }: { queryKey: un
   const { t } = useTranslation()
   const qc = useQueryClient()
   const q = useQuery({ queryKey, queryFn: load })
-  const [v, setV] = useState<Record<string, string>>({})
-  useEffect(() => { if (q.data) setV({ ...q.data }) }, [q.data])
+  // Local edits overlay the loaded values; a fresh load replaces untouched fields.
+  const [edits, setEdits] = useState<Record<string, string>>({})
+  const v = { ...q.data, ...edits }
+  const setV = (f: (cur: Record<string, string>) => Record<string, string>) => setEdits((cur) => f({ ...q.data, ...cur }))
   const mut = useMutation({ mutationFn: () => save(v), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey }) }, onError: toast.err })
   return (
     <Card>

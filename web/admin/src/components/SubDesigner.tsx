@@ -2,7 +2,7 @@ import { ActionIcon, Button, Card, Code, Group, Modal, MultiSelect, NumberInput,
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { toast } from '../lib/notify'
@@ -22,14 +22,16 @@ export function SubDesigner() {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['sub-design'], queryFn: () => api.get<Data>('/api/admin/settings/sub-design') })
-  const [d, setD] = useState<Design>({ groups: [], rules: [], final: '' })
-  const [dirty, setDirty] = useState(false)
+  // The draft starts as the loaded design; once edited it stays until saved.
+  const [local, setLocal] = useState<Design | null>(null)
+  const d: Design = local ?? q.data?.design ?? { groups: [], rules: [], final: '' }
+  const setD = (next: Design | ((x: Design) => Design)) => setLocal(typeof next === 'function' ? next(structuredClone(d)) : next)
+  const setDirty = (on: boolean) => { if (!on) setLocal(null) }
   const [preview, setPreview] = useState<{ format: string; text: string } | null>(null)
   const [previewFormat, setPreviewFormat] = useState('clash')
-  useEffect(() => { if (q.data && !dirty) setD(q.data.design) }, [q.data, dirty])
-  const edit = (f: (x: Design) => Design) => { setD((x) => f(structuredClone(x))); setDirty(true) }
+  const edit = (f: (x: Design) => Design) => setD(f)
 
-  const loadPreset = useMutation({ mutationFn: (key: string) => api.get<Design>(`/api/admin/settings/sub-design/presets/${key}`), onSuccess: (r) => { setD(r); setDirty(true) }, onError: toast.err })
+  const loadPreset = useMutation({ mutationFn: (key: string) => api.get<Design>(`/api/admin/settings/sub-design/presets/${key}`), onSuccess: (r) => setD(r), onError: toast.err })
   const save = useMutation({ mutationFn: () => api.put('/api/admin/settings/sub-design', { design: d }), onSuccess: () => { toast.ok(t('common.saved')); setDirty(false); qc.invalidateQueries({ queryKey: ['sub-design'] }) }, onError: toast.err })
   const apply = useMutation({ mutationFn: () => api.post('/api/admin/settings/sub-design/apply', { design: d }), onSuccess: () => { toast.ok(t('subDesign.applied')); setDirty(false); qc.invalidateQueries({ queryKey: ['sub-design'] }); qc.invalidateQueries({ queryKey: ['sub-templates'] }) }, onError: toast.err })
   const doPreview = useMutation({ mutationFn: (format: string) => api.post<{ format: string; text: string }>('/api/admin/settings/sub-design/preview', { design: d, format }), onSuccess: setPreview, onError: toast.err })

@@ -133,6 +133,10 @@ func (h *handlers) createNode(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "name is required")
 		return
 	}
+	if !validNodeName(in.Name) {
+		fail(w, http.StatusBadRequest, "node name may not contain control characters or markup")
+		return
+	}
 	n := &domain.Node{Name: in.Name, PublicAddr: in.PublicAddr, InternalAddr: in.InternalAddr, V6Addr: in.V6Addr, Domain: strings.ToLower(strings.TrimSpace(in.Domain)), MonitorURL: in.MonitorURL, DStatusSID: strings.TrimSpace(in.DStatusSID)}
 	if in.Mode != nil {
 		n.Mode = *in.Mode
@@ -199,6 +203,10 @@ func (h *handlers) updateNode(w http.ResponseWriter, r *http.Request) {
 	var in nodeInput
 	if !okID || !decode(r, &in) || in.Name == "" {
 		fail(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if !validNodeName(in.Name) {
+		fail(w, http.StatusBadRequest, "node name may not contain control characters or markup")
 		return
 	}
 	n := &domain.Node{ID: id, Name: in.Name, PublicAddr: in.PublicAddr, InternalAddr: in.InternalAddr, V6Addr: in.V6Addr, Domain: strings.ToLower(strings.TrimSpace(in.Domain)), MonitorURL: in.MonitorURL, DecoyEnabled: in.DecoyEnabled, DecoyUpstream: strings.TrimSpace(in.DecoyUpstream), UserSpeedLimitMbps: in.UserSpeedLimitMbps, MitaQuotas: in.MitaQuotas, EgressByIngress: in.EgressByIngress, DStatusSID: strings.TrimSpace(in.DStatusSID)}
@@ -438,7 +446,7 @@ func (h *handlers) resolveBosunVersion(ctx context.Context, in upgradeInput) (st
 	if v == "" {
 		return "", errors.New("could not determine the latest bosun release; pass a version")
 	}
-	if !strings.HasPrefix(v, "v") {
+	if !selfupdate.ValidTag(v) {
 		return "", errors.New("version must be a release tag like v0.6.0")
 	}
 	return v, nil
@@ -581,4 +589,12 @@ func (h *handlers) checkPortConflict(ctx context.Context, ib *domain.Inbound) st
 		}
 	}
 	return ""
+}
+
+// validNodeName bounds a node name for the public status page: the name is
+// a label there, so markup characters are refused at the door even though
+// the page escapes them (operators can create nodes; the page is viewed by
+// administrators on the same origin).
+func validNodeName(name string) bool {
+	return len(name) <= 128 && spec.PublicLabel(name)
 }

@@ -29,8 +29,12 @@ export function MailCard() {
   useEffect(() => { if (q.data) form.hydrate({ ...empty, ...q.data.settings, smtp: { ...empty.smtp, ...q.data.settings.smtp, password: '' }, resend: { api_key: '' } }) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
   const save = useMutation({ mutationFn: (v: MailSettings) => api.put('/api/admin/settings/mail', v), onSuccess: () => { form.resetDirty(); form.hydrate({ ...form.getValues(), smtp: { ...form.getValues().smtp, password: '' }, resend: { api_key: '' } }); toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['mail-settings'] }) }, onError: toast.err })
   const [to, setTo] = useState('')
-  const [thresholdsText, setThresholdsText] = useState('90')
-  useEffect(() => { if (q.data && !form.isDirty()) setThresholdsText((q.data.settings.traffic_thresholds?.length ? q.data.settings.traffic_thresholds : [90]).join(', ')) }, [q.data])
+  // The thresholds field is free text over a numeric list: it follows the
+  // loaded value until the operator edits it.
+  const loadedThresholds = (q.data?.settings.traffic_thresholds?.length ? q.data.settings.traffic_thresholds : [90]).join(', ')
+  const [thresholdsDraft, setThresholdsDraft] = useState<{ base: string; text: string } | null>(null)
+  const thresholdsText = thresholdsDraft && thresholdsDraft.base === loadedThresholds ? thresholdsDraft.text : loadedThresholds
+  const setThresholdsText = (text: string) => setThresholdsDraft({ base: loadedThresholds, text })
   const test = useMutation({ mutationFn: () => api.post('/api/admin/settings/mail/test', { To: to }), onSuccess: () => toast.ok(t('mail.testSent')), onError: toast.err })
   const v = form.values
   if (q.data === undefined) return <SettingsLoadState query={q} />

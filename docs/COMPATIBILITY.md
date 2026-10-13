@@ -134,7 +134,10 @@ features it has never heard of, which the node page shows as an orange
 
 | Captain | needs bosun | for |
 |---|---|---|
+| 1.19.0 | (no change) | Glassmorphism status page served by the React port; no agent, API or database change. |
 | 1.18.0 | ≥ 0.66.0 | Monitor-only installation and confirmed node mode switching; existing full nodes remain compatible. |
+| 1.17.0 | ≥ 0.65.0 | Docker web upgrades through the node's host updater (optional `host_update` metadata); older Docker nodes keep rejecting in-container binary replacement. |
+| 1.16.0 | (no change) | Node domain ownership checks, DNS health and the DNS write journal are panel-side (migrations 70–71). |
 | 1.15.0 | ≥ 0.64.0 | Reviewed core package inventory, download and activation jobs; sing-box Extended and SSH TCP proxy inbounds. Existing inbounds and older agents remain supported. |
 | 1.14.1 | ≥ 0.63.0 | Per-inbound private destination access on supported Linux nft sing-box/Xray nodes; runtime capabilities gate both save and state delivery, including individual managed reverse exits. Ordinary inbounds remain compatible with older nodes. |
 | 1.12.1 | ≥ 0.61.0 | TLS wire record size screening in REALITY target scans; older agents retain the previous checks and show record size as not checked |

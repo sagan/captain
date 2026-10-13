@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/zeptop-dev/bosun/pkg/spec"
 	"github.com/zeptop-dev/captain/internal/store"
@@ -60,7 +59,7 @@ func (h *handlers) setMonitorGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Group = strings.TrimSpace(in.Group)
-	if len(in.Group) > 128 || strings.IndexFunc(in.Group, unicode.IsControl) >= 0 {
+	if len(in.Group) > 128 || !spec.PublicLabel(in.Group) {
 		fail(w, 400, "invalid monitoring group")
 		return
 	}

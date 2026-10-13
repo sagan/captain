@@ -1,7 +1,7 @@
 import { MultiSelect, TagsInput, ActionIcon, Badge, Button, Card, Code, Group, Select, Stack, Text, TextInput, Textarea, Title, Box } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, runNodeJob } from '../lib/api'
 import { toast } from '../lib/notify'
@@ -25,10 +25,12 @@ export function RoutingCard({ nodeID, inboundTags, embedded }: { nodeID: number;
   const { t } = useTranslation()
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['routing', nodeID], queryFn: () => api.get<Routing>(`/api/admin/nodes/${nodeID}/routing`) })
-  const [nr, setNr] = useState<Routing>({ outbounds: [], routes: [], default_outbound: '', dns: [] })
+  // Local edits overlay the loaded routing until saved.
+  const [draft, setDraft] = useState<Routing | null>(null)
+  const nr: Routing = draft ?? { outbounds: q.data?.outbounds ?? [], routes: q.data?.routes ?? [], default_outbound: q.data?.default_outbound ?? '', dns: q.data?.dns ?? [] }
+  const setNr = (next: Routing | ((cur: Routing) => Routing)) => setDraft(typeof next === 'function' ? next(nr) : next)
   const [bal, setBal] = useState<{ tag: string; members: string[]; strategy: string }>({ tag: 'lb', members: [], strategy: 'urltest' })
-  useEffect(() => { if (q.data) setNr({ outbounds: q.data.outbounds ?? [], routes: q.data.routes ?? [], default_outbound: q.data.default_outbound ?? '', dns: q.data.dns ?? [] }) }, [q.data])
-  const save = useMutation({ mutationFn: (v: Routing) => api.put(`/api/admin/nodes/${nodeID}/routing`, v), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['routing', nodeID] }); qc.invalidateQueries({ queryKey: ['node', String(nodeID)] }) }, onError: toast.err })
+  const save = useMutation({ mutationFn: (v: Routing) => api.put(`/api/admin/nodes/${nodeID}/routing`, v), onSuccess: () => { toast.ok(t('common.saved')); setDraft(null); qc.invalidateQueries({ queryKey: ['routing', nodeID] }); qc.invalidateQueries({ queryKey: ['node', String(nodeID)] }) }, onError: toast.err })
   const [link, setLink] = useState('')
   const [tag, setTag] = useState('')
   const parse = useMutation({ mutationFn: () => api.post<{ nodes: { name: string; protocol: string; remote: Remote }[] }>('/api/admin/external/parse', { Text: link }), onSuccess: (r) => {
@@ -65,7 +67,7 @@ export function RoutingCard({ nodeID, inboundTags, embedded }: { nodeID: number;
           <Button size="xs" mb={2} variant="light" leftSection={<IconPlus size={14} />} disabled={!link.trim()} loading={parse.isPending} onClick={() => parse.mutate()}>{t('routing.add')}</Button>
         </Group>
         <Textarea label={t('routing.rawJSON')} description={t('routing.rawHint')} autosize minRows={2} ff="monospace" value={JSON.stringify(nr.outbounds.filter((o) => !o.remote && !o.warp && !o.balancer), null, 0)} onBlur={(e) => { try { const raw = JSON.parse(e.currentTarget.value || '[]') as Outbound[]; setNr((cur) => ({ ...cur, outbounds: [...cur.outbounds.filter((o) => o.remote), ...raw] })) } catch { toast.err(new Error('invalid JSON')) } }} />
-        {!(false) && (
+        {(
           <Group align="flex-end" wrap="nowrap">
             <TextInput label={t('routing.balancerTag')} placeholder="lb" style={{ flex: 1 }} value={bal.tag} onChange={(e) => setBal({ ...bal, tag: e.currentTarget.value })} />
             <MultiSelect label={t('routing.balancerMembers')} description={t('routing.balancerHint')} style={{ flex: 2 }} data={tags.filter((x) => !nr.outbounds.find((o) => o.tag === x)?.balancer)} value={bal.members} onChange={(v) => setBal({ ...bal, members: v })} />

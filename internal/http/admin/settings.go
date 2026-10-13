@@ -32,6 +32,10 @@ func (h *handlers) systemUpdateApply(w http.ResponseWriter, r *http.Request) {
 	}
 	var in struct{ Version string }
 	_ = json.NewDecoder(r.Body).Decode(&in)
+	if in.Version != "" && !selfupdate.ValidTag(in.Version) {
+		fail(w, http.StatusBadRequest, "version must be a release tag like v1.2.3")
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	ver, err := h.Updater.Apply(ctx, in.Version)

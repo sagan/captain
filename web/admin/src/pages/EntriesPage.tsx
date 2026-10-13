@@ -6,7 +6,7 @@ import { IconGripVertical, IconPencil, IconPlus, IconTrash } from '@tabler/icons
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type Entry, type Inbound, type Ingress, type Node } from '../lib/api'
 import { toast } from '../lib/notify'
@@ -51,8 +51,10 @@ export default function EntriesPage() {
   const onInbound = (id: string | null) => { form.setFieldValue('InboundID', id ?? ''); const x = inbounds.find((i) => String(i.ib.ID) === id); if (x && !form.getValues().DisplayHost) { if (x.ingress) { form.setValues({ DisplayHost: x.ingress.entry_domain || x.ingress.entry_host, DisplayPort: x.ib.Port + (x.ingress.port_offset || 0) }); return } const tls = x.ib.Settings?.tls as { mode?: number; server_name?: string } | undefined; form.setValues({ DisplayHost: (tls?.mode === 1 && tls.server_name) || x.node.domain || x.node.public_addr || '', DisplayPort: x.ib.Port }) } }
 
   // Local order for drag-and-drop; the server is told the new id order on drop.
-  const [rows, setRows] = useState<Entry[]>([])
-  useEffect(() => { setRows(q.data ?? []) }, [q.data])
+  // Drag order shown locally until the server confirms (invalidate) or rejects.
+  const [dragged, setDragged] = useState<{ base: Entry[] | undefined; rows: Entry[] } | null>(null)
+  const rows = dragged && dragged.base === q.data ? dragged.rows : q.data ?? []
+  const setRows = (next: Entry[]) => setDragged({ base: q.data, rows: next })
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   const onDragEnd = (ev: DragEndEvent) => {
     const { active, over } = ev

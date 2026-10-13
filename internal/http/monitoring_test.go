@@ -141,3 +141,30 @@ func TestPublicSectionsMaskSnapshotAndHistory(t *testing.T) {
 		t.Fatal("hidden history", code)
 	}
 }
+
+// Labels that reach the public status page (node names, monitoring groups,
+// ping task names) are refused when they contain markup: the page escapes
+// them, and the server refuses them too so a future client cannot regress
+// an operator-created name into a script on an administrator's screen.
+func TestPublicLabelsRefuseMarkup(t *testing.T) {
+	r := newRig(t)
+	bad := `<img src=x onerror=alert(1)>`
+	if code, _, _ := r.c.do("POST", "/api/admin/nodes", map[string]any{"Name": bad, "PublicAddr": "198.51.100.20"}, nil); code != 400 {
+		t.Fatal("node name with markup", code)
+	}
+	if code, _, _ := r.c.do("PATCH", "/api/admin/nodes/1", map[string]any{"Name": "ok & fine", "PublicAddr": "198.51.100.20"}, nil); code != 400 {
+		t.Fatal("node name with ampersand", code)
+	}
+	if code, _, _ := r.c.do("PATCH", "/api/admin/nodes/1", map[string]any{"Name": "東京 01 (IPLC)", "PublicAddr": "198.51.100.20"}, nil); code != 200 {
+		t.Fatal("plain node name", code)
+	}
+	if code, _, _ := r.c.do("PUT", "/api/admin/nodes/1/monitor-group", map[string]string{"group": bad}, nil); code != 400 {
+		t.Fatal("group with markup", code)
+	}
+	if code, _, _ := r.c.do("POST", "/api/admin/ping-tasks", map[string]any{"name": bad, "type": "tcp", "target": "203.0.113.30:443"}, nil); code != 400 {
+		t.Fatal("ping task with markup", code)
+	}
+	if code, _, _ := r.c.do("POST", "/api/admin/ping-tasks", map[string]any{"name": "cf 1.1.1.1:443", "type": "tcp", "target": "203.0.113.30:443"}, nil); code != 200 {
+		t.Fatal("plain ping task", code)
+	}
+}

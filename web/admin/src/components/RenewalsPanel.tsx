@@ -1,5 +1,6 @@
 import { Badge, Button, Card, Group, Progress, Table, Text } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { bytes, money, when } from '../lib/format'
@@ -11,12 +12,14 @@ interface Row { user_id: number; email: string; plan_name: string; expires_at: s
 // one-click extensions and a usage reset — for batch renewals.
 export function RenewalsPanel() {
   const { t } = useTranslation()
+  // One clock read per mount keeps render pure; data refetches refresh it.
+  const [renderedAt] = useState(() => Date.now())
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['renewals'], queryFn: () => api.get<Row[]>('/api/admin/renewals') })
   const done = () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['renewals'] }); qc.invalidateQueries({ queryKey: ['users'] }) }
   const extend = useMutation({ mutationFn: (v: { id: number; days: number }) => api.post(`/api/admin/users/${v.id}/subscription`, { AddDays: v.days }), onSuccess: done, onError: toast.err })
   const reset = useMutation({ mutationFn: (id: number) => api.post(`/api/admin/users/${id}/subscription`, { ResetUsage: true }), onSuccess: done, onError: toast.err })
-  const daysLeft = (iso: string | null) => (iso ? Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000) : null)
+  const daysLeft = (iso: string | null) => (iso ? Math.ceil((new Date(iso).getTime() - renderedAt) / 86400000) : null)
   return (
     <Card p={0}><Table.ScrollContainer minWidth={760}><Table>
       <Table.Thead><Table.Tr><Table.Th>{t('users.email')}</Table.Th><Table.Th>{t('users.plan')}</Table.Th><Table.Th>{t('users.usage')}</Table.Th><Table.Th>{t('users.expires')}</Table.Th><Table.Th>{t('users.balance')}</Table.Th><Table.Th /></Table.Tr></Table.Thead>

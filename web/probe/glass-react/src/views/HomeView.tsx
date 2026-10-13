@@ -93,7 +93,7 @@ function NodeCardItem({ ref, style, children }: { ref?: Ref<HTMLDivElement>, sty
   return <div ref={ref} {...s} className="min-w-0" style={style}>{children}</div>
 }
 
-export default function HomeView() {
+export default function HomeView({ ref }: { ref?: Ref<HTMLDivElement> }) {
   const router = useRouter()
   const { record: recordVisitorEvent } = useVisitorAudit()
   const app = useApp(a => ({
@@ -402,7 +402,7 @@ export default function HomeView() {
   } as const)[app.nodeCardSize]}`
 
   return (
-    <div {...s} className={`home-view${!app.disablePageAnimation ? ' home-view--motion' : ''}`}>
+    <div ref={ref} {...s} className={`home-view${!app.disablePageAnimation ? ' home-view--motion' : ''}`}>
       {app.alertEnabled && app.alertContent && (
         <div {...s} className="alert px-4">
           <Alert {...s} className="border-none bg-background/60 backdrop-blur-xs rounded-md">

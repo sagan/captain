@@ -493,7 +493,8 @@ export default function NodeList({ nodes, transitionKey, sortResetKey, pingEnabl
               </div>
             )
           : (
-              <div {...s}>
+              // Vue renders :class="''" as an empty class attribute here.
+              <div {...s} className="">
                 <TransitionGroup
                   {...s}
                   appear={!app.disablePageAnimation}

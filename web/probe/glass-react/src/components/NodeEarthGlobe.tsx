@@ -1,5 +1,5 @@
-// React counterpart of NodeEarthGlobe.vue: picks the earth renderer from the
-// theme settings and loads it on demand, forwarding attributes to it.
+// React counterpart of NodeEarthGlobe.vue: loads the earth renderer on demand
+// and forwards attributes to it.
 import type { ComponentProps } from 'react'
 import { asyncComponent } from '@/lib/asyncComponent'
 import { useApp } from '@/stores/app'
@@ -9,11 +9,11 @@ export type NodeEarthProps = Omit<ComponentProps<'div'>, 'ref'> & {
   nodes?: NodeData[]
 }
 
-const renderers = {
-  realistic: asyncComponent<NodeEarthProps>(() => import('@/components/NodeEarthRealisticGlobe')),
-  cobe: asyncComponent<NodeEarthProps>(() => import('@/components/NodeEarthCobeGlobe')),
-  tiled: asyncComponent<NodeEarthProps>(() => import('@/components/NodeEarthTiledMap')),
-}
+// Captain never sets the theme's earthRenderer setting, so it is always
+// 'realistic'; the upstream cobe and tiled renderers are unreachable and not
+// ported. Any other value falls back to the realistic globe, as in Vue.
+const realistic = asyncComponent<NodeEarthProps>(() => import('@/components/NodeEarthRealisticGlobe'))
+const renderers: Record<string, typeof realistic> = { realistic }
 
 export default function NodeEarthGlobe({ nodes, ...attrs }: NodeEarthProps) {
   const earthRenderer = useApp(s => s.earthRenderer)

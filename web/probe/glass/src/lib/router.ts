@@ -32,8 +32,12 @@ function sync(): void {
   for (const l of listeners) l()
 }
 
-if (typeof window !== 'undefined')
+if (typeof window !== 'undefined') {
+  // vue-router's hash history normalises a missing hash to "#/" on start.
+  if (!location.hash)
+    history.replaceState(history.state, '', '#/')
   window.addEventListener('hashchange', sync)
+}
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener)

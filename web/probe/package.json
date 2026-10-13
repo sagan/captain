@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "dev:glass": "vite --config vite.glass.config.ts",
     "test": "node --test glass-shared/captain.test.mjs",
-    "diff:glass": "node scripts/glass-diff.mjs"
+    "diff:glass": "node scripts/glass-diff.mjs",
+    "interact:glass": "node scripts/glass-interact.mjs"
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",

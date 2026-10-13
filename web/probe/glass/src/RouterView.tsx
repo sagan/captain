@@ -58,13 +58,16 @@ export default function RouterView() {
     }
   }
 
+  // Read the route at leave end, not at leave start: it may have changed again meanwhile.
+  const routeRef = useRef(route)
+  routeRef.current = route
   const finishLeave = useCallback(() => {
     setLeaving(null)
     if (outIn) {
-      pendingEnter.current = route.name
-      setShown(route.name)
+      pendingEnter.current = routeRef.current.name
+      setShown(routeRef.current.name)
     }
-  }, [outIn, route.name])
+  }, [outIn])
 
   const setRoot = useCallback((view: View) => (node: HTMLElement | null) => {
     if (node)
@@ -110,13 +113,29 @@ export default function RouterView() {
   }, [])
 
   const homeVisible = shown === 'home' || leaving === 'home'
+  // KeepAlive detaches the deactivated subtree, which resets the scroll
+  // offsets of its inner scrollers; Activity only hides it, so reset them.
+  const homeRoot = useRef<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    if (homeVisible)
+      return
+    const el = homeRoot.current
+    if (!el)
+      return
+    for (const scroller of el.querySelectorAll<HTMLElement>('*')) {
+      if (scroller.scrollLeft)
+        scroller.scrollLeft = 0
+      if (scroller.scrollTop)
+        scroller.scrollTop = 0
+    }
+  }, [homeVisible])
   const detailVisible = shown === 'instance-detail' || leaving === 'instance-detail'
 
   return (
     <>
       <Activity mode={homeVisible ? 'visible' : 'hidden'}>
         <ActiveContext.Provider value={shown === 'home' && leaving !== 'home'}>
-          <HomeView ref={setRoot('home') as Ref<HTMLDivElement>} />
+          <HomeView ref={(node: HTMLDivElement | null) => { homeRoot.current = node; setRoot('home')(node) }} />
         </ActiveContext.Provider>
       </Activity>
       {detailVisible && <InstanceDetail ref={setRoot('instance-detail') as Ref<HTMLDivElement>} />}

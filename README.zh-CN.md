@@ -19,6 +19,8 @@
 
 ---
 
+Captain v1.20 / bosun v0.68 新增托管反向 WireGuard：B 主动建立隧道，A 鉴权计费，内网按网段、协议和端口授权，由 B 执行 SNAT。同一 A 上普通出口与多条 WG 共享用户限速。 [WireGuard](docs/NODES.md#managed-reverse-wireguard-captain-120--bosun-068).
+
 Captain 是单个 Go 二进制文件，管理后台和用户前台都内嵌其中。
 它负责把服务卖出去（套餐、订单、八种支付网关、邀请、优惠券、
 工单），为用户真正在用的每种客户端生成订阅，并驱动节点：在一台

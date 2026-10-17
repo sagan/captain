@@ -219,6 +219,17 @@ func (h *handlers) updateNode(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "use the node mode endpoint to switch modes")
 		return
 	}
+	if n.EgressByIngress {
+		links, err := h.Store.WireGuardLinks(r.Context(), id)
+		if err != nil {
+			serverErr(w, err)
+			return
+		}
+		if len(links) > 0 {
+			fail(w, 409, "remove WireGuard connections before enabling per-ingress egress")
+			return
+		}
+	}
 	if !store.NodeProxyAllowed(old) && (n.DecoyEnabled || n.UserSpeedLimitMbps != 0 || n.MitaQuotas || n.EgressByIngress) {
 		fail(w, 409, spec.ErrMonitorOnly.Error())
 		return
@@ -312,7 +323,7 @@ func (h *handlers) createInbound(w http.ResponseWriter, r *http.Request) {
 		fail(w, 403, "only administrators can grant private access")
 		return
 	}
-	if ib.Settings.Reverse != nil {
+	if ib.Settings.Reverse != nil || ib.Settings.WireGuardSlot != 0 {
 		fail(w, 400, "use the reverse connection wizard")
 		return
 	}
@@ -380,7 +391,7 @@ func (h *handlers) updateInbound(w http.ResponseWriter, r *http.Request) {
 		fail(w, 403, "only administrators can change private access")
 		return
 	}
-	if ib.Settings.Reverse != nil {
+	if ib.Settings.Reverse != nil || ib.Settings.WireGuardSlot != 0 {
 		fail(w, 400, "use the reverse connection wizard")
 		return
 	}
@@ -554,6 +565,16 @@ func (h *handlers) nodeBinds(ctx context.Context, nodeID, skipInbound int64, ski
 		}
 		for _, l := range inboundListeners(o) {
 			out = append(out, bind{l, h.ingressListen(ctx, o.IngressID, o.Listen), "inbound " + o.Tag})
+		}
+	}
+	links, _ := h.Store.WireGuardLinks(ctx, nodeID)
+	for _, link := range links {
+		if link.TransitID != nodeID || link.UserInboundID == skipInbound {
+			continue
+		}
+		user, err := h.Store.InboundByID(ctx, link.UserInboundID)
+		if err == nil && user.Enabled {
+			out = append(out, bind{listener{"udp", link.ListenPort}, "", "managed WireGuard tunnel"})
 		}
 	}
 	if !skipForwards {

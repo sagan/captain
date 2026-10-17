@@ -3,6 +3,7 @@ import { DNSHealthCard } from '../components/DNSHealthCard'
 import { NodeDomainFields } from '../components/NodeDomainFields'
 import { useNodeDomainCheck } from '../lib/use-node-domain-check'
 import { CoreManagementCard, type CoreInventory } from '../components/CoreManagementCard'
+import { WireGuardConnections } from '../components/WireGuardConnections'
 import { ReverseConnections } from '../components/ReverseConnections'
 import type { ResourceHost } from '../lib/resources'
 import { coreName } from '../lib/coreSelection'
@@ -144,7 +145,7 @@ export default function NodePage() {
                 <Table.Td>{d.traffic?.[String(ib.ID)] ? <Text size="xs">{bytes(d.traffic[String(ib.ID)].today)} <Text span c="dimmed">/ {bytes(d.traffic[String(ib.ID)].total)}</Text></Text> : <Text size="xs" c="dimmed">—</Text>}</Table.Td>
                 <Table.Td>{ib.GroupID ? (groups.data?.find((g) => g.ID === ib.GroupID)?.Name ?? ib.GroupID) : t('inbounds.groupAll')}</Table.Td>
                 <Table.Td>{ib.Enabled ? <Badge color="teal">{t('common.enabled')}</Badge> : <Badge color="gray">{t('common.disabled')}</Badge>}</Table.Td>
-                <Table.Td>{ib.Settings.reverse ? <Text size="xs" c="dimmed">{t('reverse.managed')}</Text> : <Group gap={4} justify="flex-end">
+                <Table.Td>{(ib.Settings.reverse || ib.Settings.wireguard_slot) ? <Text size="xs" c="dimmed">{t('reverse.managed')}</Text> : <Group gap={4} justify="flex-end">
                   <Button component={Link} to={`/entries?node=${n.id}&inbound=${ib.ID}`} variant="subtle" size="compact-xs">{t('entries.create')}</Button>
                   <ActionIcon variant="subtle" onClick={() => setEditing(ib)}><IconPencil size={16} /></ActionIcon>
                   <ActionIcon variant="subtle" color="red" onClick={() => modals.openConfirmModal({ title: t('common.delete'), children: <Text size="sm">{t('common.confirmDelete')}</Text>, labels: { confirm: t('common.delete'), cancel: t('common.cancel') }, confirmProps: { color: 'red' }, onConfirm: () => del.mutate(ib.ID) })}><IconTrash size={16} /></ActionIcon>
@@ -160,6 +161,7 @@ export default function NodePage() {
         <Accordion multiple chevronPosition="right" variant="default">
           <Accordion.Item value="ingress"><Accordion.Control><Text size="sm" fw={600}>{t('ingress.title')}</Text><Text size="xs" c="dimmed">{(d.ingresses ?? []).length > 0 ? t('nodes.advIngressCount', { count: (d.ingresses ?? []).length }) : t('nodes.advIngressHint')}</Text></Accordion.Control><Accordion.Panel><IngressesCard embedded nodeID={n.id} ingresses={d.ingresses ?? []} inbounds={d.inbounds} /></Accordion.Panel></Accordion.Item>
           {me?.role === 'admin' && <Accordion.Item value="reverse"><Accordion.Control><Text size="sm" fw={600}>{t('reverse.title')}</Text></Accordion.Control><Accordion.Panel><ReverseConnections key={n.id} node={n} /></Accordion.Panel></Accordion.Item>}
+          {me?.role === 'admin' && <Accordion.Item value="wireguard"><Accordion.Control><Text size="sm" fw={600}>{t('wireguard.title')}</Text></Accordion.Control><Accordion.Panel><WireGuardConnections key={n.id} node={n} /></Accordion.Panel></Accordion.Item>}
           <Accordion.Item value="routing"><Accordion.Control><Text size="sm" fw={600}>{t('routing.title')}</Text><Text size="xs" c="dimmed">{t('nodes.advRoutingHint')}</Text></Accordion.Control><Accordion.Panel><RoutingCard embedded nodeID={n.id} inboundTags={d.inbounds.map((ib) => ib.Tag)} />{me?.role === 'admin' && <EgressUpstreams key={n.id} endpoint={`/api/admin/settings/nodes/${n.id}/egress`} />}</Accordion.Panel></Accordion.Item>
           <Accordion.Item value="overrides"><Accordion.Control><Text size="sm" fw={600}>{t('overrides.title')}</Text><Text size="xs" c="dimmed">{t('nodes.advOverridesHint')}</Text></Accordion.Control><Accordion.Panel><OverridesCard queryKey={['overrides', n.id]} load={() => api.get<Record<string, string>>(`/api/admin/nodes/${n.id}/overrides`)} save={(v) => api.put(`/api/admin/nodes/${n.id}/overrides`, v)} /></Accordion.Panel></Accordion.Item>
           <Accordion.Item value="forwards"><Accordion.Control><Text size="sm" fw={600}>{t('forwards.title')}</Text><Text size="xs" c="dimmed">{t('nodes.advForwardsHint')}</Text></Accordion.Control><Accordion.Panel><ForwardsCard key={n.id} embedded node={n} ingresses={d.ingresses ?? []} /></Accordion.Panel></Accordion.Item>

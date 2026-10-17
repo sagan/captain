@@ -44,6 +44,24 @@ func (h *handlers) privateAccessNode(ctx context.Context, id int64, proposed *do
 			n.ReverseClients = append(n.ReverseClients, spec.ReverseClient{ID: l.ID, PrivateAccess: ib.Settings.PrivateAccess})
 		}
 	}
+	wgLinks, err := h.Store.WireGuardLinks(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	for _, link := range wgLinks {
+		ib, err := h.Store.InboundByID(ctx, link.UserInboundID)
+		if err != nil {
+			return nil, err
+		}
+		if proposed != nil && proposed.ID == ib.ID {
+			ib = proposed
+		}
+		cfg, err := link.Config(id == link.ExitID, ib.Settings.PrivateAccess)
+		if err != nil {
+			return nil, err
+		}
+		n.WireGuardLinks = append(n.WireGuardLinks, cfg)
+	}
 	ov, err := h.Store.NodeOverrides(ctx, id)
 	if err != nil {
 		return nil, err
@@ -58,6 +76,9 @@ func (h *handlers) checkPrivateAccess(ctx context.Context, id int64, proposed *d
 	n, err := h.privateAccessNode(ctx, id, proposed)
 	if err != nil {
 		return "could not load node private access configuration"
+	}
+	if err = n.ValidateWireGuardLinks(); err != nil {
+		return err.Error()
 	}
 	if err = n.ValidatePrivateAccessNode(); err != nil {
 		return err.Error()

@@ -132,6 +132,7 @@ func Register(mux *http.ServeMux, d Deps) {
 	h.registerDomains(mux)
 	h.registerIngresses(mux)
 	h.registerReverse(mux)
+	h.registerWireGuard(mux)
 	h.registerSubTemplates(mux)
 	h.registerSubscriptionProfiles(mux)
 	h.registerConfigPresets(mux)

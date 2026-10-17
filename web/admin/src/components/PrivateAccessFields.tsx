@@ -5,7 +5,7 @@ type Rule = { cidr: string; protocol?: string; port_start?: number; port_end?: n
 type Policy = { mode: string; rules?: Rule[] }
 const policyOf = (json: string): Policy => { try { return JSON.parse(json || '{}').private_access || { mode: 'off' } } catch { return { mode: 'off' } } }
 
-export function PrivateAccessFields({ json, onChange, disabled = false }: { json: string; onChange: (json: string) => void; disabled?: boolean }) {
+export function PrivateAccessFields({ json, onChange, disabled = false, explicitOnly = false }: { json: string; onChange: (json: string) => void; disabled?: boolean; explicitOnly?: boolean }) {
   const { t } = useTranslation()
   const value = policyOf(json)
   const update = (policy: Policy) => {
@@ -17,7 +17,7 @@ export function PrivateAccessFields({ json, onChange, disabled = false }: { json
   const edit = (i: number, patch: Partial<Rule>) => update({ mode: 'custom', rules: rules.map((r, j) => j === i ? { ...r, ...patch } : r) })
   return <Card withBorder padding="sm"><Stack gap="sm">
     <Select label={t('privateAccess.title')} description={t('privateAccess.hint')} inputWrapperOrder={['label', 'input', 'description', 'error']} value={value.mode} disabled={disabled} allowDeselect={false}
-      data={[{ value: 'off', label: t('privateAccess.off') }, { value: 'internal', label: t('privateAccess.internal') }, { value: 'custom', label: t('privateAccess.custom') }]}
+      data={[{ value: 'off', label: t('privateAccess.off') }, ...(!explicitOnly ? [{ value: 'internal', label: t('privateAccess.internal') }] : []), { value: 'custom', label: t('privateAccess.custom') }]}
       onChange={(mode) => update(mode === 'custom' ? { mode, rules: rules.length ? rules : [{ cidr: '', protocol: '', port_start: 0, port_end: 0 }] } : { mode: mode || 'off' })} />
     {value.mode !== 'off' && <Text size="xs" c="dimmed">{t('privateAccess.protection')}</Text>}
     {value.mode === 'custom' && <>

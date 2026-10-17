@@ -19,6 +19,8 @@
 
 ---
 
+Captain v1.20 / bosun v0.68 add managed reverse WireGuard: B initiates the tunnel, A authenticates and bills users, and explicit private-network grants use B-side SNAT. User speed limits are shared across ordinary egress and WG links on A. [WireGuard](docs/NODES.md#managed-reverse-wireguard-captain-120--bosun-068).
+
 Captain is one Go binary with the admin console and the user portal embedded.
 It sells access (plans, orders, eight payment gateways, invites, coupons,
 tickets), renders subscriptions for every client people actually use, and

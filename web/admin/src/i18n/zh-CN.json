@@ -299,7 +299,8 @@
         "unknown": "无法识别此内核，请选择兼容内核。",
         "reverse": "此协议或内核不支持带用户计费的托管 VLESS Reverse。",
         "privateAccess": "私网访问需要支持此功能的节点、内核及最近的能力上报。",
-        "listenAddress": "此 Mieru 构建不能绑定指定监听 IP，请使用 mita。"
+        "listenAddress": "此 Mieru 构建不能绑定指定监听 IP，请使用 mita。",
+        "wireguardReverse": "反向 WireGuard 需要支持此功能的 Linux 节点和 Xray 内核上报最新能力。"
       }
     }
   },
@@ -2233,5 +2234,14 @@
     "upgradeHint": "切换需要节点在线并上报模式支持，请升级 bosun 后等待新上报。",
     "failed": "模式切换失败",
     "installOnly": "仅安装探针（不安装代理内核）"
+  },
+  "wireguard": {
+    "title": "反向 WireGuard",
+    "hint": "B 主动连接 A；A 负责用户鉴权和计费，B 提供公网出口与明确授权的内网访问。",
+    "requirements": "两端需支持 Linux WireGuard 并有新鲜能力上报。用户入口使用 VLESS REALITY。本版不支持将强制选择入口映射的节点用作 A。",
+    "transit": "中转节点 A",
+    "endpoint": "A 的公网 UDP 端点",
+    "endpointHint": "填写 B 可达的 IP 和 UDP 端口。若 NAT 改写端口，此处填公网映射端口，上方隧道端口仍为本地端口。",
+    "unavailable": "节点不可用或需要升级"
   }
 }

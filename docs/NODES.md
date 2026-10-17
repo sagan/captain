@@ -586,3 +586,45 @@ Update bosun first: the page requires its new `core_inventory` report and `core_
 Official sing-box and `singbox-extended` can coexist. Core package/version selection is separate from each inbound's protocol and `Core` choice. Extended Mieru must be selected explicitly and requires clients to refresh subscriptions after switching from mita; it does not support specific listen-IP/ingress binds or mita native rolling quotas. SSH is a TCP proxy with subscriber passwords and a generated host-key pin, not system SSH login or a shell. Only supported subscription formats expose it.
 
 See [bosun core management](https://github.com/zeptop-dev/bosun/blob/master/docs/CORE_MANAGEMENT.md) for persistence, release sources, supported combinations and recovery behavior.
+
+
+## Managed reverse WireGuard (Captain 1.20 / bosun 0.68)
+
+Open the exit node B, expand **Reverse WireGuard**, and create a connection to
+transit A. Both are Captain-managed full bosun nodes. A accepts VLESS REALITY
+subscribers, authenticates them and accounts their upload/download. B initiates
+a kernel WireGuard tunnel to A and provides the exit; tunnel overhead is not
+charged again. The existing VLESS Reverse option remains separate.
+
+Both nodes need Linux kernel WireGuard support, `wg`, `ip`, `nft` and `tc`,
+root network-administration privileges and enabled egress protection with
+non-root proxy cores. A also needs Xray. The panel waits for fresh capability
+reports from both nodes; upgrading the panel alone cannot enable this feature.
+
+Choose A, a subscriber TCP port, a separate local WireGuard UDP port, the literal
+IP and UDP port reachable from B, MTU (1280–1420), and a REALITY server name.
+Run the REALITY check from A. If external NAT maps A's UDP port, enter the public
+mapped endpoint separately. Nodes requiring an ingress mapping cannot serve as
+A in this initial editor. Restrict the subscriber entry's user group as needed.
+
+Private access defaults off. To reach B's LAN, select **Explicit addresses** and
+add destination CIDRs, protocols and ports. This grants access to every authorized
+subscriber on that entry. B performs SNAT, so target machines need no additional
+return route and see B as the source. Different B nodes may use overlapping LAN
+addresses. Endpoint management services, loopback, link-local and metadata remain
+isolated. Broadcast discovery and LAN-initiated connections are not supported.
+
+A never falls back to its own direct egress when the tunnel fails. Changes that
+affect permissions stop old connections before applying the new rules. A user's
+configured speed limit is shared across its ordinary egress and all WG links on
+that A; separate A nodes retain independent enforcement. Usage follows the existing
+per-inbound reporting and quota rules. Handshake/interface bytes are diagnostics.
+
+Saved, applied and connected are distinct states: connected requires a recent
+handshake and confirmation of the current configuration on both endpoints.
+Offline agents cannot acknowledge a revocation immediately. Delete or edit links
+through this card; their managed inbound and entry cannot be changed separately.
+Remove links before switching an endpoint to monitor mode or detaching it.
+Each node supports at most 64 links. Tunnel host addresses are allocated from
+`10.10.0.0/16` and `fd42:626f:7375::/112`; existing address, route and interface
+ownership conflicts are rejected rather than overwritten.

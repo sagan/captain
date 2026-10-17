@@ -136,6 +136,11 @@ func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*
 	if err != nil {
 		return nil, err
 	}
+	wgConfigs, wgInbounds, err := a.wireGuardState(ctx, n.ID)
+	if err != nil {
+		return nil, err
+	}
+	node.WireGuardLinks = wgConfigs
 	reverseCapable := a.Store.ReverseCapable(ctx, n.ID)
 	links, err := a.Store.ReverseLinks(ctx, n.ID)
 	if err != nil {
@@ -278,6 +283,9 @@ func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*
 	}
 	for _, ib := range inbounds {
 		si := ib.Spec()
+		if si.WireGuardSlot != 0 && !wgInbounds[ib.ID] {
+			continue
+		}
 		if !a.Store.PrivateAccessCapable(ctx, n.ID, si) {
 			continue
 		}

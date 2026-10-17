@@ -299,7 +299,8 @@
         "unknown": "This core is not recognized. Choose a compatible core.",
         "reverse": "This protocol or core does not support managed VLESS Reverse with per-user accounting.",
         "privateAccess": "Private access requires a recent capability report from a supported node and core.",
-        "listenAddress": "This Mieru build cannot bind a specific listening IP. Use mita."
+        "listenAddress": "This Mieru build cannot bind a specific listening IP. Use mita.",
+        "wireguardReverse": "Reverse WireGuard requires a fresh capability report from a supported Linux node and Xray core."
       }
     }
   },
@@ -2233,5 +2234,14 @@
     "upgradeHint": "Mode changes require an online node reporting mode support. Upgrade bosun and wait for a fresh report.",
     "failed": "Mode change failed",
     "installOnly": "Install monitoring only (no proxy cores)"
+  },
+  "wireguard": {
+    "title": "Reverse WireGuard",
+    "hint": "B actively connects to A. A authenticates and bills users; B provides public egress and explicitly authorized LAN access.",
+    "requirements": "Both nodes need Linux WireGuard support and a fresh capability report. The subscriber entry uses VLESS REALITY. Nodes requiring an ingress mapping cannot be used as A in this version.",
+    "transit": "Transit node A",
+    "endpoint": "Public UDP endpoint of A",
+    "endpointHint": "Enter the IP and UDP port reachable from B. If NAT changes the port, enter the public mapped port here; the tunnel port above remains local.",
+    "unavailable": "Node unavailable or upgrade required"
   }
 }

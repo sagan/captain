@@ -86,7 +86,7 @@ func (s *Store) NodeByTokenHash(ctx context.Context, hash string) (*domain.Node,
 // the code, records agent details. Returns the node or ErrNotFound.
 func (s *Store) RedeemPairCode(ctx context.Context, code, tokenHash, hostname, version, platform string) (*domain.Node, error) {
 	res, err := s.db.ExecContext(ctx, `UPDATE nodes SET token_hash = ?, pair_code = NULL, pair_code_expires_at = NULL,
-		hostname = ?, version = ?, platform = ?, last_seen_at = ?, updated_at = ?
+		wireguard_json = 'null', wireguard_reported_at = NULL, hostname = ?, version = ?, platform = ?, last_seen_at = ?, updated_at = ?
 		WHERE pair_code = ? AND pair_code_expires_at > ? AND token_hash IS NULL`,
 		tokenHash, hostname, version, platform, now(), now(), code, now())
 	if err != nil {
@@ -229,7 +229,7 @@ func (s *Store) UpdateNode(ctx context.Context, n *domain.Node) error {
 
 // ResetPairCode issues a fresh pairing code and revokes the current token.
 func (s *Store) ResetPairCode(ctx context.Context, id int64, code string, ttl time.Duration) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET pair_code = ?, pair_code_expires_at = ?, token_hash = NULL, reported_mode = '', mode_reported_at = 0, reported_mode_revision = 0, mode_error = '', updated_at = ? WHERE id = ?`,
+	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET pair_code = ?, pair_code_expires_at = ?, token_hash = NULL, wireguard_json = 'null', wireguard_reported_at = NULL, reported_mode = '', mode_reported_at = 0, reported_mode_revision = 0, mode_error = '', updated_at = ? WHERE id = ?`,
 		code, time.Now().Add(ttl).Unix(), now(), id)
 	return err
 }
@@ -257,6 +257,7 @@ func (s *Store) DeleteNode(ctx context.Context, id int64) error {
 
 // NodeStatus is the last reported host/core state.
 type NodeStatus struct {
+	WireGuard     json.RawMessage `json:"wireguard"`
 	CoreInventory json.RawMessage `json:"core_inventory"`
 	Host          json.RawMessage `json:"host"`
 	Cores         json.RawMessage `json:"cores"`
@@ -305,8 +306,8 @@ func (s *Store) DoctorFails(ctx context.Context) (map[int64]bool, error) {
 }
 
 func (s *Store) NodeStatus(ctx context.Context, id int64) (*NodeStatus, error) {
-	var host, cores, certs, doctor, warp, inventory string
-	if err := s.db.QueryRowContext(ctx, `SELECT host_status_json, cores_json, certs_json, doctor_json, warp_json, core_inventory_json FROM nodes WHERE id = ?`, id).Scan(&host, &cores, &certs, &doctor, &warp, &inventory); err != nil {
+	var host, cores, certs, doctor, warp, inventory, wireguard string
+	if err := s.db.QueryRowContext(ctx, `SELECT host_status_json, cores_json, certs_json, doctor_json, warp_json, core_inventory_json, wireguard_json FROM nodes WHERE id = ?`, id).Scan(&host, &cores, &certs, &doctor, &warp, &inventory, &wireguard); err != nil {
 		return nil, wrapNotFound(err)
 	}
 	if warp == "" {
@@ -318,7 +319,7 @@ func (s *Store) NodeStatus(ctx context.Context, id int64) (*NodeStatus, error) {
 	if doctor == "" {
 		doctor = "null"
 	}
-	return &NodeStatus{CoreInventory: json.RawMessage(inventory), Host: json.RawMessage(host), Cores: json.RawMessage(cores), Certs: json.RawMessage(certs), Doctor: json.RawMessage(doctor), WARP: json.RawMessage(warp)}, nil
+	return &NodeStatus{WireGuard: json.RawMessage(wireguard), CoreInventory: json.RawMessage(inventory), Host: json.RawMessage(host), Cores: json.RawMessage(cores), Certs: json.RawMessage(certs), Doctor: json.RawMessage(doctor), WARP: json.RawMessage(warp)}, nil
 }
 
 // AllInboundsByNode lists inbounds of a node including disabled ones.

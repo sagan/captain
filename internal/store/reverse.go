@@ -55,12 +55,12 @@ func (s *Store) ReverseCapable(ctx context.Context, nodeID int64) bool {
 
 func (s *Store) ReverseOwnedInbound(ctx context.Context, id int64) bool {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM node_reverse_links WHERE user_inbound_id = ? OR receiver_inbound_id = ?`, id, id).Scan(&n)
+	err := s.db.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM node_reverse_links WHERE user_inbound_id = ? OR receiver_inbound_id = ?) + (SELECT COUNT(*) FROM node_wireguard_links WHERE user_inbound_id = ?)`, id, id, id).Scan(&n)
 	return err != nil || n > 0
 }
 func (s *Store) ReverseOwnedEntry(ctx context.Context, id int64) bool {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM node_reverse_links WHERE entry_id = ?`, id).Scan(&n)
+	err := s.db.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM node_reverse_links WHERE entry_id = ?) + (SELECT COUNT(*) FROM node_wireguard_links WHERE entry_id = ?)`, id, id).Scan(&n)
 	return err != nil || n > 0
 }
 

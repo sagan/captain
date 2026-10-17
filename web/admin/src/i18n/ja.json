@@ -299,7 +299,8 @@
         "unknown": "不明なコアです。対応するコアを選択してください。",
         "reverse": "このプロトコルまたはコアはユーザー別計測付き VLESS Reverse に対応していません。",
         "privateAccess": "対応ノード・コアからの最新の機能報告が必要です。",
-        "listenAddress": "この Mieru ビルドは特定の IP にバインドできません。mita を使用してください。"
+        "listenAddress": "この Mieru ビルドは特定の IP にバインドできません。mita を使用してください。",
+        "wireguardReverse": "リバース WireGuard には、対応 Linux ノードと Xray コアからの最新の機能レポートが必要です。"
       }
     }
   },
@@ -2233,5 +2234,14 @@
     "upgradeHint": "切り替えには、オンラインでモード対応を報告するノードが必要です。bosun を更新して新しい報告を待ってください。",
     "failed": "モード変更に失敗しました",
     "installOnly": "監視エージェントのみをインストール（プロキシコアなし）"
+  },
+  "wireguard": {
+    "title": "リバース WireGuard",
+    "hint": "B が A に接続します。A はユーザー認証と課金、B はインターネット接続と明示的に許可した LAN アクセスを担当します。",
+    "requirements": "両ノードに Linux WireGuard 対応と最新の機能報告が必要です。ユーザー接続には VLESS REALITY を使用します。この版では入口マッピングが必須のノードを A にできません。",
+    "transit": "中継ノード A",
+    "endpoint": "A の公開 UDP エンドポイント",
+    "endpointHint": "B から接続できる IP と UDP ポートを入力してください。NAT でポートが変わる場合は公開ポートを指定し、上のトンネルポートにはローカルポートを指定します。",
+    "unavailable": "ノードが利用不可、または更新が必要"
   }
 }

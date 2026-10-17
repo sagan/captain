@@ -299,7 +299,8 @@
         "unknown": "無法識別此核心，請選擇相容核心。",
         "reverse": "此協定或核心不支援具使用者計費的託管 VLESS Reverse。",
         "privateAccess": "私網存取需要支援此功能的節點、核心及最近的能力回報。",
-        "listenAddress": "此 Mieru 建置不能綁定指定監聽 IP，請使用 mita。"
+        "listenAddress": "此 Mieru 建置不能綁定指定監聽 IP，請使用 mita。",
+        "wireguardReverse": "反向 WireGuard 需要支援此功能的 Linux 節點和 Xray 核心回報最新能力。"
       }
     }
   },
@@ -2233,5 +2234,14 @@
     "upgradeHint": "切換需要節點在線並回報模式支援，請升級 bosun 後等待新回報。",
     "failed": "模式切換失敗",
     "installOnly": "僅安裝探針（不安裝代理核心）"
+  },
+  "wireguard": {
+    "title": "反向 WireGuard",
+    "hint": "B 主動連線 A；A 負責使用者驗證與計費，B 提供公網出口及明確授權的內網存取。",
+    "requirements": "兩端須支援 Linux WireGuard 並有最新能力回報。使用者入口採用 VLESS REALITY。本版不支援將強制選擇入口映射的節點作為 A。",
+    "transit": "中轉節點 A",
+    "endpoint": "A 的公網 UDP 端點",
+    "endpointHint": "填入 B 可連線的 IP 與 UDP 連接埠。若 NAT 改寫連接埠，此處填公網映射連接埠，上方隧道連接埠仍為本機連接埠。",
+    "unavailable": "節點無法使用或需要升級"
   }
 }

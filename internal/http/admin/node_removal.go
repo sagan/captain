@@ -46,7 +46,12 @@ func (h *handlers) startNodeRemoval(w http.ResponseWriter, r *http.Request) {
 			serverErr(w, err)
 			return
 		}
-		if len(links) > 0 {
+		wgLinks, wgErr := h.Store.WireGuardLinks(r.Context(), id)
+		if wgErr != nil {
+			serverErr(w, wgErr)
+			return
+		}
+		if len(links) > 0 || len(wgLinks) > 0 {
 			fail(w, 409, "remove managed reverse connections before switching to standalone mode")
 			return
 		}

@@ -134,6 +134,7 @@ features it has never heard of, which the node page shows as an orange
 
 | Captain | needs bosun | for |
 |---|---|---|
+| 1.20.0 | ≥ 0.68.0 for reverse WireGuard | Managed kernel tunnels, explicit LAN grants, shared user shaping and migration 73; old nodes retain ordinary services. |
 | 1.19.0 | (no change) | Glassmorphism status page served by the React port; no agent, API or database change. |
 | 1.18.0 | ≥ 0.66.0 | Monitor-only installation and confirmed node mode switching; existing full nodes remain compatible. |
 | 1.17.0 | ≥ 0.65.0 | Docker web upgrades through the node's host updater (optional `host_update` metadata); older Docker nodes keep rejecting in-container binary replacement. |
@@ -331,3 +332,24 @@ remain as disabled compatibility endpoints; enabling is rejected. Agent fields a
 migration 51 remain intact, but Captain never sends exporter configuration. Old
 managed nodes stop on their next successful state pull; standalone nodes must be
 upgraded. Built-in monitoring and Glassmorphism are unchanged.
+
+
+### Managed reverse WireGuard (Captain 1.20 / bosun 0.68)
+
+`Node.wireguard_links`, `Inbound.wireguard_slot`, Xray capability
+`wireguard_reverse`, and agent `Report.wireguard` are additive. Captain migration
+73 owns managed connections and their dedicated subscriber resources. Both peers
+must report current transport capability; A must also advertise Xray support.
+Captain withholds the whole managed inbound when either peer is unsupported,
+so an older agent cannot ignore the routing field and serve it through direct
+egress. Re-pairing clears capability and report writes are bound to the current
+node token. Existing VLESS Reverse resources and APIs keep their behavior.
+
+Bosun v0.68.0's built-in updater and rollback retain a v0.68.0 minimum, including
+when no link is active. A previous binary of unknown version cannot satisfy a
+configured floor. This prevents old binaries from ignoring WG routing fields in
+cached desired state. Manual replacement outside the updater is not protected.
+
+Captain v1.20.0 similarly retains a v1.20.0 built-in rollback floor: older panels
+would discard the WG fields while rebuilding desired node state. Higher
+administrator-configured floors remain in effect on both applications.

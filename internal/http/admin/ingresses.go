@@ -264,6 +264,17 @@ func (h *handlers) checkIngressChange(ctx context.Context, g *store.Ingress, rem
 			}
 		}
 	}
+	wgLinks, err := h.Store.WireGuardLinks(ctx, g.NodeID)
+	if err != nil {
+		return "", err
+	}
+	for _, link := range wgLinks {
+		if link.TransitID == g.NodeID {
+			if msg := checkIngressListener(next, "", "", link.ListenPort); msg != "" {
+				return "WireGuard tunnel: " + msg, nil
+			}
+		}
+	}
 	fs, err := h.Store.NodeForwards(ctx, g.NodeID)
 	if err != nil {
 		return "", err

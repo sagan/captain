@@ -601,6 +601,27 @@ root network-administration privileges and enabled egress protection with
 non-root proxy cores. A also needs Xray. The panel waits for fresh capability
 reports from both nodes; upgrading the panel alone cannot enable this feature.
 
+The host firewall must also permit forwarding on B from the managed `bwg<slot>`
+interface to the intended public or LAN interface, including return traffic.
+Bosun's destination ACL and SNAT do not override a later UFW/firewalld default
+drop. Its port auto-open feature only opens listeners; it does not change the
+host's forwarding policy. A fresh handshake can therefore show **Connected**
+while subscriber requests still fail. Check the host firewall before changing
+the tunnel or private-access grants.
+
+For example, with UFW, link slot 1 and exit interface `eth0`, the administrator
+can allow just this interface pair and the supported transport protocols:
+
+```sh
+ufw route allow in on bwg1 out on eth0 proto tcp
+ufw route allow in on bwg1 out on eth0 proto udp
+```
+
+Use the actual slot and exit interface; an authorized LAN destination may use
+a different interface. Bosun still restricts destinations before these rules.
+Remove the corresponding host rules when retiring the link. Do not disable the
+host firewall or change its global forwarding policy just to enable a tunnel.
+
 Choose A, a subscriber TCP port, a separate local WireGuard UDP port, the literal
 IP and UDP port reachable from B, MTU (1280–1420), and a REALITY server name.
 Run the REALITY check from A. If external NAT maps A's UDP port, enter the public

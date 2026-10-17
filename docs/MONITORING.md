@@ -104,55 +104,18 @@ plus the nodes' own probe results. Add a probe task of type `download` (a
 large file URL) and each node reports its download throughput every ten
 minutes, which also lands in the status page history.
 
-## Komari reporting
+## Retired external monitoring integrations
 
-Settings → Notifications and integrations → Komari reporting attaches every managed node to a Komari monitor
-as an agent: give the Komari URL and its auto-discovery key and each node
-(bosun ≥ 0.17) registers under its node name, reports metrics every few
-seconds and answers Komari's ping tasks. Only the ping capability is
-offered. This runs alongside Captain's own probe; turn the probe page off
-if you prefer Komari's.
+Komari and DStatus registration, reporting and scrape endpoints have been removed.
+Use the built-in resource/network monitoring and status page. Captain's Glassmorphism
+React theme remains available and does not need a Komari server.
 
-## DStatus
-
-Settings → Notifications and integrations → DStatus lets a [DStatus](https://github.com/fev125/dstatus)
-panel — the open-source one or the official build at dstatus.sh, which
-share the wire protocol — monitor the nodes **without installing its
-agent on them**. Do not use DStatus' own SSH-based agent installer for
-nodes Captain manages: it would leave the monitoring panel holding root
-credentials for every node, which is exactly the blast radius Captain's
-pairing tokens exist to avoid.
-
-The setting is panel-wide and follows the panel's 通讯模式 switch:
-
-- **Passive (被动)**, the default: every node (bosun ≥ 0.52) serves
-  `GET /stat` on the port you give and answers only when the request
-  carries the key in a `key` header. In DStatus, add each server with that
-  port and key. This is a pull, so the port must be reachable from the
-  DStatus panel — bosun's firewall auto-open opens it while the setting is
-  on. The panel's optional `/ping` and `/tcping` capability probes get a
-  404, which only greys out its "network quality" feature.
-- **Active (主动)**: every node (bosun ≥ 0.53) posts its sample to the
-  panel URL you give, every few seconds, with the same key — and opens no
-  port, for hosts the panel cannot reach. Reporting has to name the
-  server it reports as, so each node carries a **DStatus server ID (SID)**
-  on its node page: the ID of that server in DStatus' list. A node without
-  one simply does not report. Switch the server to 主动 in DStatus as well.
-  DStatus' task channel (remote scripts, diagnostics) is deliberately not
-  implemented.
-
-The key is write-only here, as the other secrets are, and the setting
-refuses to be enabled without one. The node's doctor warns when a passive
-endpoint is up but has never been scraped (usually a firewall or the wrong
-address in DStatus), when scrapes are refused for a wrong key, and in
-active mode when the panel stops accepting reports — with the panel's own
-reason.
-
-Two figures will not match DStatus': it counts whole-interface traffic,
-Captain counts the per-user proxy traffic it bills, so the interface number
-runs higher. The DStatus adapter still leaves its per-core CPU and per-interface fields
-empty; Captain’s native resource detail is separate from that export mapping; everything DStatus renders from
-`cpu.multi`, `mem`, `disk` and `net` is real.
+Legacy settings API paths retain their response shapes but return disabled settings;
+enabling them is rejected. Protocol fields and old database migrations are retained
+for compatibility. Captain no longer sends exporter configurations, so older managed
+agents stop exporting after their next successful state pull. Upgrade standalone
+agents to stop their exporters. Existing stored credentials are inert and are not
+used for exporter connections; removing this feature does not delete remote monitoring accounts.
 
 ## Metrics
 
@@ -375,8 +338,7 @@ Timeouts, connection refusal, DNS/TLS errors, permission errors, unreachable
 hosts, HTTP errors, I/O errors and empty downloads have separate reason labels.
 No raw error, URL or response body is included in those labels. Task targets are
 administrator-configured and may deliberately address private line endpoints.
-`source_ip` binds all four task types. The old external Komari on-demand task
-policy is unchanged; the new periodic checks never select the best of retries.
+`source_ip` binds all four task types. Periodic checks never select the best of retries.
 
 The latest result includes an exact window of up to 30 attempts: failure count,
 min/max, nearest-rank P50/P95, and mean absolute difference of consecutive

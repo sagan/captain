@@ -1,7 +1,6 @@
 package store
 
-// KomariSettings makes every managed node report to a Komari monitor as
-// an agent (settings key "komari"); each node registers under its own name.
+// KomariSettings is retained only for decoding and clearing retired settings.
 type KomariSettings struct {
 	Enabled  bool   `json:"enabled"`
 	Server   string `json:"server"`

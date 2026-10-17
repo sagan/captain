@@ -338,27 +338,8 @@ func (a *AgentState) finishState(ctx context.Context, n *domain.Node, st *agentp
 	if a.Probe != nil {
 		st.Probe = a.Probe.AgentConfig(ctx, n.ID)
 	}
-	// Komari: one panel-wide setting, each node registers under its name.
-	var km store.KomariSettings
-	if err := a.Store.GetSetting(ctx, store.SettingKomari, &km); err == nil && km.Enabled && km.Server != "" {
-		st.Komari = &spec.Komari{Enabled: true, Server: km.Server, Key: km.Key, Name: n.Name, Interval: km.Interval}
-	}
-	// DStatus: also panel-wide, but a pull — every node listens on the
-	// same port with the same key and the panel tells them apart by
-	// address, which is how DStatus' own agent installer works too.
-	var ds store.DStatusSettings
-	if err := a.Store.GetSetting(ctx, store.SettingDStatus, &ds); err == nil && ds.Enabled && ds.Key != "" {
-		switch ds.Mode {
-		case spec.DStatusActive:
-			// Reporting needs the node's own id in the panel; a node
-			// without one stays silent rather than reporting as nobody.
-			if n.DStatusSID != "" {
-				st.DStatus = &spec.DStatus{Enabled: true, Mode: spec.DStatusActive, Server: ds.Server, SID: n.DStatusSID, Key: ds.Key, Interval: ds.Interval}
-			}
-		default:
-			st.DStatus = &spec.DStatus{Enabled: true, Listen: ds.Listen, Key: ds.Key}
-		}
-	}
+	// Retired exporters stay absent, including for nodes running older agents.
+	st.Komari, st.DStatus = nil, nil
 	if jobs, err := a.Store.PendingNodeJobs(ctx, n.ID); err == nil {
 		for _, j := range jobs {
 			if !store.NodeProxyAllowed(n) && (j.Kind == spec.CoreManagementKind || j.Kind == "warp_register" || j.Kind == "reality_scan") {

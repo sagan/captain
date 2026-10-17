@@ -1619,53 +1619,25 @@ func TestProbePageAndBeats(t *testing.T) {
 	if !strings.Contains(string(b), `"carriers":[{"name":"HK","addr":"www.hkix.net:443"}]`) {
 		t.Fatalf("carriers missing from state: %s", b)
 	}
-	// Komari: a panel-wide setting reaches every node with the node's name.
-	if code, _, _ := ac.do("PUT", "/api/admin/settings/komari", map[string]any{"enabled": true, "server": "https://komari.example.com/"}, nil); code != 400 {
-		t.Fatal("komari without key accepted")
+	// Legacy enabled settings must not reach even older agents.
+	for _, key := range []string{store.SettingKomari, store.SettingDStatus} {
+		if err := st.SetSetting(context.Background(), key, map[string]any{"enabled": true, "server": "https://monitor.example.com", "key": "retired-secret"}); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if code, b, _ := ac.do("PUT", "/api/admin/settings/komari", map[string]any{"enabled": true, "server": "https://komari.example.com/", "key": "adkey-1234567890", "interval": 5}, nil); code != 200 || !strings.Contains(string(b), `"has_key":true`) || strings.Contains(string(b), "adkey") {
-		t.Fatalf("put komari: %d %s", code, b)
-	}
-	_, b, _ = nc.do("GET", "/api/agent/state", nil, nil)
-	if !strings.Contains(string(b), `"komari":{"enabled":true,"server":"https://komari.example.com","key":"adkey-1234567890","name":"jp1","interval":5}`) {
-		t.Fatalf("komari missing from state: %s", b)
-	}
-	// DStatus: panel-wide too, but a pull — the key never comes back out
-	// of the API, and the endpoint refuses to be enabled without one.
-	if code, _, _ := ac.do("PUT", "/api/admin/settings/dstatus", map[string]any{"enabled": true, "listen": ":9999"}, nil); code != 400 {
-		t.Fatal("dstatus without a key accepted")
-	}
-	if code, _, _ := ac.do("PUT", "/api/admin/settings/dstatus", map[string]any{"enabled": true, "listen": "9999", "key": "scrapekey"}, nil); code != 400 {
-		t.Fatal("dstatus listen without a colon accepted")
-	}
-	if code, b, _ := ac.do("PUT", "/api/admin/settings/dstatus", map[string]any{"enabled": true, "listen": ":9999", "key": "scrapekey"}, nil); code != 200 || !strings.Contains(string(b), `"has_key":true`) || strings.Contains(string(b), "scrapekey") {
-		t.Fatalf("put dstatus: %d %s", code, b)
-	}
-	if code, b, _ := ac.do("GET", "/api/admin/settings/dstatus", nil, nil); code != 200 || strings.Contains(string(b), "scrapekey") {
-		t.Fatalf("the key must not be readable back: %d %s", code, b)
+	for _, name := range []string{"komari", "dstatus"} {
+		path := "/api/admin/settings/" + name
+		if code, _, _ := ac.do("PUT", path, map[string]any{"enabled": true}, nil); code != 400 {
+			t.Fatalf("retired %s enabled: %d", name, code)
+		}
+		if code, body, _ := ac.do("GET", path, nil, nil); code != 200 || !strings.Contains(string(body), `"enabled":false`) || strings.Contains(string(body), "retired-secret") {
+			t.Fatalf("retired settings: %d %s", code, body)
+		}
 	}
 	_, b, _ = nc.do("GET", "/api/agent/state", nil, nil)
-	if !strings.Contains(string(b), `"dstatus":{"enabled":true,"listen":":9999","key":"scrapekey"}`) {
-		t.Fatalf("dstatus missing from state: %s", b)
-	}
-	// Active mode: the panel URL is required, and a node only reports
-	// once it has been given its server id in the panel.
-	if code, _, _ := ac.do("PUT", "/api/admin/settings/dstatus", map[string]any{"enabled": true, "mode": "active", "key": "scrapekey"}, nil); code != 400 {
-		t.Fatal("active mode without a panel URL accepted")
-	}
-	if code, b, _ := ac.do("PUT", "/api/admin/settings/dstatus", map[string]any{"enabled": true, "mode": "active", "server": "https://status.example.com/", "interval": 5, "key": ""}, nil); code != 200 || !strings.Contains(string(b), `"mode":"active"`) || !strings.Contains(string(b), `"has_key":true`) {
-		t.Fatalf("put dstatus active: %d %s", code, b)
-	}
-	_, b, _ = nc.do("GET", "/api/agent/state", nil, nil)
-	if strings.Contains(string(b), `"dstatus"`) {
-		t.Fatalf("a node without a SID must not be told to report: %s", b)
-	}
-	if code, b, _ := ac.do("PATCH", "/api/admin/nodes/"+nodeID, map[string]any{"Name": "jp1", "PublicAddr": "jp1.test", "DStatusSID": "srv-42"}, nil); code != 200 {
-		t.Fatalf("patch node sid: %d %s", code, b)
-	}
-	_, b, _ = nc.do("GET", "/api/agent/state", nil, nil)
-	if !strings.Contains(string(b), `"dstatus":{"enabled":true,"key":"scrapekey","mode":"active","server":"https://status.example.com","sid":"srv-42","interval":5}`) {
-		t.Fatalf("active dstatus missing from state: %s", b)
+	retiredState := mustJSON[agentproto.State](t, b)
+	if retiredState.Komari != nil || retiredState.DStatus != nil {
+		t.Fatal("retired exporters reached agent")
 	}
 	// A line ingress adds a source-bound RTT task to the far end: the
 	// reserved (SSH) port until an inbound uses the line, then that port.

@@ -25,8 +25,6 @@ export const settingsCatalog: SettingsEntry[] = [
   { id: 'mail', area: 'integrations', titleKey: 'mail.title', hintKey: 'mail.hint', keywords: 'SMTP Resend email 邮件' },
   { id: 'telegram', area: 'integrations', titleKey: 'telegram.title', hintKey: 'telegram.hint', keywords: 'telegram bot 通知 机器人' },
   { id: 'webhooks', area: 'integrations', titleKey: 'webhooks.title', hintKey: 'webhooks.hint', keywords: 'webhook events 通知 事件' },
-  { id: 'komari', area: 'integrations', titleKey: 'komari.title', hintKey: 'komari.hint', keywords: 'komari monitor 探针' },
-  { id: 'dstatus', area: 'integrations', titleKey: 'dstatus.title', hintKey: 'dstatus.hint', keywords: 'dstatus SID monitor 探针' },
   { id: 'backup', area: 'maintenance', titleKey: 'backup.title', hintKey: 'workspace.backupHint', keywords: 'backup restore S3 WebDAV 备份 恢复' },
   { id: 'update', area: 'maintenance', titleKey: 'update.title', hintKey: 'workspace.updateHint', keywords: 'version upgrade 版本 更新' },
   { id: 'reset', area: 'maintenance', titleKey: 'siteReset.title', hintKey: 'siteReset.description', keywords: 'reset fresh install 重置 全新安装' },

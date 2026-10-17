@@ -24,8 +24,6 @@ const editors: Record<string, ComponentType> = {
   probe: lazy(() => import('../components/ProbeCard').then(m => ({ default: m.ProbeCard }))),
   'ping-tasks': lazy(() => import('../components/ProbeCard').then(m => ({ default: m.PingTasks }))),
   heartbeat: lazy(() => import('../components/HeartbeatCard').then(m => ({ default: m.HeartbeatCard }))),
-  komari: lazy(() => import('../components/KomariCard').then(m => ({ default: m.KomariCard }))),
-  dstatus: lazy(() => import('../components/DStatusCard').then(m => ({ default: m.DStatusCard }))),
   connections: lazy(() => import('../components/ConnLogCard').then(m => ({ default: m.ConnLogCard }))),
   audit: lazy(() => import('../components/AuditRulesCard').then(m => ({ default: m.AuditRulesCard }))),
   limits: lazy(() => import('../components/DynLimitCard').then(m => ({ default: m.DynLimitCard }))),

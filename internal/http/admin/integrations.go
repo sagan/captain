@@ -2,10 +2,7 @@ package admin
 
 import (
 	"context"
-	"github.com/zeptop-dev/bosun/pkg/spec"
-	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -170,107 +167,40 @@ func (h *handlers) testWebhook(w http.ResponseWriter, r *http.Request) {
 	ok(w, map[string]bool{"ok": true})
 }
 
+// Compatibility endpoints retain their response shapes but cannot enable retired exporters.
 func (h *handlers) getKomari(w http.ResponseWriter, r *http.Request) {
-	var v store.KomariSettings
-	_ = h.Store.GetSetting(r.Context(), store.SettingKomari, &v)
-	ok(w, map[string]any{"enabled": v.Enabled, "server": v.Server, "interval": v.Interval, "has_key": v.Key != ""})
+	ok(w, map[string]any{"enabled": false, "server": "", "interval": 0, "has_key": false})
 }
-
-// putKomari stores the setting; a blank key keeps the stored one, "-" clears it.
 func (h *handlers) putKomari(w http.ResponseWriter, r *http.Request) {
 	var in store.KomariSettings
 	if !readJSON(w, r, &in) {
 		return
 	}
-	var cur store.KomariSettings
-	_ = h.Store.GetSetting(r.Context(), store.SettingKomari, &cur)
-	in.Server = strings.TrimRight(strings.TrimSpace(in.Server), "/")
-	if in.Enabled && !strings.HasPrefix(in.Server, "http://") && !strings.HasPrefix(in.Server, "https://") {
-		fail(w, http.StatusBadRequest, "Komari URL must start with http:// or https://")
+	if in.Enabled {
+		fail(w, http.StatusBadRequest, "external monitoring integration has been removed")
 		return
 	}
-	if in.Interval < 0 || in.Interval > 300 {
-		fail(w, http.StatusBadRequest, "interval must be 0-300 seconds")
-		return
-	}
-	switch strings.TrimSpace(in.Key) {
-	case "":
-		in.Key = cur.Key
-	case "-":
-		in.Key = ""
-	default:
-		in.Key = strings.TrimSpace(in.Key)
-	}
-	if in.Enabled && in.Key == "" {
-		fail(w, http.StatusBadRequest, "the auto-discovery key is required to register nodes")
-		return
-	}
-	if err := h.Store.SetSetting(r.Context(), store.SettingKomari, in); err != nil {
+	if err := h.Store.SetSetting(r.Context(), store.SettingKomari, store.KomariSettings{}); err != nil {
 		serverErr(w, err)
 		return
 	}
-	ok(w, map[string]any{"enabled": in.Enabled, "server": in.Server, "interval": in.Interval, "has_key": in.Key != ""})
+	h.getKomari(w, r)
 }
-
 func (h *handlers) getDStatus(w http.ResponseWriter, r *http.Request) {
-	var v store.DStatusSettings
-	_ = h.Store.GetSetting(r.Context(), store.SettingDStatus, &v)
-	ok(w, dstatusView(v))
+	ok(w, map[string]any{"enabled": false, "mode": "", "listen": "", "server": "", "interval": 0, "has_key": false})
 }
-
-func dstatusView(v store.DStatusSettings) map[string]any {
-	return map[string]any{"enabled": v.Enabled, "mode": v.Mode, "listen": v.Listen, "server": v.Server, "interval": v.Interval, "has_key": v.Key != ""}
-}
-
-// putDStatus stores the setting; a blank key keeps the stored one, "-"
-// clears it, as everywhere else.
 func (h *handlers) putDStatus(w http.ResponseWriter, r *http.Request) {
 	var in store.DStatusSettings
 	if !readJSON(w, r, &in) {
 		return
 	}
-	var cur store.DStatusSettings
-	_ = h.Store.GetSetting(r.Context(), store.SettingDStatus, &cur)
-	in.Listen = strings.TrimSpace(in.Listen)
-	in.Server = strings.TrimRight(strings.TrimSpace(in.Server), "/")
-	if in.Mode != "" && in.Mode != "passive" && in.Mode != spec.DStatusActive {
-		fail(w, http.StatusBadRequest, "mode must be passive or active")
+	if in.Enabled {
+		fail(w, http.StatusBadRequest, "external monitoring integration has been removed")
 		return
 	}
-	if in.Interval < 0 || in.Interval > 300 {
-		fail(w, http.StatusBadRequest, "interval must be 0-300 seconds")
-		return
-	}
-	if in.Enabled && in.Mode == spec.DStatusActive && !strings.HasPrefix(in.Server, "http://") && !strings.HasPrefix(in.Server, "https://") {
-		fail(w, http.StatusBadRequest, "active mode needs the DStatus panel URL (http:// or https://)")
-		return
-	}
-	if in.Listen != "" {
-		if _, port, err := net.SplitHostPort(in.Listen); err != nil {
-			fail(w, http.StatusBadRequest, "listen must be host:port, e.g. :9999")
-			return
-		} else if n, err := strconv.Atoi(port); err != nil || n < 1 || n > 65535 {
-			fail(w, http.StatusBadRequest, "listen must be host:port, e.g. :9999")
-			return
-		}
-	}
-	switch strings.TrimSpace(in.Key) {
-	case "":
-		in.Key = cur.Key
-	case "-":
-		in.Key = ""
-	default:
-		in.Key = strings.TrimSpace(in.Key)
-	}
-	// The endpoint is reachable from outside; without a key it would hand
-	// every host's details to anyone who finds the port.
-	if in.Enabled && in.Key == "" {
-		fail(w, http.StatusBadRequest, "a key is required: the endpoint is reachable from the network")
-		return
-	}
-	if err := h.Store.SetSetting(r.Context(), store.SettingDStatus, in); err != nil {
+	if err := h.Store.SetSetting(r.Context(), store.SettingDStatus, store.DStatusSettings{}); err != nil {
 		serverErr(w, err)
 		return
 	}
-	ok(w, dstatusView(in))
+	h.getDStatus(w, r)
 }

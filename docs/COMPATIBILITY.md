@@ -323,3 +323,11 @@ with old nodes. Enabled private policies require a recent supporting node
 report when saving and are withheld at state delivery if support disappears.
 Existing JSON storage carries the field without a schema migration. Omitted
 or null policy updates preserve permissions; explicit `mode: off` revokes them.
+
+### Retired external monitoring exporters
+
+The next release removes Komari/DStatus exporters and their UI. Existing API paths
+remain as disabled compatibility endpoints; enabling is rejected. Agent fields and
+migration 51 remain intact, but Captain never sends exporter configuration. Old
+managed nodes stop on their next successful state pull; standalone nodes must be
+upgraded. Built-in monitoring and Glassmorphism are unchanged.

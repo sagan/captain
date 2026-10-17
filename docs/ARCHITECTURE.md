@@ -135,7 +135,7 @@ Designed around bosun's `spec` types so there is no mapping layer.
 - Desired state: `GET /api/agent/state` returns `agentproto.State`
   (`revision`, `node: spec.Node`, `users: []spec.User`, `forwards:
   []spec.Forward`, `pull_seconds`, `push_seconds`, optional `probe`,
-  `komari` and `jobs`) with an ETag. With `?wait=` (capped at 50 s) and a
+  `jobs`) with an ETag. With `?wait=` (capped at 50 s) and a
   matching `If-None-Match` the request is held, re-checked every two
   seconds, so edits reach nodes within seconds without a persistent
   connection. `service.AgentState` builds the state and caches it per node
@@ -255,8 +255,7 @@ order, and `OnPaid` invalidates node state and emits `order.paid`.
   raises offline / threshold / monthly-traffic alerts through `notify`, and
   `http/probe` serves the page under a path of the main site or on dedicated
   hosts with its visibility rules.
-- **Komari**: the Komari settings ride in `state.komari`, so every managed
-  node registers itself as a Komari agent.
+- **External monitoring exporters**: retired; compatibility fields remain unset.
 - **Metrics**: `GET /api/admin/metrics` (admin session or API token) is a
   Prometheus text exposition: node, user, subscription and order gauges,
   per-node `captain_node_last_seen_seconds`, backup outcome, and counters
@@ -278,7 +277,7 @@ is in [OPERATIONS.md](OPERATIONS.md).
   (`store/ingresses.go`), port forwards (`store/forwards.go`), outbounds,
   routes, DNS and WARP (`nodes` JSON columns), per-core config overrides
   (`nodes.overrides_json`, checked against bosun's `spec.CheckOverride`
-  denylist), decoy site, mita native quotas, Komari and probe settings.
+  denylist), decoy site, mita native quotas, probe settings.
 - External nodes: `service/external.go` parses share links and syncs
   airport subscriptions; `store/external.go` keeps them per group.
 - Money: coupons, commissions, withdrawals, gift codes, surplus credit and

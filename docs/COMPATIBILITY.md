@@ -134,6 +134,7 @@ features it has never heard of, which the node page shows as an orange
 
 | Captain | needs bosun | for |
 |---|---|---|
+| 1.22.0 | ≥ 0.70.0 for route-tool management | Explicit NextTrace installation and tool/ICMP checks; route collection remains available on 0.69.0. No migration. |
 | 1.21.0 | ≥ 0.69.0 for return routes and public address observations | Optional private route history/schedules and address following (migrations 74–75); existing fixed entries and older nodes remain supported. |
 | 1.20.0 | ≥ 0.68.0 for reverse WireGuard | Managed kernel tunnels, explicit LAN grants, shared user shaping and migration 73; old nodes retain ordinary services. |
 | 1.19.0 | (no change) | Glassmorphism status page served by the React port; no agent, API or database change. |

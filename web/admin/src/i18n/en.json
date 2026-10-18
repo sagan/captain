@@ -2,7 +2,7 @@
   "returnRoutes": {
     "title": "Return routes",
     "hint": "Measure this node’s default route to three carrier targets. Independent of proxy/WireGuard business paths. ASN lookups disclose public hop IPs to Team Cymru through DNS.",
-    "requirement": "Requires bosun ≥ 0.69.0 and Linux traceroute with ICMP/raw-socket permission. IPv4 and IPv6 are independent.",
+    "requirement": "Requires bosun ≥ 0.69.0 and a compatible probe tool with ICMP permissions. IPv4 and IPv6 are tested separately.",
     "city": "Target region",
     "family": "Address family",
     "run": "Test three carriers",
@@ -21,7 +21,7 @@
     "asnMissing": "{{count}} public hops without ASN",
     "changed": "Observed networks changed: {{before}} → {{after}}. Missing replies or ASN data can also cause this; this is not a confirmed downgrade.",
     "details": "Hop evidence",
-    "install": "Install Linux traceroute and allow ICMP raw sockets in this node/container, then retry. No automatic installation or privilege change is performed.",
+    "install": "Use the tool check and install buttons above; verify ICMP permissions in the node or container.",
     "limits": "Labels identify observed transit networks, not guaranteed service tiers or quality. GIA is only a hypothesis; a missing hop is not proof of packet loss. Targets may become unavailable. Results are visible only to administrators.",
     "cities": {
       "beijing": "Beijing",
@@ -50,6 +50,25 @@
       "unavailable": "Tool unavailable",
       "busy": "Node busy",
       "invalid": "Invalid request"
+    },
+    "tools": {
+      "title": "Probe tool",
+      "check": "Check again",
+      "install": "Install NextTrace",
+      "minimum": "Requires bosun 0.70.0 or newer.",
+      "working": "Waiting for the node to check the tool, or download, verify and test NextTrace…",
+      "hint": "Installs a pinned, checksum-verified NextTrace Tiny into the node data directory. System traceroute remains a fallback. No system packages or container privileges are changed.",
+      "permission": "ICMP raw sockets are unavailable. Check NET_RAW/container permissions; installing a tool cannot grant these permissions.",
+      "states": {
+        "ready": "Ready",
+        "missing": "Not installed",
+        "unsupported": "Unsupported platform",
+        "invalid": "Checksum or file permissions invalid",
+        "install_failed": "Installation failed",
+        "incompatible": "Incompatible tool",
+        "permission": "ICMP permission required",
+        "unavailable": "Unavailable"
+      }
     }
   },
   "nodeAddresses": {
@@ -547,7 +566,7 @@
     "restartingTitle": "Restarting",
     "upgradingTo": "Upgrading to {{version}}",
     "restartingHint": "Waiting for the service to come back. The page reloads by itself and you stay signed in.",
-    "restartTimeout": "No answer after 90 seconds. Startup may be slow or the upgrade failed; reload later and check the server logs if it persists.",
+    "restartTimeout": "No response within 30 minutes. Check the service and upgrade status before retrying.",
     "elapsed": "{{seconds}} s elapsed",
     "reload": "Reload page",
     "hostReady": "Host updater connected",
@@ -562,7 +581,10 @@
       "verifying": "Verifying running version and readiness",
       "complete": "Upgrade completed",
       "failed": "Upgrade failed"
-    }
+    },
+    "waitingService": "Waiting for service recovery",
+    "stageCount": "Stage {{current}} of {{total}} (not download percentage)",
+    "preparing": "Submitting the upgrade request and preparing the update…"
   },
   "site": {
     "title": "Landing page",

@@ -1,6 +1,6 @@
 import { Accordion, Alert, Badge, Button, Card, Group, Select, Stack, Switch, Table, Text, Title } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type NodeJob } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -10,9 +10,10 @@ interface Schedule { enabled: boolean; interval_hours: number; city: string; fam
 interface Hop { reply?: string; ttl: number; ip?: string; rtt_ms?: number; asns?: number[] }
 interface Path { carrier: string; target: string; outcome: string; reached: boolean; hops: Hop[]; evidence: { code: string; hops: number[] }[]; classification: string; asn_missing: number }
 interface Report { city: string; family: string; protocol: string; engine: string; rules_version: string; asn_provider: string; paths?: Path[] }
-interface Result { started_at: number; outcome: string; route?: Report }
+interface Tool { engine?: string; version?: string; state: string; installable: boolean; managed: boolean; ipv4: string; ipv6: string }
+interface Result { tool?: Tool; started_at: number; outcome: string; route?: Report }
 type Job = Omit<NodeJob, 'params' | 'result'> & { params: { route?: { city: string; family: string } }; result?: Result }
-interface Data { schedule: Schedule; history: Job[] }
+interface Data { schedule: Schedule; history: Job[]; tool_job?: Job; tool_supported: boolean; tool_online: boolean }
 const defaults: Schedule = { enabled: false, interval_hours: 6, city: 'beijing', family: 'ipv4' }
 const signature = (p: Path) => [...new Set(p.evidence.map(e => e.code))].sort().join(',') || 'unknown'
 
@@ -21,7 +22,7 @@ export function ReturnRoutesCard({ nodeID }: { nodeID: number }) {
   const admin = useAuth().me?.role === 'admin'
   const qc = useQueryClient()
   const key = ['return-routes', nodeID]
-  const q = useQuery({ queryKey: key, queryFn: () => api.get<Data>(`/api/admin/nodes/${nodeID}/return-routes`), enabled: admin, refetchInterval: query => query.state.data?.history.some(j => !j.done_at) ? 2000 : 30_000 })
+  const q = useQuery({ queryKey: key, queryFn: () => api.get<Data>(`/api/admin/nodes/${nodeID}/return-routes`), enabled: admin, refetchInterval: query => (query.state.data?.history.some(j => !j.done_at) || (query.state.data?.tool_job && !query.state.data.tool_job.done_at)) ? 2000 : 30_000 })
   const [draft, setDraft] = useState<Schedule | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const form = draft ?? q.data?.schedule ?? defaults
@@ -36,16 +37,44 @@ export function ReturnRoutesCard({ nodeID }: { nodeID: number }) {
     onSuccess: async ({ id }) => { setSelected(id); await qc.invalidateQueries({ queryKey: key }) },
     onError: toast.err,
   })
+  const toolJob = q.data?.tool_job
+  const tool = toolJob?.result?.tool
+  const toolBusy = !!toolJob && !toolJob.done_at
+  const manageTool = useMutation({
+    mutationFn: (install: boolean) => api.post<{ id: string }>(`/api/admin/nodes/${nodeID}/jobs`, { kind: 'network_diagnostic', params: { type: install ? 'route_tool_install' : 'route_tool_check' } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    onError: toast.err,
+  })
+  const checked = useRef<number | null>(null)
+  useEffect(() => {
+    if (admin && q.data?.tool_supported && q.data.tool_online && !toolJob && !q.data.history.some(j => !j.done_at) && checked.current !== nodeID) {
+      checked.current = nodeID
+      manageTool.mutate(false)
+    }
+  }, [admin, nodeID, q.data, toolJob, manageTool])
   if (!admin) return null
   const history = q.data?.history ?? []
   const job = history.find(j => j.id === selected) ?? history[0]
   const report = job?.result?.route
-  const pending = run.isPending || history.some(j => !j.done_at)
+  const pending = toolBusy || manageTool.isPending || run.isPending || history.some(j => !j.done_at)
   const previous = report && history.slice(history.findIndex(j => j.id === job?.id) + 1).find(j => j.result?.route?.city === report.city && j.result?.route?.family === report.family && j.result?.route?.rules_version === report.rules_version)?.result?.route
   return <Card mb="lg"><Stack gap="sm">
     <Title order={5}>{t('returnRoutes.title')}</Title>
     <Text size="sm" c="dimmed">{t('returnRoutes.hint')}</Text>
     <Text size="xs" c="dimmed">{t('returnRoutes.requirement')}</Text>
+    <Card withBorder padding="sm"><Stack gap="xs">
+      <Group justify="space-between"><Text fw={600}>{t('returnRoutes.tools.title')}</Text><Group gap="xs">
+        <Button size="xs" variant="default" disabled={!q.data?.tool_supported || !q.data.tool_online || pending} onClick={() => manageTool.mutate(false)}>{t('returnRoutes.tools.check')}</Button>
+        {(!tool?.managed || tool?.state === 'invalid' || tool?.state === 'install_failed' || tool?.state === 'incompatible') && <Button size="xs" disabled={!q.data?.tool_supported || !q.data.tool_online || pending || tool?.installable === false} onClick={() => manageTool.mutate(true)}>{t('returnRoutes.tools.install')}</Button>}
+      </Group></Group>
+      {!q.data?.tool_supported && <Text size="xs" c="dimmed">{t('returnRoutes.tools.minimum')}</Text>}
+      {tool && <><Group gap="xs"><Badge color={tool.state === 'ready' ? 'teal' : 'orange'}>{t('returnRoutes.tools.states.' + tool.state)}</Badge><Text size="sm">{tool.engine || '—'} {tool.version}</Text></Group><Text size="xs">IPv4: {t('returnRoutes.tools.states.' + tool.ipv4)} · IPv6: {t('returnRoutes.tools.states.' + tool.ipv6)}</Text></>}
+      {(tool?.ipv4 === 'permission' || tool?.ipv6 === 'permission') && <Alert color="orange">{t('returnRoutes.tools.permission')}</Alert>}
+      {(toolBusy || manageTool.isPending) && <><progress style={{ width: '100%' }} aria-label={t('returnRoutes.tools.working')} /><Text size="sm">{t('returnRoutes.tools.working')}</Text></>}
+      {toolJob?.error && <Alert color="orange">{toolJob.error}</Alert>}
+      {toolJob?.result && !tool && <Alert color="orange">{t('returnRoutes.outcomes.' + toolJob.result.outcome, { defaultValue: toolJob.result.outcome })}</Alert>}
+      <Text size="xs" c="dimmed">{t('returnRoutes.tools.hint')}</Text>
+    </Stack></Card>
     {q.isError && <Alert color="red">{q.error.message}</Alert>}
     <Group grow align="flex-start">
       <Select label={t('returnRoutes.city')} value={form.city} allowDeselect={false} disabled={save.isPending || pending} onChange={v => v && edit({ city: v })} data={['beijing', 'shanghai', 'guangzhou'].map(value => ({ value, label: t(`returnRoutes.cities.${value}`) }))} />
@@ -60,7 +89,7 @@ export function ReturnRoutesCard({ nodeID }: { nodeID: number }) {
     {job && !job.done_at && <Text size="sm">{t('diagnostics.pending')}</Text>}
     {job?.result && <Group><Badge color={job.result.outcome === 'ok' ? 'blue' : 'orange'}>{t('returnRoutes.outcomes.' + job.result.outcome, { defaultValue: job.result.outcome })}</Badge><Text size="xs">{new Date(job.result.started_at * 1000).toLocaleString()}</Text></Group>}
     {job?.result?.outcome === 'unavailable' && <Alert color="orange">{t('returnRoutes.install')}</Alert>}
-    {report && <Text size="xs" c="dimmed">{report.engine} · {report.protocol?.toUpperCase() ?? "—"} · {report.asn_provider} · {t('returnRoutes.rules')}: {report.rules_version}</Text>}
+    {report?.engine && report.rules_version && <Text size="xs" c="dimmed">{report.engine} · {report.protocol?.toUpperCase() ?? "—"} · {report.asn_provider} · {t('returnRoutes.rules')}: {report.rules_version}</Text>}
     {report?.paths?.map(p => {
       const before = previous?.paths?.find(old => old.carrier === p.carrier && old.target === p.target)
       const changed = before && signature(before) !== signature(p)

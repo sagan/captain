@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/zeptop-dev/bosun/pkg/selfupdate"
 	"github.com/zeptop-dev/bosun/pkg/spec"
@@ -18,7 +20,8 @@ func (h *handlers) returnRoutes(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "bad id")
 		return
 	}
-	if _, err := h.Store.NodeByID(r.Context(), id); err != nil {
+	n, err := h.Store.NodeByID(r.Context(), id)
+	if err != nil {
 		fail(w, 404, "node not found")
 		return
 	}
@@ -32,7 +35,22 @@ func (h *handlers) returnRoutes(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	ok(w, map[string]any{"schedule": p, "history": history})
+	var tool *store.NodeJob
+	jobs, err := h.Store.NetworkDiagnosticsWithTools(r.Context(), id)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	for _, j := range jobs {
+		var req spec.DiagnosticRequest
+		if json.Unmarshal(j.Params, &req) == nil && (req.Type == "route_tool_check" || req.Type == "route_tool_install") {
+			copy := j
+			tool = &copy
+			break
+		}
+	}
+	supported := n.Version == spec.RouteToolMinimumVersion || selfupdate.Newer(n.Version, spec.RouteToolMinimumVersion)
+	ok(w, map[string]any{"schedule": p, "history": history, "tool_job": tool, "tool_supported": supported, "tool_online": n.Paired && n.LastSeenAt != nil && time.Since(*n.LastSeenAt) < 3*time.Minute})
 }
 func (h *handlers) setReturnRoutes(w http.ResponseWriter, r *http.Request) {
 	if !userFrom(r).IsAdmin() {

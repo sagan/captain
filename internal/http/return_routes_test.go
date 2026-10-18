@@ -101,3 +101,62 @@ func TestReturnRouteMonitorNodeDelivery(t *testing.T) {
 		t.Fatal("monitor diagnostic not delivered")
 	}
 }
+
+func TestRouteToolManagement(t *testing.T) {
+	r := newRig(t)
+	base := "/api/admin/nodes/" + itoa(r.nodeID)
+	req := map[string]any{"kind": spec.NetworkDiagnosticKind, "params": spec.DiagnosticRequest{Type: "route_tool_install"}}
+	if code, _, _ := r.c.do("POST", base+"/jobs", req, nil); code != 409 {
+		t.Fatal("old node accepted tool install", code)
+	}
+	r.agent.do("POST", "/api/agent/report", agentproto.Report{Version: spec.RouteToolMinimumVersion}, nil)
+	code, b, _ := r.c.do("POST", base+"/jobs", req, nil)
+	if code != 200 {
+		t.Fatal(code, string(b))
+	}
+	id := mustJSON[map[string]string](t, b)["id"]
+	code, b, _ = r.c.do("GET", base+"/return-routes", nil, nil)
+	var pending struct {
+		ToolSupported bool           `json:"tool_supported"`
+		ToolJob       *store.NodeJob `json:"tool_job"`
+		History       []store.NodeJob
+	}
+	pending = mustJSON[struct {
+		ToolSupported bool           `json:"tool_supported"`
+		ToolJob       *store.NodeJob `json:"tool_job"`
+		History       []store.NodeJob
+	}](t, b)
+	if ordinary, err := r.st.NetworkDiagnostics(context.Background(), r.nodeID); err != nil || len(ordinary) != 0 {
+		t.Fatal("tool leaked into ordinary diagnostic history", err)
+	}
+	if code != 200 || !pending.ToolSupported || pending.ToolJob == nil || pending.ToolJob.ID != id || len(pending.History) != 0 {
+		t.Fatal("tool status/history isolation failed", code)
+	}
+	if code, _, _ := r.c.do("POST", base+"/jobs", req, nil); code != 409 {
+		t.Fatal("concurrent install accepted", code)
+	}
+	result := json.RawMessage(`{"type":"route_tool_install","outcome":"ok","tool":{"state":"ready","engine":"nexttrace","managed":true,"version":"v1.7.4","ipv4":"ready","ipv6":"ready"}}`)
+	r.agent.do("POST", "/api/agent/report", agentproto.Report{Version: spec.RouteToolMinimumVersion, Jobs: []agentproto.JobResult{{ID: id, Kind: spec.NetworkDiagnosticKind, Result: result}}}, nil)
+	code, b, _ = r.c.do("GET", base+"/jobs/"+id, nil, nil)
+	if code != 200 || mustJSON[store.NodeJob](t, b).DoneAt == nil {
+		t.Fatal("install result missing")
+	}
+	u, err := admin.NewUser("tools@example.com", "password123", "operator")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = r.st.CreateStaff(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	c := &client{t: t, srv: r.srv}
+	c.do("POST", "/api/admin/login", map[string]string{"Email": u.Email, "Password": "password123"}, nil)
+	for _, method := range []string{"GET", "POST"} {
+		path := base + "/return-routes"
+		if method == "POST" {
+			path = base + "/jobs"
+		}
+		if code, _, _ := c.do(method, path, req, nil); code != 403 {
+			t.Fatal("operator tool access", method, code)
+		}
+	}
+}

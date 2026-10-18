@@ -2,7 +2,7 @@
   "returnRoutes": {
     "title": "三網回程線路",
     "hint": "探測本節點預設路由到三網目標的路徑，與代理／WireGuard 業務路徑獨立。ASN 查詢會透過 DNS 向 Team Cymru 查詢公網跳點 IP。",
-    "requirement": "需要 bosun ≥ 0.69.0、Linux traceroute 及 ICMP 原始通訊端權限。IPv4 與 IPv6 分別探測。",
+    "requirement": "需要 bosun ≥ 0.69.0、相容的探測工具及 ICMP 權限。IPv4 與 IPv6 分別探測。",
     "city": "目標地區",
     "family": "位址族",
     "run": "檢測三網回程",
@@ -21,7 +21,7 @@
     "asnMissing": "{{count}} 個公網跳點缺少 ASN",
     "changed": "觀測網路變化：{{before}} → {{after}}。缺跳或 ASN 資料缺失也可能導致變化，不表示已確認線路降級。",
     "details": "查看逐跳依據",
-    "install": "請在節點或容器中安裝 Linux traceroute，並允許 ICMP 原始通訊端後重試。不會自動安裝軟體或修改權限。",
+    "install": "請使用上方的檢查與安裝按鈕，並確認節點或容器具有 ICMP 權限。",
     "limits": "標籤僅表示觀測到的中間網路，不保證線路等級或品質。GIA 僅為推測；缺跳不等於實際丟包。目標可能失效。結果僅管理員可見。",
     "cities": {
       "beijing": "北京",
@@ -50,6 +50,25 @@
       "unavailable": "工具不可用",
       "busy": "節點忙碌",
       "invalid": "請求無效"
+    },
+    "tools": {
+      "title": "探測工具",
+      "check": "重新檢查",
+      "install": "安裝 NextTrace",
+      "minimum": "需要 bosun 0.70.0 或更新版本。",
+      "working": "等待節點檢查工具，或下載、驗證並自檢 NextTrace…",
+      "hint": "將固定版本、經過驗證的 NextTrace Tiny 安裝到節點資料目錄，系統 traceroute 保留為備用。不修改系統套件或容器權限。",
+      "permission": "ICMP 原始通訊端不可用。請檢查 NET_RAW 或容器權限；安裝工具無法自動授予這些權限。",
+      "states": {
+        "ready": "可用",
+        "missing": "未安裝",
+        "unsupported": "不支援的平台",
+        "invalid": "校驗或檔案權限異常",
+        "install_failed": "安裝失敗",
+        "incompatible": "工具不相容",
+        "permission": "缺少 ICMP 權限",
+        "unavailable": "不可用"
+      }
     }
   },
   "nodeAddresses": {
@@ -547,7 +566,7 @@
     "restartingTitle": "正在重新啟動",
     "upgradingTo": "正在升級到 {{version}}",
     "restartingHint": "等待服務恢復，恢復後頁面會自動重新整理，登入狀態會保留。",
-    "restartTimeout": "等了 90 秒服務仍未恢復。可能是啟動較慢或升級失敗，請稍後重新整理頁面，必要時到伺服器上查看日誌。",
+    "restartTimeout": "30 分鐘內未恢復回應，請檢查服務及升級狀態後再重試。",
     "elapsed": "已等待 {{seconds}} 秒",
     "reload": "重新整理頁面",
     "hostReady": "宿主機升級服務已連線",
@@ -562,7 +581,10 @@
       "verifying": "核對執行版本和就緒狀態",
       "complete": "升級完成",
       "failed": "升級失敗"
-    }
+    },
+    "waitingService": "等待服務恢復",
+    "stageCount": "第 {{current}} / {{total}} 階段（非下載百分比）",
+    "preparing": "正在提交升級請求並準備更新…"
   },
   "site": {
     "title": "展示頁",

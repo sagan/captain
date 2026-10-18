@@ -64,7 +64,24 @@ func (s *Store) expireNetworkDiagnostics(ctx context.Context, nodeID int64) erro
 	return err
 }
 
+// NetworkDiagnostics preserves the ordinary diagnostic history for older UIs.
 func (s *Store) NetworkDiagnostics(ctx context.Context, nodeID int64) ([]NodeJob, error) {
+	jobs, err := s.NetworkDiagnosticsWithTools(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	out := []NodeJob{}
+	for _, j := range jobs {
+		var p spec.DiagnosticRequest
+		if json.Unmarshal(j.Params, &p) == nil && (p.Type == "route_tool_check" || p.Type == "route_tool_install") {
+			continue
+		}
+		out = append(out, j)
+	}
+	return out, nil
+}
+
+func (s *Store) NetworkDiagnosticsWithTools(ctx context.Context, nodeID int64) ([]NodeJob, error) {
 	if err := s.expireNetworkDiagnostics(ctx, nodeID); err != nil {
 		return nil, err
 	}

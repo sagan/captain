@@ -756,3 +756,25 @@ Sources for the initial public target catalog and ASN-query protocol:
 [Team Cymru DNS mapping](https://www.team-cymru.com/ip-asn-mapping).
 The classifier and collector are implemented in bosun; no NextTrace or
 backtrace implementation was copied or embedded.
+
+### Managed return-route tool (Captain 1.22 / bosun 0.70)
+
+The return-route card checks tool availability through the node's existing job
+channel. **Check again** refreshes status; **Install NextTrace** downloads pinned
+NextTrace Tiny v1.7.4 for Linux amd64/arm64, verifies its embedded SHA256 digest,
+and atomically installs it under `data_dir/tools/nexttrace/v1.7.4`. Only full
+administrators may request installation. No shell installer or OS package
+manager is invoked. The managed tool is preferred; Linux traceroute remains the
+fallback. An incompatible system implementation (including BusyBox variants)
+is reported explicitly by the tool check.
+
+Checks distinguish executable compatibility and IPv4/IPv6 raw ICMP socket
+availability. Installing an executable does not grant NET_RAW or change a
+container's privileges. Container data volumes must be writable, persistent and
+owned by the service user; the same managed installation works inside that
+volume. Existing images are not silently rebuilt or modified on the host.
+NextTrace is a separate GPL-3.0 upstream executable downloaded from
+https://github.com/nxtrace/NTrace-core/releases/tag/v1.7.4; its source and license
+are available at that tag. No upstream implementation is linked into bosun.
+Built-in enrichment, reverse DNS and map uploads are disabled. The existing
+Team Cymru/public-hop-only policy and conservative classification remain intact.

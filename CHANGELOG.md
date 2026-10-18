@@ -6,6 +6,9 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
+- **v1.22.0** (2026-10-18) — Add return-route tool checks and one-click NextTrace installation, with node-version and administrator guards, installation results and IPv4/IPv6 ICMP permission status. Keep tool jobs separate from route history; require bosun v0.70.0 for management and retain v0.69.0 route support. Hide empty route metadata.
+  - Replace the upgrade spinner with actual host-update stage segments, current operation and elapsed time. Use indeterminate waiting during startup or unavailable stages, open the dialog while the request runs, and retain target-version verification before reload. Update all six languages.
+
 - **v1.21.0** (2026-10-17) — Add administrator-only three-carrier return-route diagnostics, optional 6/12/24-hour schedules, private 30-day history (up to 120 results per node), hop evidence and comparable-result changes. Require bosun v0.69.0; preserve incomplete and unknown observations and keep premium-route labels explicitly heuristic.
   - Separate observed machine IPv4/IPv6 from public entry addresses. Allow independent automatic following after repeated fresh confirmation, preserve existing fixed entries and NAT/line/WG endpoints, and use the existing protected DNS update journal with retry. New-node forms default to automatic addresses; legacy API clients keep fixed-address behavior. Add migrations 74–75.
   - Show IPv4 before IPv6 in DNS health, clarify the optional internal address, and keep REALITY target selection visible on narrow screens with wrapping result cards. Reverse WireGuard uses the selected transit for its user-entry REALITY scan.

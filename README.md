@@ -19,6 +19,8 @@
 
 ---
 
+Captain v1.21 / bosun v0.69 add private three-carrier return-route diagnostics and independently observed public IPv4/IPv6, with optional address following that preserves fixed public entries. [Node monitoring and addresses](docs/NODES.md).
+
 Captain v1.20 / bosun v0.68 add managed reverse WireGuard: B initiates the tunnel, A authenticates and bills users, and explicit private-network grants use B-side SNAT. User speed limits are shared across ordinary egress and WG links on A. [WireGuard](docs/NODES.md#managed-reverse-wireguard-captain-120--bosun-068).
 
 Captain is one Go binary with the admin console and the user portal embedded.

@@ -208,6 +208,10 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, "internal error")
 		return
 	}
+	if err := h.Store.ObserveNodeAddresses(r.Context(), n.ID, tokenHash, rep.PublicAddresses, time.Now()); err != nil {
+		fail(w, 400, "invalid address observation or node identity")
+		return
+	}
 	metrics.NodeReports.Inc(nil)
 	ctx := r.Context()
 	now := time.Now()

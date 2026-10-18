@@ -64,8 +64,9 @@ function Connections({ node }: { node: Node }) {
           <NumberInput required label="MTU" min={1280} max={1420} value={draft.mtu} onChange={n => update({ mtu: Number(n) })} />
         </SimpleGrid>
         <Text size="xs" c="dimmed">{t('wireguard.endpointHint')}</Text>
-        <TextInput required label={t('reverse.sni')} value={draft.server_name} onChange={e => update({ server_name: e.currentTarget.value })} />
-        {draft.transit_id > 0 && <RealityScan key={draft.transit_id} current={draft.server_name} scan={(hosts, signal) => scanRealityViaNode(draft.transit_id, hosts, signal)} onPick={server_name => update({ server_name })} />}
+        <TextInput required label={t('wireguard.sni')} description={t('wireguard.sniHint')} value={draft.server_name} onChange={e => update({ server_name: e.currentTarget.value })} />
+        <Text size="xs" c="dimmed">{draft.transit_id > 0 ? t('wireguard.scanFrom', { node: nodes.data?.find(n => n.id === draft.transit_id)?.name ?? String(draft.transit_id) }) : t('wireguard.selectTransitToScan')}</Text>
+        <RealityScan key={draft.transit_id} disabled={!draft.transit_id} current={draft.server_name} scan={(hosts, signal) => scanRealityViaNode(draft.transit_id, hosts, signal)} onPick={server_name => update({ server_name })} />
         <Select clearable label={t('inbounds.group')} placeholder={t('inbounds.groupAll')} value={draft.group_id ? String(draft.group_id) : null} data={(groups.data ?? []).map(g => ({ value: String(g.ID), label: g.Name }))} onChange={id => update({ group_id: id ? Number(id) : null })} />
         <PrivateAccessFields explicitOnly json={JSON.stringify({ private_access: draft.private_access })} onChange={json => update({ private_access: JSON.parse(json).private_access })} />
         <Switch label={t('common.enabled')} checked={draft.enabled} onChange={e => update({ enabled: e.currentTarget.checked })} />

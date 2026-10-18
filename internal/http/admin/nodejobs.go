@@ -66,6 +66,9 @@ func (h *handlers) createNodeJob(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		minimum := "v0.56.0"
+		if p.Type == "return_route" {
+			minimum = spec.ReturnRouteMinimumVersion
+		}
 		if p.Type == "exit" {
 			minimum = "v0.57.0"
 		}

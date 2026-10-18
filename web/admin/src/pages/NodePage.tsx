@@ -1,3 +1,4 @@
+import { NodeAddressesCard } from '../components/NodeAddressesCard'
 import { NodeModeCard } from '../components/NodeModeCard'
 import { DNSHealthCard } from '../components/DNSHealthCard'
 import { NodeDomainFields } from '../components/NodeDomainFields'
@@ -91,6 +92,7 @@ export default function NodePage() {
       {n.paired && <NodeProbeCard key={n.id} nodeID={n.id} reportedHost={host} />}
       <Card mb="lg"><MetadataEditor endpoint={`/api/admin/nodes/${n.id}/metadata`} /></Card>
       {d.status?.doctor && <DoctorCard report={d.status.doctor} />}
+      <NodeAddressesCard nodeID={n.id} canWrite={me?.role === 'admin'} />
       <DNSHealthCard nodeID={n.id} />
       {d.status?.certs && d.status.certs.length > 0 && (
         <Card mb="lg">
@@ -176,7 +178,7 @@ export default function NodePage() {
           <TextInput label={t('nodes.name')} required {...nodeForm.getInputProps('Name')} />
           <TextInput label={t('nodes.publicAddr')} {...nodeForm.getInputProps('PublicAddr')} />
           <NodeDomainFields domain={nodeForm.values.Domain} shared={nodeForm.values.DomainShared} onDomainChange={v => nodeForm.setFieldValue('Domain', v)} onSharedChange={v => nodeForm.setFieldValue('DomainShared', v)} check={domainCheck} />
-          <Group grow><TextInput label={t('nodes.internalAddr')} {...nodeForm.getInputProps('InternalAddr')} /><TextInput label={t('nodes.v6Addr')} {...nodeForm.getInputProps('V6Addr')} /></Group>
+          <Group grow><TextInput label={t('nodes.internalAddr')} description={t('nodeAddresses.internalHint')} {...nodeForm.getInputProps('InternalAddr')} /><TextInput label={t('nodes.v6Addr')} {...nodeForm.getInputProps('V6Addr')} /></Group>
           <TextInput label={t('nodes.monitorUrl')} description={t('nodes.monitorUrlHint')} placeholder="https://monitor.example.com/..." {...nodeForm.getInputProps('MonitorURL')} />
           {proxyAllowed && <><NumberInput label={t('nodes.speedLimit')} description={t('nodes.speedLimitHint')} min={0} {...nodeForm.getInputProps('UserSpeedLimitMbps')} />
           <Switch label={t('nodes.mitaQuotas')} description={t('nodes.mitaQuotasHint')} {...nodeForm.getInputProps('MitaQuotas', { type: 'checkbox' })} />

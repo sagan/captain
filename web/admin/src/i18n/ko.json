@@ -1,4 +1,75 @@
 {
+  "returnRoutes": {
+    "title": "3개 통신사 복귀 경로",
+    "hint": "노드 기본 경로에서 통신사 대상을 측정합니다. 프록시／WireGuard 경로와는 별개입니다. 공인 홉 IP를 DNS로 Team Cymru에 조회합니다.",
+    "requirement": "bosun ≥ 0.69.0, Linux traceroute 및 ICMP raw socket 권한이 필요합니다. IPv4와 IPv6를 별도로 측정합니다.",
+    "city": "대상 지역",
+    "family": "주소 유형",
+    "run": "3개 통신사 측정",
+    "direction": "방향: 이 노드 → 선택한 대상",
+    "schedule": "예약 측정",
+    "interval": "측정 간격",
+    "hours": "{{count}}시간마다",
+    "scheduleHint": "선택한 지역과 주소 유형을 저장합니다. 첫 측정은 설정한 간격 후 실행합니다.",
+    "history": "기록 (30일／최대 120회)",
+    "empty": "측정 기록 없음",
+    "rules": "규칙 버전",
+    "target": "대상",
+    "hop": "홉",
+    "reached": "대상 응답",
+    "notReached": "대상 미도달",
+    "asnMissing": "ASN 없는 공인 홉 {{count}}개",
+    "changed": "관측 네트워크 변경: {{before}} → {{after}}. 응답이나 ASN 누락으로도 달라질 수 있으며 품질 저하를 확정하지 않습니다.",
+    "details": "홉별 근거",
+    "install": "노드／컨테이너에 Linux traceroute를 설치하고 ICMP raw socket을 허용하세요. 자동 설치나 권한 변경은 하지 않습니다.",
+    "limits": "라벨은 관측된 중간 네트워크이며 품질을 보장하지 않습니다. GIA는 추정입니다. 홉 누락은 실제 패킷 손실의 증거가 아닙니다. 대상이 중단될 수 있습니다. 관리자만 볼 수 있습니다.",
+    "cities": {
+      "beijing": "베이징",
+      "shanghai": "상하이",
+      "guangzhou": "광저우"
+    },
+    "carriers": {
+      "telecom": "중국 전신",
+      "unicom": "중국 연통",
+      "mobile": "중국 이동"
+    },
+    "classes": {
+      "unknown": "근거 부족",
+      "observed": "네트워크 관측",
+      "cn2": "CN2 관측",
+      "mixed": "혼합 네트워크",
+      "possible_gia": "CN2 GIA 추정"
+    },
+    "outcomes": {
+      "ok": "완료",
+      "incomplete": "불완전한 경로",
+      "failed": "측정 실패",
+      "timeout": "시간 초과",
+      "canceled": "취소됨",
+      "truncated": "출력 잘림",
+      "unavailable": "도구 없음",
+      "busy": "노드 사용 중",
+      "invalid": "잘못된 요청"
+    }
+  },
+  "nodeAddresses": {
+    "autoIPv4": "IPv4 자동 감지",
+    "autoIPv6": "IPv6 자동 감지",
+    "createHint": "공인 IP는 입력하지 않아도 됩니다. 페어링 후 bosun이 반복 확인한 주소를 입력하고 변경을 반영합니다. IPv6가 없으면 비워 둡니다. 주소 감지 지원 버전이 필요합니다.",
+    "fixedHint": "고정 공인 진입 주소는 감지 결과로 변경되지 않습니다. NAT / 전용선은 제공업체 진입 주소와 포트 매핑을 별도로 설정하세요.",
+    "internalHint": "선택 사항. 사설망 중계 출처를 식별하여 기기 수 중복 계산을 방지합니다. 연결을 만들거나 bosun 페어링에 영향을 주지 않습니다.",
+    "title": "서버 공인 주소 및 진입점",
+    "hint": "bosun은 5분마다 공인 IPv4 / IPv6를 탐지합니다. 이는 아웃바운드 공인 주소이며 NAT 사용자 진입점과 다를 수 있습니다.",
+    "waiting": "업데이트된 bosun의 새 주소 보고를 기다립니다. 이전 값은 참고용입니다.",
+    "detected": "탐지 성공",
+    "unknown": "미확인",
+    "machine": "탐지된 서버 주소",
+    "lastSuccess": "마지막 탐지 성공",
+    "entry": "현재 공인 진입점 주소",
+    "follow": "탐지된 주소 자동 추적",
+    "behavior": "기존 진입점은 기본적으로 고정됩니다. 연속 두 번 확인 후 해당 주소와 적용 가능한 자동 DNS를 갱신합니다. 탐지 실패 시 이전 값을 유지합니다. 주소를 수동 변경하면 해당 주소 체계의 추적이 해제됩니다. 명시적 NAT/전용선 진입점, 구독 주소 및 WG 엔드포인트는 유지됩니다.",
+    "dnsPending": "주소가 갱신되었습니다. DNS 동기화 대기 또는 재시도 중입니다. DNS 상태와 변경 기록을 확인하세요."
+  },
   "app": {
     "logout": "로그아웃"
   },
@@ -2236,6 +2307,10 @@
     "installOnly": "모니터링 에이전트만 설치 (프록시 코어 없음)"
   },
   "wireguard": {
+    "sni": "사용자 인바운드 REALITY SNI",
+    "sniHint": "A의 VLESS REALITY 인바운드에 사용됩니다. WireGuard 터널 자체는 SNI를 사용하지 않습니다.",
+    "scanFrom": "중계 노드 A({{node}})에서 검사하고 대상을 선택합니다.",
+    "selectTransitToScan": "먼저 중계 노드 A를 선택한 후 자동 선택 또는 현재 SNI 검사를 실행하세요.",
     "title": "역방향 WireGuard",
     "hint": "B가 A에 연결합니다. A는 사용자 인증과 과금을 담당하고 B는 인터넷 출구 및 명시적으로 허용된 내부망 접근을 제공합니다.",
     "requirements": "두 노드 모두 Linux WireGuard 지원과 최근 기능 보고가 필요합니다. 사용자 입구는 VLESS REALITY를 사용합니다. 이 버전에서는 입구 매핑 선택이 필수인 노드를 A로 사용할 수 없습니다.",

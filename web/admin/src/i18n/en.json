@@ -1,4 +1,75 @@
 {
+  "returnRoutes": {
+    "title": "Return routes",
+    "hint": "Measure this node’s default route to three carrier targets. Independent of proxy/WireGuard business paths. ASN lookups disclose public hop IPs to Team Cymru through DNS.",
+    "requirement": "Requires bosun ≥ 0.69.0 and Linux traceroute with ICMP/raw-socket permission. IPv4 and IPv6 are independent.",
+    "city": "Target region",
+    "family": "Address family",
+    "run": "Test three carriers",
+    "direction": "Direction: this node → selected targets",
+    "schedule": "Scheduled checks",
+    "interval": "Interval",
+    "hours": "Every {{count}} hours",
+    "scheduleHint": "Save schedules for the selected region and family. First check runs after one interval.",
+    "history": "History (30 days / 120 checks)",
+    "empty": "No checks yet",
+    "rules": "Rules",
+    "target": "Target",
+    "hop": "Hop",
+    "reached": "Target responded",
+    "notReached": "Target not reached",
+    "asnMissing": "{{count}} public hops without ASN",
+    "changed": "Observed networks changed: {{before}} → {{after}}. Missing replies or ASN data can also cause this; this is not a confirmed downgrade.",
+    "details": "Hop evidence",
+    "install": "Install Linux traceroute and allow ICMP raw sockets in this node/container, then retry. No automatic installation or privilege change is performed.",
+    "limits": "Labels identify observed transit networks, not guaranteed service tiers or quality. GIA is only a hypothesis; a missing hop is not proof of packet loss. Targets may become unavailable. Results are visible only to administrators.",
+    "cities": {
+      "beijing": "Beijing",
+      "shanghai": "Shanghai",
+      "guangzhou": "Guangzhou"
+    },
+    "carriers": {
+      "telecom": "China Telecom",
+      "unicom": "China Unicom",
+      "mobile": "China Mobile"
+    },
+    "classes": {
+      "unknown": "Insufficient evidence",
+      "observed": "Networks observed",
+      "cn2": "CN2 observed",
+      "mixed": "Mixed networks",
+      "possible_gia": "Possible CN2 GIA"
+    },
+    "outcomes": {
+      "ok": "Completed",
+      "incomplete": "Incomplete path",
+      "failed": "Probe failed",
+      "timeout": "Timed out",
+      "canceled": "Canceled",
+      "truncated": "Output truncated",
+      "unavailable": "Tool unavailable",
+      "busy": "Node busy",
+      "invalid": "Invalid request"
+    }
+  },
+  "nodeAddresses": {
+    "autoIPv4": "Detect IPv4 automatically",
+    "autoIPv6": "Detect IPv6 automatically",
+    "createHint": "Public IPs are optional by default. After pairing, bosun fills and follows addresses after repeated confirmation; IPv6 stays empty when unavailable. Requires bosun with address detection.",
+    "fixedHint": "Fixed public entries do not follow detected changes. For NAT / private lines, enter the provider entry and configure port mappings separately.",
+    "internalHint": "Optional. Identifies private-network relays to avoid counting each relay as a device. Does not establish connectivity or affect bosun pairing.",
+    "title": "Machine public addresses and entry",
+    "hint": "Bosun probes public IPv4 / IPv6 every 5 minutes. These are outbound public addresses; a NAT exit may differ from the subscriber entry.",
+    "waiting": "Waiting for a fresh address report from an updated bosun. Old values are for reference only.",
+    "detected": "Detected",
+    "unknown": "Unconfirmed",
+    "machine": "Observed machine address",
+    "lastSuccess": "Last successful probe",
+    "entry": "Current public entry address",
+    "follow": "Automatically follow observed address",
+    "behavior": "Existing entries stay fixed by default. Following requires two consecutive confirmed probes before updating this address and eligible automatic DNS. Failed probes retain old values. Manually editing a node address disables following for that family. Explicit NAT/line entries, subscription addresses and WG endpoints stay unchanged.",
+    "dnsPending": "Address updated; DNS sync is pending or retrying. See DNS health and change history."
+  },
   "app": {
     "logout": "Log out"
   },
@@ -2236,6 +2307,10 @@
     "installOnly": "Install monitoring only (no proxy cores)"
   },
   "wireguard": {
+    "sni": "Subscriber REALITY SNI",
+    "sniHint": "Used by the VLESS REALITY listener on A. The WireGuard tunnel itself does not use SNI.",
+    "scanFrom": "Scan and select a target from transit A ({{node}}).",
+    "selectTransitToScan": "Select transit node A first to auto-select a target or probe the current SNI.",
     "title": "Reverse WireGuard",
     "hint": "B actively connects to A. A authenticates and bills users; B provides public egress and explicitly authorized LAN access.",
     "requirements": "Both nodes need Linux WireGuard support and a fresh capability report. The subscriber entry uses VLESS REALITY. Nodes requiring an ingress mapping cannot be used as A in this version.",

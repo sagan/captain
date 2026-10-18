@@ -42,6 +42,12 @@ func scanNode(row interface{ Scan(...any) error }) (*domain.Node, error) {
 
 // CreateNode inserts a node with a fresh pairing code valid for ttl.
 func (s *Store) CreateNode(ctx context.Context, n *domain.Node, pairCode string, ttl time.Duration) error {
+	return s.CreateNodeWithAddressPolicy(ctx, n, pairCode, ttl, false, false)
+}
+
+// CreateNodeWithAddressPolicy atomically saves a new node and its explicit
+// address policy. Legacy callers retain fixed addresses.
+func (s *Store) CreateNodeWithAddressPolicy(ctx context.Context, n *domain.Node, pairCode string, ttl time.Duration, auto4, auto6 bool) error {
 	n.Mode = n.Mode.Effective()
 	if n.Mode == spec.NodeMonitor {
 		n.ModeRevision = 1
@@ -58,9 +64,9 @@ func (s *Store) CreateNode(ctx context.Context, n *domain.Node, pairCode string,
 		return err
 	}
 	ts := now()
-	res, err := tx.ExecContext(ctx, `INSERT INTO nodes (name, pair_code, pair_code_expires_at, public_addr, internal_addr, v6_addr, domain, monitor_url, dstatus_sid, created_at, updated_at, domain_shared, node_mode, mode_managed, mode_revision)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		n.Name, pairCode, time.Now().Add(ttl).Unix(), n.PublicAddr, n.InternalAddr, n.V6Addr, n.Domain, n.MonitorURL, n.DStatusSID, ts, ts, boolInt(n.DomainShared), n.Mode, boolInt(n.Mode == spec.NodeMonitor), n.ModeRevision)
+	res, err := tx.ExecContext(ctx, `INSERT INTO nodes (name, pair_code, pair_code_expires_at, public_addr, internal_addr, v6_addr, domain, monitor_url, dstatus_sid, created_at, updated_at, domain_shared, node_mode, mode_managed, mode_revision, address_auto_v4, address_auto_v6)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.Name, pairCode, time.Now().Add(ttl).Unix(), n.PublicAddr, n.InternalAddr, n.V6Addr, n.Domain, n.MonitorURL, n.DStatusSID, ts, ts, boolInt(n.DomainShared), n.Mode, boolInt(n.Mode == spec.NodeMonitor), n.ModeRevision, boolInt(auto4), boolInt(auto6))
 	if err != nil {
 		return err
 	}
@@ -86,7 +92,7 @@ func (s *Store) NodeByTokenHash(ctx context.Context, hash string) (*domain.Node,
 // the code, records agent details. Returns the node or ErrNotFound.
 func (s *Store) RedeemPairCode(ctx context.Context, code, tokenHash, hostname, version, platform string) (*domain.Node, error) {
 	res, err := s.db.ExecContext(ctx, `UPDATE nodes SET token_hash = ?, pair_code = NULL, pair_code_expires_at = NULL,
-		wireguard_json = 'null', wireguard_reported_at = NULL, hostname = ?, version = ?, platform = ?, last_seen_at = ?, updated_at = ?
+		address_json = '{}', address_dns_pending = 0, wireguard_json = 'null', wireguard_reported_at = NULL, hostname = ?, version = ?, platform = ?, last_seen_at = ?, updated_at = ?
 		WHERE pair_code = ? AND pair_code_expires_at > ? AND token_hash IS NULL`,
 		tokenHash, hostname, version, platform, now(), now(), code, now())
 	if err != nil {
@@ -100,9 +106,10 @@ func (s *Store) RedeemPairCode(ctx context.Context, code, tokenHash, hostname, v
 
 // FillPublicAddr records the address a node paired from when the operator
 // left public_addr blank, so a fresh node is reachable in subscriptions
-// without a second edit. An address already set is never touched.
+// without a second edit. Automatic nodes wait for confirmed observations;
+// an address already set is never touched.
 func (s *Store) FillPublicAddr(ctx context.Context, id int64, addr string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET public_addr = ?, updated_at = ? WHERE id = ? AND (public_addr IS NULL OR public_addr = '')`, addr, now(), id)
+	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET public_addr = ?, updated_at = ? WHERE id = ? AND address_auto_v4 = 0 AND (public_addr IS NULL OR public_addr = '')`, addr, now(), id)
 	return err
 }
 
@@ -219,6 +226,18 @@ func (s *Store) UpdateNode(ctx context.Context, n *domain.Node) error {
 	if err := validateNodeDomain(ctx, tx, n, old); err != nil {
 		return err
 	}
+	// An explicit edit to a published address opts that family back into fixed
+	// mode. Old clients that leave the value unchanged preserve following.
+	if n.PublicAddr != old.PublicAddr {
+		if _, err = tx.ExecContext(ctx, `UPDATE nodes SET address_auto_v4=0 WHERE id=?`, n.ID); err != nil {
+			return err
+		}
+	}
+	if n.V6Addr != old.V6Addr {
+		if _, err = tx.ExecContext(ctx, `UPDATE nodes SET address_auto_v6=0 WHERE id=?`, n.ID); err != nil {
+			return err
+		}
+	}
 	_, err = tx.ExecContext(ctx, `UPDATE nodes SET name = ?, public_addr = ?, internal_addr = ?, v6_addr = ?, domain = ?, monitor_url = ?, decoy_enabled = ?, decoy_upstream = ?, user_speed_limit_mbps = ?, mita_quotas = ?, egress_by_ingress = ?, dstatus_sid = ?, domain_shared = ?, updated_at = ? WHERE id = ?`,
 		n.Name, n.PublicAddr, n.InternalAddr, n.V6Addr, n.Domain, n.MonitorURL, boolInt(n.DecoyEnabled), n.DecoyUpstream, n.UserSpeedLimitMbps, boolInt(n.MitaQuotas), boolInt(n.EgressByIngress), n.DStatusSID, boolInt(n.DomainShared), now(), n.ID)
 	if err != nil {
@@ -228,8 +247,9 @@ func (s *Store) UpdateNode(ctx context.Context, n *domain.Node) error {
 }
 
 // ResetPairCode issues a fresh pairing code and revokes the current token.
+// ResetPairCode must be called under Topology when serving requests.
 func (s *Store) ResetPairCode(ctx context.Context, id int64, code string, ttl time.Duration) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET pair_code = ?, pair_code_expires_at = ?, token_hash = NULL, wireguard_json = 'null', wireguard_reported_at = NULL, reported_mode = '', mode_reported_at = 0, reported_mode_revision = 0, mode_error = '', updated_at = ? WHERE id = ?`,
+	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET pair_code = ?, pair_code_expires_at = ?, token_hash = NULL, address_json = '{}', address_dns_pending = 0, wireguard_json = 'null', wireguard_reported_at = NULL, reported_mode = '', mode_reported_at = 0, reported_mode_revision = 0, mode_error = '', updated_at = ? WHERE id = ?`,
 		code, time.Now().Add(ttl).Unix(), now(), id)
 	return err
 }

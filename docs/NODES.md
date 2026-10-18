@@ -649,3 +649,110 @@ Remove links before switching an endpoint to monitor mode or detaching it.
 Each node supports at most 64 links. Tunnel host addresses are allocated from
 `10.10.0.0/16` and `fd42:626f:7375::/112`; existing address, route and interface
 ownership conflicts are rejected rather than overwritten.
+
+## Observed public addresses and automatic following (Captain 1.21 / bosun 0.69)
+
+The **Machine public addresses and entry** card keeps the bosun-observed public
+IPv4/IPv6 separate from the node's published entry addresses. Updated full and
+monitor-only Captain agents probe every five minutes using two independent HTTPS
+responders per family, with direct, family-specific sockets and no environment
+HTTP proxy. These are outbound public addresses, not proof of inbound reachability
+or the node's private interface addresses. OS-level VPN routing can still affect
+what the responders observe.
+
+Existing node addresses remain fixed by default. Administrators can enable
+following separately for IPv4 and IPv6 after a fresh agent report. A changed
+address must agree across responders and be confirmed on two distinct sampling
+cycles before Captain updates the enabled family. Cached reports do not count
+again. Failed, disagreeing, stale or missing observations retain the last known
+address and never delete A/AAAA records. The card shows the last successful
+observation time; older agents cannot enable following until upgraded. A large
+agent clock error also prevents accepting observations.
+
+A manual edit to a node address disables following for that family. Unchanged
+fields and older clients omitting the follow settings preserve the existing
+choice. Explicit NAT/line ingress addresses, subscription Entry addresses and
+managed WireGuard literal endpoints are not inferred from outbound probes and
+are not rewritten. For dynamic direct nodes, use the node domain in subscription
+entries and enable automatic DNS for that domain. For fixed NAT public entries,
+leave following off: machine observations still update independently.
+
+Captain reconciles confirmed changes every minute and invalidates cached node
+state. DNS synchronization uses the existing Cloudflare auto-DNS configuration,
+shared-domain/CDN/multiple-record guards and durable change history. It runs
+outside agent report/billing acknowledgements and retries failures at most every
+five minutes. DNS changes and node address changes are not an atomic external
+transaction; a pending indication and DNS health/history expose failures.
+Re-pairing clears observations and requires new confirmations. Source-restricted
+networks or unavailable public responders leave observations unknown rather than
+guessing an inbound address from the Captain connection.
+
+The new-node form enables automatic IPv4 and IPv6 detection independently by
+default. Leave both enabled for a direct node; disable a family to enter its
+fixed public entry. Pairing does not fill the IPv4 entry from the request source
+when automatic IPv4 is enabled: it waits for confirmed bosun observations.
+Unavailable IPv6 remains blank. Older agents require upgrading to support this
+workflow. Existing nodes and API clients omitting the additive creation fields
+`AutoIPv4` / `AutoIPv6` retain the previous fixed-address behavior.
+
+The optional internal address identifies relay sources in online-device views
+and device-limit accounting. Traffic arriving through known relays is grouped
+instead of counting each relay as a separate device. This field does not create
+private-network connectivity, configure a tunnel, or select the connection used
+by bosun to reach Captain. Leave it blank unless private-network relay
+identification is needed.
+
+## Three-carrier return routes (Captain 1.21 / bosun 0.69)
+
+The administrator-only node monitoring section now offers **Return routes**.
+Choose Beijing, Shanghai or Guangzhou and IPv4 or IPv6, then run a three-carrier
+check. Each measurement follows the node's OS default route toward the selected
+public targets. It does not measure the customer's forward path, or force
+traffic through a proxy inbound, WireGuard tunnel or configured application
+outbound. OS policy routing/VPNs can affect the path.
+
+Requires bosun v0.69.0 or newer, Linux traceroute supporting ICMP mode, and
+permission to use raw ICMP sockets. Missing software, permissions or IPv6
+connectivity produce unavailable/failed/incomplete results. The check does not
+install software, alter firewall rules or grant container privileges. The
+existing network-diagnostic task channel works for both full and monitor nodes;
+no additional inbound port or SSH access is required.
+
+Checks show the destination, responding hops, RTT, origin ASNs, reached status,
+missing ASN count and classification evidence. Public-hop ASN enrichment uses
+Team Cymru's DNS service through the node resolver; private hops are not sent.
+ASN lookup failure preserves the path but leaves its network identity unknown.
+IP origin ASNs describe announced prefixes, not contractual transit products or
+geographic locations. The public target catalog is a dated snapshot, not a
+guarantee that every target is continuously reachable or serves all customers in
+its labelled region. No automatic target substitution occurs.
+
+CN2/163/9929/4837/CUG/CMIN2/CMI/CMNET/CTGNET evidence is kept separately.
+Destination addresses do not count as transit evidence. Repeated routers cannot
+inflate CN2 hop counts. Only a complete responding path with at least two
+distinct CN2 routers, no missing public ASNs, no ambiguous origin ASN and no
+other recognised network may show **Possible CN2 GIA**. Even then this is a
+hypothesis; the tool does not certify GIA, GT or a purchased service tier.
+Missing intermediate responses do not prove user-traffic packet loss. Use the
+adjacent network-quality monitoring for ongoing measurements.
+
+Schedules default off, with 6/12/24-hour intervals for one chosen region and
+family per node. Saving starts a fresh interval; use the manual button for an
+immediate test. Offline/unpaired/unsupported nodes are not sent checks. A busy
+network diagnostic delays a scheduled run by five minutes. Each node admits
+one diagnostic; a return-route task uses at most three bounded traceroute
+processes and four ASN queries concurrently, with a 90-second total timeout.
+Tasks expire after 120 seconds. Disabling a schedule does not cancel an already
+dispatched check.
+
+History is limited to 30 days and 120 checks per node, separate from ordinary
+diagnostics. A result compares observed network labels against the preceding
+matching region/family/rules version and the same target. A change is evidence
+to investigate, not an automatic degradation alert: missing hops or enrichment
+can also change the labels. No route details are added to the public status page.
+
+Sources for the initial public target catalog and ASN-query protocol:
+[backtrace catalog](https://github.com/oneclickvirt/backtrace/blob/main/model/model.go),
+[Team Cymru DNS mapping](https://www.team-cymru.com/ip-asn-mapping).
+The classifier and collector are implemented in bosun; no NextTrace or
+backtrace implementation was copied or embedded.

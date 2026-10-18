@@ -1,0 +1,8 @@
+-- +goose Up
+ALTER TABLE nodes ADD COLUMN address_auto_v4 INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE nodes ADD COLUMN address_auto_v6 INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE nodes ADD COLUMN address_json TEXT NOT NULL DEFAULT '{}';
+ALTER TABLE nodes ADD COLUMN address_dns_pending INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE nodes ADD COLUMN address_dns_attempt INTEGER NOT NULL DEFAULT 0;
+-- +goose Down
+SELECT 1;

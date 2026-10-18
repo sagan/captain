@@ -51,7 +51,7 @@ export default function NodesPage() {
   const filtered = (q.data ?? []).filter(n => status === 'all' || (status === 'offline' && n.paired && !n.online) || (status === 'unpaired' && !n.paired) || (status === 'doctor' && n.paired && n.doctor_fail) || (status === 'monitor' && n.mode === 'monitor'))
   const [opened, { open, close }] = useDisclosure()
   const [created, setCreated] = useState<Node | null>(null)
-  const form = useForm({ initialValues: { Name: '', PublicAddr: '', InternalAddr: '', V6Addr: '', Domain: '', DomainShared: false, MonitorURL: '', Mode: 'full' } })
+  const form = useForm({ initialValues: { Name: '', AutoIPv4: true, AutoIPv6: true, PublicAddr: '', InternalAddr: '', V6Addr: '', Domain: '', DomainShared: false, MonitorURL: '', Mode: 'full' } })
   const domainCheck = useNodeDomainCheck(form.values.Domain, form.values.DomainShared, undefined, opened && !created)
   const sys = useQuery({ queryKey: ['update'], queryFn: () => api.get<SystemUpdate>('/api/admin/system/update'), enabled: isAdmin, staleTime: 10 * 60_000, retry: false })
   const rollback = useMutation({ mutationFn: (id: number) => api.post(`/api/admin/nodes/${id}/jobs`, { kind: 'rollback', params: {} }), onSuccess: () => { toast.ok(t('nodes.rollbackQueued')); qc.invalidateQueries({ queryKey: ['nodes'] }) }, onError: toast.err })
@@ -59,7 +59,7 @@ export default function NodesPage() {
   const upgradeAll = useMutation({ mutationFn: () => api.post<{ nodes: number; upgrade_to: string }>('/api/admin/nodes/upgrade-all', {}), onSuccess: (r) => { toast.ok(t('nodes.upgradeAllQueued', { count: r.nodes, version: r.upgrade_to })); qc.invalidateQueries({ queryKey: ['nodes'] }) }, onError: toast.err })
   const outdated = (q.data ?? []).filter((n) => n.outdated && n.paired).length
   const create = useMutation({
-    mutationFn: (v: typeof form.values) => api.post<Node & { dns?: DNSResult[] }>('/api/admin/nodes', v),
+    mutationFn: (v: typeof form.values) => api.post<Node & { dns?: DNSResult[] }>('/api/admin/nodes', { ...v, PublicAddr: v.AutoIPv4 ? '' : v.PublicAddr, V6Addr: v.AutoIPv6 ? '' : v.V6Addr }),
     onSuccess: (n) => { setCreated(n); form.reset(); qc.invalidateQueries({ queryKey: ['nodes'] }); qc.invalidateQueries({ queryKey: ['dns-health'] }); qc.invalidateQueries({ queryKey: ['dns-history'] }); dnsToast(n.dns) },
     onError: (e) => { toast.err(e); qc.invalidateQueries({ queryKey: ['node-domain-check'] }) },
   })
@@ -107,12 +107,13 @@ export default function NodesPage() {
             <Stack>
               <Switch label={t('nodeMode.installOnly')} description={t('nodeMode.installHint')} checked={form.values.Mode === 'monitor'} onChange={e => form.setFieldValue('Mode', e.currentTarget.checked ? 'monitor' : 'full')} />
               <TextInput label={t('nodes.name')} placeholder="jp-1" required {...form.getInputProps('Name')} />
-              <TextInput label={t('nodes.publicAddr')} placeholder="203.0.113.5" {...form.getInputProps('PublicAddr')} />
+              <Text size="sm" c="dimmed">{t('nodeAddresses.createHint')}</Text>
+              <Switch label={t('nodeAddresses.autoIPv4')} {...form.getInputProps('AutoIPv4', { type: 'checkbox' })} />
+              {!form.values.AutoIPv4 && <TextInput label={t('nodes.publicAddr')} description={t('nodeAddresses.fixedHint')} placeholder="198.51.100.20" {...form.getInputProps('PublicAddr')} />}
+              <Switch label={t('nodeAddresses.autoIPv6')} {...form.getInputProps('AutoIPv6', { type: 'checkbox' })} />
+              {!form.values.AutoIPv6 && <TextInput label={t('nodes.v6Addr')} description={t('nodeAddresses.fixedHint')} {...form.getInputProps('V6Addr')} />}
               <NodeDomainFields domain={form.values.Domain} shared={form.values.DomainShared} onDomainChange={v => form.setFieldValue('Domain', v)} onSharedChange={v => form.setFieldValue('DomainShared', v)} check={domainCheck} />
-              <Group grow>
-                <TextInput label={t('nodes.internalAddr')} {...form.getInputProps('InternalAddr')} />
-                <TextInput label={t('nodes.v6Addr')} {...form.getInputProps('V6Addr')} />
-              </Group>
+              <TextInput label={t('nodes.internalAddr')} description={t('nodeAddresses.internalHint')} {...form.getInputProps('InternalAddr')} />
               <Group justify="flex-end"><Button variant="default" onClick={close}>{t('common.cancel')}</Button><Button type="submit" disabled={domainCheck.blocked} loading={create.isPending}>{t('common.create')}</Button></Group>
             </Stack>
           </form>

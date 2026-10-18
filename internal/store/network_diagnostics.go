@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"time"
@@ -22,7 +23,14 @@ func (s *Store) QueueNetworkDiagnostic(ctx context.Context, id string, nodeID in
 		return err
 	}
 	defer tx.Rollback()
-	now := time.Now().Unix()
+	if err := queueNetworkDiagnostic(ctx, tx, id, nodeID, req, time.Now().Unix()); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func queueNetworkDiagnostic(ctx context.Context, tx *sql.Tx, id string, nodeID int64, req spec.DiagnosticRequest, now int64) error {
+	var err error
 	if _, err = tx.ExecContext(ctx, `UPDATE node_jobs SET done_at = ?, error = 'diagnostic request expired' WHERE node_id = ? AND kind = ? AND done_at IS NULL AND created_at <= ?`, now, nodeID, spec.NetworkDiagnosticKind, now-spec.DiagnosticTTLSeconds); err != nil {
 		return err
 	}
@@ -37,15 +45,17 @@ func (s *Store) QueueNetworkDiagnostic(ctx context.Context, id string, nodeID in
 	if err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO node_jobs (id,node_id,kind,params_json,created_at) VALUES (?,?,?,?,?)`, id, nodeID, spec.NetworkDiagnosticKind, string(raw), now); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO node_jobs (id,node_id,kind,params_json,created_at,route_check) VALUES (?,?,?,?,?,?)`, id, nodeID, spec.NetworkDiagnosticKind, string(raw), now, boolInt(req.Type == "return_route")); err != nil {
 		return err
 	}
-	// Keep at most 20 checks per node, including the current one. Destructive
-	// lifecycle jobs have separate retention and must never be removed here.
-	if _, err = tx.ExecContext(ctx, `DELETE FROM node_jobs WHERE node_id = ? AND kind = ? AND id NOT IN (SELECT id FROM node_jobs WHERE node_id = ? AND kind = ? ORDER BY created_at DESC,rowid DESC LIMIT 20)`, nodeID, spec.NetworkDiagnosticKind, nodeID, spec.NetworkDiagnosticKind); err != nil {
+	limit, route := 20, boolInt(req.Type == "return_route")
+	if route == 1 {
+		limit = 120
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM node_jobs WHERE node_id = ? AND kind = ? AND route_check = ? AND done_at IS NOT NULL AND (created_at < ? OR id NOT IN (SELECT id FROM node_jobs WHERE node_id = ? AND kind = ? AND route_check = ? ORDER BY created_at DESC,rowid DESC LIMIT ?))`, nodeID, spec.NetworkDiagnosticKind, route, now-30*86400, nodeID, spec.NetworkDiagnosticKind, route, limit); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return nil
 }
 
 func (s *Store) expireNetworkDiagnostics(ctx context.Context, nodeID int64) error {
@@ -58,7 +68,7 @@ func (s *Store) NetworkDiagnostics(ctx context.Context, nodeID int64) ([]NodeJob
 	if err := s.expireNetworkDiagnostics(ctx, nodeID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,node_id,kind,params_json,result_json,error,created_at,done_at FROM node_jobs WHERE node_id = ? AND kind = ? AND created_at >= ? ORDER BY created_at DESC,rowid DESC LIMIT 20`, nodeID, spec.NetworkDiagnosticKind, time.Now().Add(-24*time.Hour).Unix())
+	rows, err := s.db.QueryContext(ctx, `SELECT id,node_id,kind,params_json,result_json,error,created_at,done_at FROM node_jobs WHERE node_id = ? AND kind = ? AND route_check = 0 AND created_at >= ? ORDER BY created_at DESC,rowid DESC LIMIT 20`, nodeID, spec.NetworkDiagnosticKind, time.Now().Add(-24*time.Hour).Unix())
 	if err != nil {
 		return nil, err
 	}

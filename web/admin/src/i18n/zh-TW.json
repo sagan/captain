@@ -1,4 +1,75 @@
 {
+  "returnRoutes": {
+    "title": "三網回程線路",
+    "hint": "探測本節點預設路由到三網目標的路徑，與代理／WireGuard 業務路徑獨立。ASN 查詢會透過 DNS 向 Team Cymru 查詢公網跳點 IP。",
+    "requirement": "需要 bosun ≥ 0.69.0、Linux traceroute 及 ICMP 原始通訊端權限。IPv4 與 IPv6 分別探測。",
+    "city": "目標地區",
+    "family": "位址族",
+    "run": "檢測三網回程",
+    "direction": "探測方向：本節點 → 所選目標",
+    "schedule": "定時檢測",
+    "interval": "檢測間隔",
+    "hours": "每 {{count}} 小時",
+    "scheduleHint": "儲存所選地區和位址族的定時任務；首次檢測在一個間隔後執行。",
+    "history": "檢測歷史（30 天／最多 120 次）",
+    "empty": "暫無檢測記錄",
+    "rules": "規則版本",
+    "target": "目標",
+    "hop": "跳數",
+    "reached": "目標已回應",
+    "notReached": "未到達目標",
+    "asnMissing": "{{count}} 個公網跳點缺少 ASN",
+    "changed": "觀測網路變化：{{before}} → {{after}}。缺跳或 ASN 資料缺失也可能導致變化，不表示已確認線路降級。",
+    "details": "查看逐跳依據",
+    "install": "請在節點或容器中安裝 Linux traceroute，並允許 ICMP 原始通訊端後重試。不會自動安裝軟體或修改權限。",
+    "limits": "標籤僅表示觀測到的中間網路，不保證線路等級或品質。GIA 僅為推測；缺跳不等於實際丟包。目標可能失效。結果僅管理員可見。",
+    "cities": {
+      "beijing": "北京",
+      "shanghai": "上海",
+      "guangzhou": "廣州"
+    },
+    "carriers": {
+      "telecom": "電信",
+      "unicom": "聯通",
+      "mobile": "移動"
+    },
+    "classes": {
+      "unknown": "證據不足",
+      "observed": "已觀測網路",
+      "cn2": "檢測到 CN2",
+      "mixed": "混合網路",
+      "possible_gia": "疑似 CN2 GIA"
+    },
+    "outcomes": {
+      "ok": "檢測完成",
+      "incomplete": "路徑不完整",
+      "failed": "探測失敗",
+      "timeout": "逾時",
+      "canceled": "已取消",
+      "truncated": "輸出已截斷",
+      "unavailable": "工具不可用",
+      "busy": "節點忙碌",
+      "invalid": "請求無效"
+    }
+  },
+  "nodeAddresses": {
+    "autoIPv4": "自動探測 IPv4",
+    "autoIPv6": "自動探測 IPv6",
+    "createHint": "預設無需填寫公網 IP。配對後經 bosun 連續確認再填入並跟隨變化；沒有 IPv6 時保持空白。需要支援位址探測的新版 bosun。",
+    "fixedHint": "固定公網入口不隨探測變化。NAT / 專線請填寫服務商入口，並另行設定連接埠對映。",
+    "internalHint": "選填。識別內網中轉來源，避免重複計算裝置數；不會建立內網連線，不影響 bosun 配對。",
+    "title": "機器公網位址與入口",
+    "hint": "bosun 每 5 分鐘獨立探測公網 IPv4 / IPv6。探測到的是出站公網位址，NAT 出口可能不同於使用者連接的入口。",
+    "waiting": "等待新版 bosun 的新鮮位址報告；舊值僅供參考。",
+    "detected": "探測成功",
+    "unknown": "未確認",
+    "machine": "機器探測位址",
+    "lastSuccess": "上次探測成功",
+    "entry": "目前公網入口位址",
+    "follow": "入口自動跟隨探測位址",
+    "behavior": "現有入口預設固定。開啟後，連續兩次探測確認才更新該位址及符合條件的自動 DNS；探測失敗保留舊值。手動修改節點位址會關閉對應跟隨。獨立設定的 NAT/專線入口、訂閱位址和 WG 端點保持不變。",
+    "dnsPending": "位址已更新，DNS 同步待處理或重試；可查看 DNS 健康與變更歷史。"
+  },
   "app": {
     "logout": "登出"
   },
@@ -2236,6 +2307,10 @@
     "installOnly": "僅安裝探針（不安裝代理核心）"
   },
   "wireguard": {
+    "sni": "使用者入口 REALITY SNI",
+    "sniHint": "用於使用者連接 A 的 VLESS REALITY 入站；WireGuard 隧道本身不使用 SNI。",
+    "scanFrom": "從中轉節點 A（{{node}}）檢測並選用目標。",
+    "selectTransitToScan": "請先選擇中轉節點 A，再自動優選或檢測目前的 SNI。",
     "title": "反向 WireGuard",
     "hint": "B 主動連線 A；A 負責使用者驗證與計費，B 提供公網出口及明確授權的內網存取。",
     "requirements": "兩端須支援 Linux WireGuard 並有最新能力回報。使用者入口採用 VLESS REALITY。本版不支援將強制選擇入口映射的節點作為 A。",

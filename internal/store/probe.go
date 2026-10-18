@@ -495,7 +495,7 @@ func (s *Store) PruneStats(ctx context.Context, at time.Time) error {
 	if err := s.pruneResourceHistory(ctx, at); err != nil {
 		return err
 	}
-	if _, err := s.db.ExecContext(ctx, `DELETE FROM node_jobs WHERE kind = 'network_diagnostic' AND created_at < ?`, at.Add(-24*time.Hour).Unix()); err != nil {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM node_jobs WHERE kind = 'network_diagnostic' AND route_check = 0 AND created_at < ?`, at.Add(-24*time.Hour).Unix()); err != nil {
 		return err
 	}
 	return s.pruneMonitoring(ctx, at)

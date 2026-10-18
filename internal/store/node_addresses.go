@@ -1,0 +1,175 @@
+package store
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/netip"
+	"time"
+
+	"github.com/zeptop-dev/bosun/pkg/agentproto"
+	"github.com/zeptop-dev/captain/internal/domain"
+)
+
+// Observation and published entry addresses have separate lifetimes. Never
+// infer a NAT entry address from the IP used by an outbound HTTP request.
+type AddressFamily struct {
+	Address        string `json:"address"`
+	LastSuccess    int64  `json:"last_success"`
+	CandidateSince int64  `json:"candidate_since"`
+	ConfirmedAt    int64  `json:"confirmed_at"`
+}
+type AddressObservation struct {
+	SampledAt  int64         `json:"sampled_at"`
+	ReceivedAt int64         `json:"received_at"`
+	IPv4       AddressFamily `json:"ipv4"`
+	IPv6       AddressFamily `json:"ipv6"`
+}
+type NodeAddresses struct {
+	AutoIPv4   bool               `json:"auto_ipv4"`
+	AutoIPv6   bool               `json:"auto_ipv6"`
+	EntryIPv4  string             `json:"entry_ipv4"`
+	EntryIPv6  string             `json:"entry_ipv6"`
+	Observed   AddressObservation `json:"observed"`
+	DNSPending bool               `json:"dns_pending"`
+}
+
+func (s *Store) NodeAddresses(ctx context.Context, id int64) (NodeAddresses, error) {
+	var out NodeAddresses
+	var raw string
+	err := s.db.QueryRowContext(ctx, `SELECT address_auto_v4,address_auto_v6,public_addr,v6_addr,address_json,address_dns_pending FROM nodes WHERE id=?`, id).Scan(&out.AutoIPv4, &out.AutoIPv6, &out.EntryIPv4, &out.EntryIPv6, &raw, &out.DNSPending)
+	if err != nil {
+		return out, wrapNotFound(err)
+	}
+	err = json.Unmarshal([]byte(raw), &out.Observed)
+	return out, err
+}
+
+// SetAddressPolicy requires Topology. Existing nodes default to manual; an old
+// client that edits unrelated fields cannot enable automatic following.
+func (s *Store) SetAddressPolicy(ctx context.Context, id int64, v4, v6 bool) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE nodes SET address_auto_v4=?,address_auto_v6=?,updated_at=? WHERE id=?`, boolInt(v4), boolInt(v6), now(), id)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ObserveNodeAddresses is token-bound and transactionally deduplicated. Cached
+// reports, re-pairing and an old report racing a newer sample cannot promote a
+// candidate. Unknown families retain the last known value but lose confirmation.
+func (s *Store) ObserveNodeAddresses(ctx context.Context, id int64, token string, sample *agentproto.PublicAddresses, at time.Time) error {
+	if sample == nil {
+		return nil
+	}
+	if sample.SampledAt < at.Add(-15*time.Minute).Unix() || sample.SampledAt > at.Add(time.Minute).Unix() {
+		return nil
+	}
+	if sample.IPv4 != "" && !agentproto.ValidPublicAddress(sample.IPv4, false) || sample.IPv6 != "" && !agentproto.ValidPublicAddress(sample.IPv6, true) {
+		return errors.New("invalid public address observation")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var raw string
+	if err = tx.QueryRowContext(ctx, `SELECT address_json FROM nodes WHERE id=? AND token_hash=?`, id, token).Scan(&raw); err != nil {
+		return wrapNotFound(err)
+	}
+	var obs AddressObservation
+	if err = json.Unmarshal([]byte(raw), &obs); err != nil {
+		return err
+	}
+	if sample.SampledAt <= obs.SampledAt {
+		return nil
+	}
+	advance := func(f *AddressFamily, value string) {
+		if value != "" {
+			value = netip.MustParseAddr(value).String()
+		}
+		if value == "" {
+			f.CandidateSince = 0
+			f.ConfirmedAt = 0
+			return
+		}
+		if f.Address != value || f.CandidateSince == 0 || at.Unix()-f.LastSuccess > 900 {
+			f.CandidateSince = at.Unix()
+			f.ConfirmedAt = 0
+		}
+		if at.Unix()-f.CandidateSince >= 120 {
+			f.ConfirmedAt = at.Unix()
+		}
+		f.Address = value
+		f.LastSuccess = at.Unix()
+	}
+	advance(&obs.IPv4, sample.IPv4)
+	advance(&obs.IPv6, sample.IPv6)
+	obs.SampledAt = sample.SampledAt
+	obs.ReceivedAt = at.Unix()
+	buf, _ := json.Marshal(obs)
+	_, err = tx.ExecContext(ctx, `UPDATE nodes SET address_json=? WHERE id=? AND token_hash=?`, string(buf), id, token)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ReconcileNodeAddresses requires Topology. Only confirmed, fresh observations
+// may change an opted-in family. Explicit entry/ingress/WG endpoints are untouched.
+func (s *Store) ReconcileNodeAddresses(ctx context.Context, id int64, at time.Time) (*domain.Node, bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback()
+	var raw, ip4, ip6 string
+	var auto4, auto6, pending bool
+	var attempt int64
+	err = tx.QueryRowContext(ctx, `SELECT address_auto_v4,address_auto_v6,public_addr,v6_addr,address_json,address_dns_pending,address_dns_attempt FROM nodes WHERE id=? AND token_hash IS NOT NULL`, id).Scan(&auto4, &auto6, &ip4, &ip6, &raw, &pending, &attempt)
+	if err != nil {
+		return nil, false, wrapNotFound(err)
+	}
+	var obs AddressObservation
+	if err = json.Unmarshal([]byte(raw), &obs); err != nil {
+		return nil, false, err
+	}
+	old4, old6 := ip4, ip6
+	valid := func(f AddressFamily) bool {
+		return f.ConfirmedAt > 0 && f.LastSuccess >= at.Add(-15*time.Minute).Unix()
+	}
+	if auto4 && valid(obs.IPv4) {
+		ip4 = obs.IPv4.Address
+	}
+	if auto6 && valid(obs.IPv6) {
+		ip6 = obs.IPv6.Address
+	}
+	changed := old4 != ip4 || old6 != ip6
+	if changed {
+		pending = true
+		attempt = 0
+	}
+	if changed {
+		_, err = tx.ExecContext(ctx, `UPDATE nodes SET public_addr=?,v6_addr=?,address_dns_pending=?,address_dns_attempt=?,updated_at=? WHERE id=?`, ip4, ip6, boolInt(pending), attempt, at.Unix(), id)
+		if err != nil {
+			return nil, false, err
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, false, err
+	}
+	n, err := s.NodeByID(ctx, id)
+	return n, pending && at.Unix()-attempt >= 300, err
+}
+func (s *Store) BeginAddressDNS(ctx context.Context, id int64, at time.Time) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET address_dns_attempt=? WHERE id=?`, at.Unix(), id)
+	return err
+}
+func (s *Store) FinishAddressDNS(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET address_dns_pending=0 WHERE id=?`, id)
+	return err
+}

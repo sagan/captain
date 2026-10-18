@@ -114,6 +114,7 @@ func (h *handlers) listNodes(w http.ResponseWriter, r *http.Request) {
 }
 
 type nodeInput struct {
+	AutoIPv4, AutoIPv6                                         *bool
 	Mode                                                       *spec.NodeMode
 	Name, PublicAddr, InternalAddr, V6Addr, Domain, MonitorURL string
 	DomainShared                                               *bool
@@ -148,7 +149,12 @@ func (h *handlers) createNode(w http.ResponseWriter, r *http.Request) {
 	if in.DomainShared != nil {
 		n.DomainShared = *in.DomainShared
 	}
-	if err := h.Store.CreateNode(r.Context(), n, auth.PairCode(), 24*time.Hour); err != nil {
+	auto4, auto6 := in.AutoIPv4 != nil && *in.AutoIPv4, in.AutoIPv6 != nil && *in.AutoIPv6
+	if (auto4 && strings.TrimSpace(n.PublicAddr) != "") || (auto6 && strings.TrimSpace(n.V6Addr) != "") {
+		fail(w, 400, "automatic addresses must be empty; choose fixed mode to provide an entry address")
+		return
+	}
+	if err := h.Store.CreateNodeWithAddressPolicy(r.Context(), n, auth.PairCode(), 24*time.Hour, auto4, auto6); err != nil {
 		nodeSaveError(w, err)
 		return
 	}

@@ -1,3 +1,4 @@
+import { ReturnRoutesCard } from './ReturnRoutesCard'
 import { AvailabilityCard } from './AvailabilityCard'
 import { NetworkQualityCard } from './NetworkQualityCard'
 import { NetworkDiagnosticsCard } from './NetworkDiagnosticsCard'
@@ -40,6 +41,7 @@ export function NodeProbeCard({ nodeID, reportedHost }: { nodeID: number; report
     <><ResourcesCard host={host} />
     <AvailabilityCard nodeID={nodeID} />
     <NetworkQualityCard nodeID={nodeID} />
+    <ReturnRoutesCard key={`routes-${nodeID}`} nodeID={nodeID} />
     <NetworkDiagnosticsCard key={nodeID} nodeID={nodeID} />
     <ResourceHistoryCard nodes={[{ id: nodeID, name: t('monitoring.kinds.host') }]} detail />
     <Card mb="lg">

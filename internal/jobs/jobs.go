@@ -101,6 +101,9 @@ func (r *Runner) Tick(ctx context.Context) {
 	now := time.Now()
 	log := r.Log.With("component", "jobs")
 	r.housekeeping(ctx, now, log)
+	if err := r.Store.ScheduleReturnRoutes(ctx, now); err != nil {
+		log.Error("return route scheduling failed", "err", err)
+	}
 	if r.External != nil && now.Sub(r.lastSync) >= time.Hour {
 		r.lastSync = now
 		r.External.SyncAll(ctx, now)

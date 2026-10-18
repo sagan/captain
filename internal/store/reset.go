@@ -27,6 +27,8 @@ func (s *Store) ResetPreview(ctx context.Context) (map[string]int64, error) {
 // No files or remote services are removed. The entire database change rolls
 // back on failure; migrations are deliberately neither deleted nor replayed.
 func (s *Store) ResetSite(ctx context.Context, adminID int64) (*domain.User, error) {
+	s.Topology.Lock()
+	defer s.Topology.Unlock()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err

@@ -54,21 +54,22 @@ import (
 
 // Server is the HTTP front.
 type Server struct {
-	backups   *backup.Manager
-	certs     *service.Certs
-	external  *service.External
-	state     *service.AgentState
-	probe     *probe.Router
-	probeSvc  *service.Probe
-	dnsHealth *service.DNSHealth
-	heartbeat *service.Heartbeat
-	hooks     *webhook.Hub
-	bot       *telegram.Bot
-	subLinks  *service.SubLinks
-	cfg       *config.Config
-	store     *store.Store
-	log       *slog.Logger
-	mux       *http.ServeMux
+	backups       *backup.Manager
+	certs         *service.Certs
+	external      *service.External
+	state         *service.AgentState
+	probe         *probe.Router
+	probeSvc      *service.Probe
+	dnsHealth     *service.DNSHealth
+	nodeAddresses *service.NodeAddresses
+	heartbeat     *service.Heartbeat
+	hooks         *webhook.Hub
+	bot           *telegram.Bot
+	subLinks      *service.SubLinks
+	cfg           *config.Config
+	store         *store.Store
+	log           *slog.Logger
+	mux           *http.ServeMux
 }
 
 // Options carries wiring the config alone cannot express (test gateways).
@@ -136,6 +137,8 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger, opts ...Options)
 	s.probeSvc = &service.Probe{Store: st, Notify: notifier, Log: log}
 	s.dnsHealth = &service.DNSHealth{Store: st, Probe: s.probeSvc, Log: log}
 	s.state = &service.AgentState{Store: st, PullSeconds: cfg.Agent.PullSeconds, PushSeconds: cfg.Agent.PushSeconds, EnforceDevices: cfg.EnforceDevices(), Probe: s.probeSvc}
+	s.nodeAddresses = &service.NodeAddresses{Store: st, DNS: &service.DNS{Store: st, Log: log, Base: dnsBase}, State: s.state, Log: log}
+
 	resolve := func(r *http.Request) *domain.User {
 		c, err := r.Cookie("captain_session")
 		if err != nil {
@@ -543,3 +546,5 @@ func captainUpdateFloor(configured string) string {
 	}
 	return configured
 }
+
+func (s *Server) NodeAddresses() *service.NodeAddresses { return s.nodeAddresses }

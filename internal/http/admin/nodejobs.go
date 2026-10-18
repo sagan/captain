@@ -112,7 +112,7 @@ func (h *handlers) getNodeJob(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	if (j.Kind == spec.NetworkDiagnosticKind || j.Kind == spec.CoreManagementKind) && !userFrom(r).IsAdmin() {
+	if (j.Kind == spec.NetworkDiagnosticKind || j.Kind == spec.CoreManagementKind || j.Kind == spec.HostManagementKind) && !userFrom(r).IsAdmin() {
 		fail(w, 403, "admin only")
 		return
 	}

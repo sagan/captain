@@ -119,6 +119,8 @@ func Register(mux *http.ServeMux, d Deps) {
 	mux.HandleFunc("POST /api/admin/nodes/{id}/upgrade", h.requireAdmin(h.upgradeNode))
 	mux.HandleFunc("POST /api/admin/nodes/{id}/jobs", h.requireAdmin(h.createNodeJob))
 	mux.HandleFunc("GET /api/admin/nodes/{id}/jobs/{job}", h.requireAdmin(h.getNodeJob))
+	mux.HandleFunc("GET /api/admin/settings/nodes/{id}/host", h.requireAdmin(h.hostManagement))
+	mux.HandleFunc("POST /api/admin/settings/nodes/{id}/host", h.requireAdmin(h.hostManagement))
 	mux.HandleFunc("GET /api/admin/nodes/{id}/return-routes", h.requireAdmin(h.returnRoutes))
 	mux.HandleFunc("PUT /api/admin/settings/nodes/{id}/return-routes", h.requireAdmin(h.setReturnRoutes))
 	mux.HandleFunc("GET /api/admin/nodes/{id}/network-diagnostics", h.requireAdmin(h.networkDiagnostics))

@@ -296,3 +296,7 @@ MIT —— 见 [LICENSE](LICENSE)。
 [![Star History Chart](https://api.star-history.com/svg?repos=zeptop-dev/captain&type=Date)](https://star-history.com/#zeptop-dev/captain&Date)
 
 </details>
+
+### 主机管理
+
+Captain 节点详情提供实际状态、单项修改及操作记录。原生 root Debian/Ubuntu systemd 节点支持受控管理；SSH、DNS、防火墙变更带本地超时恢复。其他环境只读，缺少的系统软件不会自动安装。

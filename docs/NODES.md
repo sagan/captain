@@ -778,3 +778,57 @@ https://github.com/nxtrace/NTrace-core/releases/tag/v1.7.4; its source and licen
 are available at that tag. No upstream implementation is linked into bosun.
 Built-in enrichment, reverse DNS and map uploads are disabled. The existing
 Team Cymru/public-hop-only policy and conservative classification remain intact.
+
+## Host management
+
+Captain 1.23 / bosun 0.71 add **Node details → Host management** for full
+administrators. It observes actual host configuration, including settings made
+through Quench or a terminal. There is no onboarding score or mandatory baseline.
+The page refreshes stale observations while open; offline nodes retain their last
+observation and cannot be edited. Observations are not proof of actual SSH login.
+
+Each supported item has its own change review. The initial write scope is native
+root Debian/Ubuntu with systemd. Containers and other environments remain
+read-only; their observations describe the agent environment, not the host.
+Capabilities are rechecked on the node before each operation.
+
+- Hostname and timezone/NTP use existing system facilities. Hostname changes do
+  not rename the Captain node or update DNS; `/etc/hosts` is preserved.
+- SSH supports ordinary configurations, retaining existing content and adding a
+  small managed first-value block. Socket activation, conditional Match/access
+  restrictions, custom includes and listen-address policies require manual work.
+  Port changes keep old and new listeners until a separate login is confirmed.
+  NAT mappings and cloud security groups must be arranged with the provider.
+  Prepare local firewall access first and pause an active sshd Fail2ban jail
+  before migrating; re-enable it after the final port is in place.
+- Administrator access adds a public key to a root-owned key store and a dedicated
+  passwordless-sudo grant (full root privileges). Existing accounts/grants are
+  preserved. Recovery removes the new grant/key but retains any newly created
+  account/home. Existing account renames and deletion are not performed.
+- Firewall editing adds a scoped allow rule to an already active UFW backend.
+  It does not enable a firewall, replace foreign nftables rules, or flush bosun
+  rules. Fail2ban edits only its installed sshd jail. Security-update policy uses
+  installed unattended-upgrades and the distribution's active timer; automatic
+  reboot remains disabled. These operations do not install missing packages.
+- DNS supports systemd-resolved and ordinary, externally unmanaged resolv.conf.
+  It preserves search/options directives and never changes domain records.
+  Link/DHCP resolvers can still take precedence.
+- Network settings select an available TCP congestion algorithm and optionally
+  supported security sysctls, preserving qdiscs, WireGuard and user limits.
+- Swap creates one dedicated file and fstab entry, preserving existing swap.
+  Resize/removal of existing swap is not offered; unsupported filesystems or
+  insufficient space fail explicitly.
+
+Access, DNS and firewall changes await explicit confirmation for ten minutes.
+A root-owned `bosun-host-recovery.timer` runs independently of bosun and Captain,
+checks deadlines every 30 seconds, and remains enabled across reboots. Failed
+restores remain visible and are retried; conflicting external configuration edits
+require manual recovery instead of being silently overwritten. Keep provider
+console access available for changes that affect remote access. A successful
+node heartbeat is not a substitute for verifying the new SSH login and sudo.
+
+Changes carry a configuration revision and durable, panel-bound job receipts to
+reject stale plans and duplicate execution. Recovery files and receipts live in
+`data_dir/host-management` with restrictive permissions. Captain retains up to
+200 operations for 180 days plus the latest checks; ordinary job cleanup does
+not delete this history. This is separate from proxy core backups and updates.

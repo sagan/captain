@@ -74,6 +74,7 @@ export default function NodePage() {
       <DeleteNodeModal node={n} opened={deletingNode} onClose={() => setDeletingNode(false)} onDeleted={() => { qc.invalidateQueries({ queryKey: ['nodes'] }); nav('/nodes') }} />
       <PageHeader title={n.name} subtitle={`${n.hostname || ''} ${n.platform || ''} ${n.version || ''}`.trim()} actions={<>
         <NodeStatus n={n} />
+        {me?.role === 'admin' && <Button component={Link} to={`/nodes/${n.id}/host`} variant="light" size="xs">{t('host.title')}</Button>}
         {me?.role === 'admin' && <Button variant="light" size="xs" onClick={() => nav(`/infrastructure?node=${n.id}`)}>{t('infra.title')}</Button>}
         <Button variant="default" size="xs" leftSection={<IconPencil size={14} />} onClick={() => { nodeForm.setValues({ Name: n.name, PublicAddr: n.public_addr, InternalAddr: n.internal_addr, V6Addr: n.v6_addr, Domain: n.domain ?? '', DomainShared: !!n.domain_shared, MonitorURL: n.monitor_url, DecoyEnabled: !!n.decoy_enabled, DecoyUpstream: n.decoy_upstream ?? '', UserSpeedLimitMbps: n.user_speed_limit_mbps ?? 0, MitaQuotas: !!n.mita_quotas, EgressByIngress: !!n.egress_by_ingress }); setEditNode(true) }}>{t('common.edit')}</Button>
         <Button variant="default" size="xs" onClick={() => modals.openConfirmModal({ title: t('nodes.repair'), children: <Text size="sm">{t('nodes.repairHint')}</Text>, labels: { confirm: t('common.confirm'), cancel: t('common.cancel') }, onConfirm: () => repair.mutate() })}>{t('nodes.repair')}</Button>

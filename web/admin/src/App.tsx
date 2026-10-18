@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage'
 import MonitoringPage from './pages/MonitoringPage'
 import NodesPage from './pages/NodesPage'
 import NodePage from './pages/NodePage'
+import HostManagementPage from './pages/HostManagementPage'
 import EntriesPage from './pages/EntriesPage'
 import UsersPage from './pages/UsersPage'
 import PlansPage from './pages/PlansPage'
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/monitoring" element={<MonitoringPage />} />
           <Route path="/nodes" element={<NodesPage />} />
           <Route path="/nodes/:id" element={<NodePage />} />
+          <Route path="/nodes/:id/host" element={<HostManagementPage />} />
           <Route path="/entries" element={<EntriesPage />} />
           <Route path="/external" element={<ExternalPage />} />
           <Route path="/speedtest" element={<SpeedtestPage />} />

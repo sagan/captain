@@ -136,6 +136,7 @@ func cmdServe(args []string) error {
 	go web.Bot().Run(ctx)
 	go web.DNSHealth().Run(ctx)
 	go web.NodeAddresses().Run(ctx)
+	go web.NodeRegions().Run(ctx)
 	for _, c := range cfg.TrustedProxies {
 		if _, n, err := net.ParseCIDR(strings.TrimSpace(c)); err == nil {
 			ratelimit.TrustedProxies = append(ratelimit.TrustedProxies, n)

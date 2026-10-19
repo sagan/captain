@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -175,7 +176,7 @@ func (h *handlers) getNodeProbe(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, "node not found")
 		return
 	}
-	out := map[string]any{"probe": np, "billed": np.Billed()}
+	out := map[string]any{"probe": np, "billed": np.Billed(), "region_countries": store.RegionCountries()}
 	if h.Probe != nil {
 		if l, ok := h.Probe.Live(np.NodeID); ok {
 			out["live"] = l
@@ -186,6 +187,7 @@ func (h *handlers) getNodeProbe(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlers) putNodeProbe(w http.ResponseWriter, r *http.Request) {
 	var in struct {
+		RegionMode *string
 		Hidden     bool
 		Info       store.NodeProbeInfo
 		LimitBytes int64
@@ -202,7 +204,15 @@ func (h *handlers) putNodeProbe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := h.Store.UpdateNodeProbe(r.Context(), idOf(r), in.Hidden, in.Info, in.LimitBytes, in.ResetDay, in.Mode, in.Resources); err != nil {
+	if err := h.Store.UpdateNodeProbeWithRegion(r.Context(), idOf(r), in.Hidden, in.Info, in.LimitBytes, in.ResetDay, in.Mode, in.Resources, in.RegionMode); err != nil {
+		if errors.Is(err, store.ErrNodeRegion) {
+			fail(w, 400, err.Error())
+			return
+		}
+		if errors.Is(err, store.ErrNotFound) {
+			fail(w, 404, "node not found")
+			return
+		}
 		serverErr(w, err)
 		return
 	}

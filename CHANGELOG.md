@@ -6,6 +6,9 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
+- **v1.25.0** (2026-10-19) — Manage shared node/status-page groups and display order from Nodes. Add drag handles, keyboard and arrow controls, batch moves, per-node group editing, and group filtering. Save the complete layout atomically with conflict detection; preserve existing order on migration, keep hidden nodes private, and retain the legacy monitoring-group API. Migration 76; no bosun upgrade required.
+  - Add an automatic/manual/hidden country selector with localized searchable flag options, panel-side Country.is lookup of observed machine IPs, per-IP caching, IPv4 preference, dual-stack disagreement hints, and stale-result rejection. Migration 77 preserves legacy manual/hidden choices; new nodes default to automatic.
+
 - **v1.24.0** (2026-10-19) — Show automatic firewall listener sources and synchronization results in node Host management, including manual/legacy retention and failed cleanup. Explain local listener versus remote outbound ports and cloud/NAT/forwarding boundaries; requires bosun v0.72.0 for detailed status.
 
 - **v1.23.0** (2026-10-18) — Add administrator-only node Host management with actual-state observations, independent edit/review flows, access-change confirmation/recovery and persistent operation history. Gate writes by online bosun v0.71.0 and actual node capabilities; stale, offline and unsupported states stay explicit. No onboarding score or mandatory workflow.

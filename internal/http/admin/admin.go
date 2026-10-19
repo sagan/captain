@@ -39,7 +39,8 @@ type SessionStore interface {
 
 // Deps are the handlers' dependencies.
 type Deps struct {
-	Store *store.Store
+	NodeRegions *service.NodeRegions
+	Store       *store.Store
 	// State is the node desired-state builder; every non-GET admin request
 	// drops its cache so nodes see edits at once.
 	State *service.AgentState
@@ -106,6 +107,9 @@ func Register(mux *http.ServeMux, d Deps) {
 	mux.HandleFunc("POST /api/admin/system/reset", h.requireAdmin(h.resetSite))
 	mux.HandleFunc("GET /api/admin/dashboard", h.requireAdmin(h.dashboard))
 
+	mux.HandleFunc("GET /api/admin/nodes/layout", h.requireAdmin(h.nodeLayout))
+	mux.HandleFunc("PUT /api/admin/nodes/layout", h.requireAdmin(h.nodeLayout))
+	mux.HandleFunc("POST /api/admin/nodes/{id}/region-detect", h.requireAdmin(h.detectNodeRegion))
 	mux.HandleFunc("GET /api/admin/nodes", h.requireAdmin(h.listNodes))
 	mux.HandleFunc("GET /api/admin/nodes/domain-check", h.requireAdmin(h.checkNodeDomain))
 	mux.HandleFunc("POST /api/admin/nodes", h.requireAdmin(h.createNode))

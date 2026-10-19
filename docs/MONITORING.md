@@ -51,6 +51,46 @@ message (cut to Telegram's 4096-character limit), so a panel-side blip that
 takes every node offline at once does not page once per node. Webhook
 events are still emitted per alert.
 
+## Shared node groups and ordering
+
+Manage groups, node order and batch moves in **Nodes → Groups and order**.
+These are the same monitoring groups used by the status page. Public group
+names and default node order follow the saved layout; visibility is unchanged.
+See [node organization](NODES.md#groups-and-display-order).
+
+## Automatic country / region
+
+Node details → Probe and monthly traffic → Region offers, in order:
+**Do not show**, the current **automatic** country, and searchable flag/code/name
+choices. Names follow the admin UI language. Manual choices are fixed; automatic
+mode uses bosun's independently observed machine public IP, preferring IPv4 and
+using IPv6 only when IPv4 is absent. A differing IPv6 country is shown as a hint.
+A failed IPv4 lookup does not silently switch to the IPv6 country.
+
+Captain queries [Country.is](https://country.is/) over HTTPS with the public IP
+only. No node hostname, token or credentials are sent. A country lookup is an
+estimate, not proof of physical location; use manual selection for broadcast IPs
+or inaccurate database entries. The form shows the lookup IP and time and offers
+**Detect / refresh country**. Detection previews do not change the saved choice.
+Public pages receive only the effective country code, never lookup metadata or
+the detection IP through this feature.
+
+Automatic mode checks for changes every minute using recent bosun observations
+(15 minutes). Successes are cached per IP for seven days; unknown/failed lookups
+retry after an hour. Interactive refresh is limited to once per minute per cached
+IP; all requests share a bounded rate-limited stream. An IP change immediately
+invalidates the previous country's display on the next uncached page read, and
+late results are discarded if the observed IP or pairing identity changed.
+Offline nodes keep their last matching country but do not trigger new lookups.
+
+Migration 77 preserves existing nonempty region codes as manual choices and
+existing empty regions as Do not show. Newly added nodes default to automatic.
+Automatic observations require bosun's public-address report (v0.69.0+); manually
+configured public entries, NAT mappings, domain records and HTTP peer addresses
+are not substitutes. No further bosun upgrade is needed. The probe update API
+adds optional `RegionMode: auto|manual|off`; legacy clients can still change the
+country explicitly and an unchanged effective country preserves automatic mode.
+
 ## DNS health checks
 
 Node details → DNS health and Monitoring → DNS health show panel-side DNS

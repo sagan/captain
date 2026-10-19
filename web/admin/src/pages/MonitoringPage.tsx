@@ -20,7 +20,7 @@ export default function MonitoringPage() {
   const [search, setSearch] = useState(''), [group, setGroup] = useState<string | null>(null), [status, setStatus] = useState<string | null>(null)
   const [sort, setSort] = useState<string | null>('name'), [selected, setSelected] = useState<string[]>([])
   const [editing, setEditing] = useState<number | null>(null), [newGroup, setNewGroup] = useState('')
-  const saveGroup = useMutation({ mutationFn: () => api.put(`/api/admin/nodes/${editing}/monitor-group`, { group: newGroup }), onSuccess: () => { setEditing(null); qc.invalidateQueries({ queryKey: ['monitoring'] }); toast.ok(t('common.saved')) }, onError: toast.err })
+  const saveGroup = useMutation({ mutationFn: () => api.put(`/api/admin/nodes/${editing}/monitor-group`, { group: newGroup }), onSuccess: () => { setEditing(null); qc.invalidateQueries({ queryKey: ['monitoring'] }); qc.invalidateQueries({ queryKey: ['node-layout'] }); qc.invalidateQueries({ queryKey: ['nodes'] }); qc.invalidateQueries({ queryKey: ['node'] }); toast.ok(t('common.saved')) }, onError: toast.err })
   const nodes = q.data ?? []
   const val = (n: MonitorNode, metric: string): number | null => {
     const h = n.host

@@ -12,7 +12,7 @@ import (
 	"github.com/zeptop-dev/captain/internal/domain"
 )
 
-const nodeCols = "id, name, token_hash, pair_code, public_addr, internal_addr, v6_addr, domain, monitor_url, version, platform, hostname, last_seen_at, applied_revision, upgrade_to, created_at, decoy_enabled, decoy_upstream, user_speed_limit_mbps, mita_quotas, egress_by_ingress, dstatus_sid, domain_shared, node_mode, reported_mode, mode_reported_at, mode_error, mode_managed, mode_revision, reported_mode_revision"
+const nodeCols = "id, name, token_hash, pair_code, public_addr, internal_addr, v6_addr, domain, monitor_url, version, platform, hostname, last_seen_at, applied_revision, upgrade_to, created_at, decoy_enabled, decoy_upstream, user_speed_limit_mbps, mita_quotas, egress_by_ingress, dstatus_sid, domain_shared, node_mode, reported_mode, mode_reported_at, mode_error, mode_managed, mode_revision, reported_mode_revision, monitor_group"
 
 func scanNode(row interface{ Scan(...any) error }) (*domain.Node, error) {
 	var n domain.Node
@@ -21,7 +21,7 @@ func scanNode(row interface{ Scan(...any) error }) (*domain.Node, error) {
 	var created, modeReported int64
 	var decoy, mitaQ, egress, shared, modeManaged int
 	if err := row.Scan(&n.ID, &n.Name, &tokenHash, &pairCode, &n.PublicAddr, &n.InternalAddr, &n.V6Addr, &n.Domain, &n.MonitorURL,
-		&n.Version, &n.Platform, &n.Hostname, &lastSeen, &n.AppliedRevision, &n.UpgradeTo, &created, &decoy, &n.DecoyUpstream, &n.UserSpeedLimitMbps, &mitaQ, &egress, &n.DStatusSID, &shared, &n.Mode, &n.ReportedMode, &modeReported, &n.ModeError, &modeManaged, &n.ModeRevision, &n.ReportedModeRevision); err != nil {
+		&n.Version, &n.Platform, &n.Hostname, &lastSeen, &n.AppliedRevision, &n.UpgradeTo, &created, &decoy, &n.DecoyUpstream, &n.UserSpeedLimitMbps, &mitaQ, &egress, &n.DStatusSID, &shared, &n.Mode, &n.ReportedMode, &modeReported, &n.ModeError, &modeManaged, &n.ModeRevision, &n.ReportedModeRevision, &n.MonitorGroup); err != nil {
 		return nil, wrapNotFound(err)
 	}
 	n.ModeManaged = modeManaged != 0
@@ -64,8 +64,8 @@ func (s *Store) CreateNodeWithAddressPolicy(ctx context.Context, n *domain.Node,
 		return err
 	}
 	ts := now()
-	res, err := tx.ExecContext(ctx, `INSERT INTO nodes (name, pair_code, pair_code_expires_at, public_addr, internal_addr, v6_addr, domain, monitor_url, dstatus_sid, created_at, updated_at, domain_shared, node_mode, mode_managed, mode_revision, address_auto_v4, address_auto_v6)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	res, err := tx.ExecContext(ctx, `INSERT INTO nodes (name, pair_code, pair_code_expires_at, public_addr, internal_addr, v6_addr, domain, monitor_url, dstatus_sid, created_at, updated_at, domain_shared, node_mode, mode_managed, mode_revision, address_auto_v4, address_auto_v6, display_order, region_mode)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(display_order),0)+1 FROM nodes), 'auto')`,
 		n.Name, pairCode, time.Now().Add(ttl).Unix(), n.PublicAddr, n.InternalAddr, n.V6Addr, n.Domain, n.MonitorURL, n.DStatusSID, ts, ts, boolInt(n.DomainShared), n.Mode, boolInt(n.Mode == spec.NodeMonitor), n.ModeRevision, boolInt(auto4), boolInt(auto6))
 	if err != nil {
 		return err
@@ -114,7 +114,7 @@ func (s *Store) FillPublicAddr(ctx context.Context, id int64, addr string) error
 }
 
 func (s *Store) ListNodes(ctx context.Context) ([]*domain.Node, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+nodeCols+` FROM nodes ORDER BY id`)
+	rows, err := s.db.QueryContext(ctx, `SELECT `+nodeCols+` FROM nodes ORDER BY display_order,id`)
 	if err != nil {
 		return nil, err
 	}

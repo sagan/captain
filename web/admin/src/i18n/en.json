@@ -923,7 +923,6 @@
       "max": "Larger of outbound and inbound"
     },
     "region": "Region code",
-    "regionHint": "Two-letter country or region code, e.g. JP for Japan. Leave blank to hide the flag; the example is not a saved value.",
     "provider": "Provider",
     "providerURL": "Provider URL",
     "price": "Price",
@@ -2497,5 +2496,36 @@
       "certificate": "Certificate validation",
       "system": "System listener"
     }
+  },
+  "nodeLayout": {
+    "title": "Groups and order",
+    "hint": "Groups and order are shared by node management and the public status page. Drag the handles or use the arrow buttons, then save. Ungrouped nodes appear last.",
+    "ungrouped": "Ungrouped",
+    "drag": "Drag to reorder",
+    "up": "Move up",
+    "down": "Move down",
+    "addGroup": "Add group",
+    "rename": "Rename",
+    "deleteGroup": "Delete group",
+    "deleteHint": "Deleting a group moves its nodes to Ungrouped; it does not delete nodes.",
+    "groupNodes": "Nodes in group",
+    "selectAll": "Select all nodes in this group",
+    "moveTo": "Move to group",
+    "move": "Move",
+    "invalidName": "Group names must be unique, nonempty, at most 128 bytes, and contain no control characters or markup.",
+    "conflict": "Nodes or groups changed elsewhere. Cancel and reopen to avoid overwriting the latest changes.",
+    "publicHint": "Group names appear on the public status page. Manage groups and order from the node list."
+  },
+  "nodeRegion": {
+    "off": "Do not show",
+    "auto": "{{country}} (automatic)",
+    "unknown": "Unidentified",
+    "pending": "Not detected",
+    "hint": "Captain queries Country.is using the machine public IP observed by bosun (IPv4 first). Manual choices do not follow IP changes.",
+    "conflict": "IPv4 reports {{ipv4}}, IPv6 reports {{ipv6}}. Automatic mode uses IPv4; you can override it manually.",
+    "failed": "Country lookup failed. Try again later.",
+    "detect": "Detect / refresh country",
+    "noIP": "Waiting for bosun to report the machine public IP. Manually configured entry addresses are not used.",
+    "stale": "The public IP observation has expired. Wait for a fresh bosun report before detecting again."
   }
 }

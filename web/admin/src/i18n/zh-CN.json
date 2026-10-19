@@ -923,7 +923,6 @@
       "max": "出站与入站取较大值"
     },
     "region": "地区代码",
-    "regionHint": "填写两位国家或地区代码，例如日本填 JP。留空不显示国旗；灰色示例不代表已设置。",
     "provider": "服务商",
     "providerURL": "服务商链接",
     "price": "价格",
@@ -2497,5 +2496,36 @@
       "certificate": "证书验证",
       "system": "系统监听"
     }
+  },
+  "nodeLayout": {
+    "title": "分组与排序",
+    "hint": "分组和顺序同时用于节点管理与公开探针。拖拽手柄或使用上下按钮调整，保存后生效；未分组排在最后。",
+    "ungrouped": "未分组",
+    "drag": "拖动排序",
+    "up": "上移",
+    "down": "下移",
+    "addGroup": "新增分组",
+    "rename": "重命名",
+    "deleteGroup": "删除分组",
+    "deleteHint": "删除分组会把节点移到“未分组”，不会删除节点。",
+    "groupNodes": "组内节点",
+    "selectAll": "全选本组节点",
+    "moveTo": "移至分组",
+    "move": "移动",
+    "invalidName": "分组名称不能为空、重复、包含控制字符或标记符号，且不得超过 128 字节。",
+    "conflict": "节点或分组已被其他操作修改。请取消并重新打开，避免覆盖最新内容。",
+    "publicHint": "分组名称会显示在公开探针上。分组与顺序可在节点列表统一管理。"
+  },
+  "nodeRegion": {
+    "off": "不显示",
+    "auto": "{{country}}（自动）",
+    "unknown": "未识别",
+    "pending": "未检测",
+    "hint": "自动使用 bosun 探测的机器公网 IP（IPv4 优先），由 Captain 向 Country.is 查询。手动选择不随 IP 变化。",
+    "conflict": "IPv4 为 {{ipv4}}，IPv6 为 {{ipv6}}；自动显示 IPv4 的地区，可手动覆盖。",
+    "failed": "地区查询失败，可稍后重试。",
+    "detect": "检测 / 刷新地区",
+    "noIP": "等待 bosun 上报机器公网 IP；不会使用手动设置的公网入口。",
+    "stale": "公网地址观测已过期，等待 bosun 重新上报后再检测。"
   }
 }

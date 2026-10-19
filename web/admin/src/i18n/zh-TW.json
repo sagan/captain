@@ -1145,7 +1145,6 @@
       "max": "出站與入站取較大值"
     },
     "region": "地區代碼",
-    "regionHint": "填寫兩位國家或地區代碼，例如日本填 JP。留空不顯示國旗；灰色範例不代表已設定。",
     "provider": "服務商",
     "providerURL": "服務商連結",
     "price": "價格",
@@ -2497,5 +2496,36 @@
       "certificate": "憑證驗證",
       "system": "系統監聽"
     }
+  },
+  "nodeLayout": {
+    "title": "分組與排序",
+    "hint": "分組和順序同時用於節點管理與公開探針。拖曳把手或使用上下按鈕調整，儲存後生效；未分組排在最後。",
+    "ungrouped": "未分組",
+    "drag": "拖曳排序",
+    "up": "上移",
+    "down": "下移",
+    "addGroup": "新增分組",
+    "rename": "重新命名",
+    "deleteGroup": "刪除分組",
+    "deleteHint": "刪除分組會將節點移到「未分組」，不會刪除節點。",
+    "groupNodes": "組內節點",
+    "selectAll": "全選本組節點",
+    "moveTo": "移至分組",
+    "move": "移動",
+    "invalidName": "分組名稱不得為空白、重複、包含控制字元或標記符號，且不得超過 128 位元組。",
+    "conflict": "節點或分組已被其他操作修改。請取消並重新開啟，避免覆蓋最新內容。",
+    "publicHint": "分組名稱會顯示在公開探針上。分組與順序可在節點清單統一管理。"
+  },
+  "nodeRegion": {
+    "off": "不顯示",
+    "auto": "{{country}}（自動）",
+    "unknown": "未識別",
+    "pending": "未偵測",
+    "hint": "自動使用 bosun 偵測的機器公網 IP（IPv4 優先），由 Captain 向 Country.is 查詢。手動選擇不隨 IP 變更。",
+    "conflict": "IPv4 為 {{ipv4}}，IPv6 為 {{ipv6}}；自動顯示 IPv4 的地區，可手動覆寫。",
+    "failed": "地區查詢失敗，請稍後重試。",
+    "detect": "偵測 / 更新地區",
+    "noIP": "等待 bosun 回報機器公網 IP；不會使用手動設定的公網入口。",
+    "stale": "公網位址觀測已過期，等待 bosun 重新回報後再偵測。"
   }
 }

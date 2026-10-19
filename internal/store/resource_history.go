@@ -389,13 +389,13 @@ type MonitorNode struct {
 // The persisted snapshot survives panel restarts. Receipt time is independent
 // from liveness: a recent status/task request must not make old metrics fresh.
 func (s *Store) MonitorNodes(ctx context.Context, at time.Time, grace time.Duration, nodeIDs ...int64) ([]MonitorNode, error) {
-	query := `SELECT id,name,monitor_group,token_hash,last_seen_at,probe_info_json,monitor_at,monitor_host_json,host_reported_at,host_status_json FROM nodes`
+	query := `SELECT id,name,monitor_group,token_hash,last_seen_at,probe_info_json,monitor_at,monitor_host_json,host_reported_at,host_status_json,region_mode,address_json,region_detection_json FROM nodes`
 	var args []any
 	if len(nodeIDs) > 0 {
 		query += ` WHERE id=?`
 		args = append(args, nodeIDs[0])
 	}
-	rows, err := s.db.QueryContext(ctx, query+` ORDER BY id`, args...)
+	rows, err := s.db.QueryContext(ctx, query+` ORDER BY display_order,id`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -404,10 +404,10 @@ func (s *Store) MonitorNodes(ctx context.Context, at time.Time, grace time.Durat
 	for rows.Next() {
 		var n MonitorNode
 		var token sql.NullString
-		var info, beatHost, reportHost string
+		var info, beatHost, reportHost, regionMode, addressJSON, regionJSON string
 		var last sql.NullInt64
 		var beatAt, reportAt int64
-		if err := rows.Scan(&n.ID, &n.Name, &n.Group, &token, &last, &info, &beatAt, &beatHost, &reportAt, &reportHost); err != nil {
+		if err := rows.Scan(&n.ID, &n.Name, &n.Group, &token, &last, &info, &beatAt, &beatHost, &reportAt, &reportHost, &regionMode, &addressJSON, &regionJSON); err != nil {
 			return nil, err
 		}
 		n.Paired = token.Valid && token.String != ""
@@ -417,6 +417,11 @@ func (s *Store) MonitorNodes(ctx context.Context, at time.Time, grace time.Durat
 			n.Online = n.Paired && at.Sub(t) <= grace
 		}
 		_ = json.Unmarshal([]byte(info), &n.Info)
+		var obs AddressObservation
+		var detection RegionDetection
+		_ = json.Unmarshal([]byte(addressJSON), &obs)
+		_ = json.Unmarshal([]byte(regionJSON), &detection)
+		resolveRegion(&n.Info, regionMode, obs, detection)
 		n.SampledAt = beatAt
 		raw := beatHost
 		if reportAt > beatAt {
@@ -438,16 +443,4 @@ func (s *Store) MonitorNodes(ctx context.Context, at time.Time, grace time.Durat
 		out = append(out, n)
 	}
 	return out, rows.Err()
-}
-
-func (s *Store) SetMonitorGroup(ctx context.Context, id int64, group string) error {
-	result, err := s.db.ExecContext(ctx, `UPDATE nodes SET monitor_group=? WHERE id=?`, group, id)
-	if err != nil {
-		return err
-	}
-	n, err := result.RowsAffected()
-	if err == nil && n == 0 {
-		return ErrNotFound
-	}
-	return err
 }

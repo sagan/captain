@@ -1,3 +1,5 @@
+import { NodeLayoutEditor } from '../components/NodeLayoutEditor'
+import { nodeLayoutQuery } from '../lib/node-layout'
 import { Badge, Button, Card, Code, Group, Modal, Stack, Table, Text, TextInput, Anchor, ActionIcon, Tooltip, Select, Switch } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { useDisclosure } from '@mantine/hooks'
@@ -47,8 +49,11 @@ export default function NodesPage() {
   const isAdmin = useAuth().me?.role === 'admin'
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['nodes'], queryFn: () => api.get<Node[]>('/api/admin/nodes'), refetchInterval: 15_000 })
+  const layout = useQuery(nodeLayoutQuery)
+  const [organizing, setOrganizing] = useState(false)
+  const [nodeGroup, setNodeGroup] = useState<string | null>(null)
   const [status, setStatus] = useURLChoice('status', ['all', 'offline', 'unpaired', 'doctor', 'monitor'], 'all')
-  const filtered = (q.data ?? []).filter(n => status === 'all' || (status === 'offline' && n.paired && !n.online) || (status === 'unpaired' && !n.paired) || (status === 'doctor' && n.paired && n.doctor_fail) || (status === 'monitor' && n.mode === 'monitor'))
+  const filtered = (q.data ?? []).filter(n => nodeGroup === null || (n.monitor_group ?? '') === nodeGroup).filter(n => status === 'all' || (status === 'offline' && n.paired && !n.online) || (status === 'unpaired' && !n.paired) || (status === 'doctor' && n.paired && n.doctor_fail) || (status === 'monitor' && n.mode === 'monitor'))
   const [opened, { open, close }] = useDisclosure()
   const [created, setCreated] = useState<Node | null>(null)
   const form = useForm({ initialValues: { Name: '', AutoIPv4: true, AutoIPv6: true, PublicAddr: '', InternalAddr: '', V6Addr: '', Domain: '', DomainShared: false, MonitorURL: '', Mode: 'full' } })
@@ -67,20 +72,23 @@ export default function NodesPage() {
     <>
       <PageHeader title={t('nodes.title')} subtitle={t('nodes.subtitle')} actions={<>
         {isAdmin && outdated > 0 && <Button variant="light" color="orange" leftSection={<IconArrowUp size={16} />} loading={upgradeAll.isPending} onClick={() => modals.openConfirmModal({ title: t('nodes.upgradeAll', { count: outdated }), children: <Text size="sm">{t('nodes.upgradeAllConfirm', { count: outdated, version: sys.data?.bosun_latest ?? '' })}</Text>, labels: { confirm: t('nodes.upgradeAll', { count: outdated }), cancel: t('common.cancel') }, confirmProps: { color: 'orange' }, onConfirm: () => upgradeAll.mutate() })}>{t('nodes.upgradeAll', { count: outdated })}</Button>}
+        <Button variant="light" disabled={!layout.data || !q.data || layout.isError || q.isError} loading={layout.isFetching} onClick={() => { void layout.refetch().then(r => { if (r.data && !r.isError) setOrganizing(true); else toast.err(r.error) }) }}>{t('nodeLayout.title')}</Button>
         <Button leftSection={<IconPlus size={16} />} onClick={open}>{t('nodes.create')}</Button>
       </>} />
-      <Select mb="md" maw={320} label={t('monitoring.status')} value={status} onChange={value => setStatus(value ?? 'all')} allowDeselect={false} data={[{ value: 'all', label: t('common.all') }, { value: 'offline', label: t('nodes.offline') }, { value: 'unpaired', label: t('nodes.unpaired') }, { value: 'doctor', label: t('dashboard.lastCheckFailed') }, { value: 'monitor', label: t('nodeMode.monitor') }]} />
+      <Group align="flex-end" mb="md"><Select style={{ flex: 1 }} label={t('monitoring.group')} placeholder={t('common.all')} clearable value={nodeGroup} onChange={setNodeGroup} data={[{ value: '', label: t('nodeLayout.ungrouped') }, ...(layout.data?.groups ?? []).map(g => ({ value: g, label: g }))]} />
+      <Select style={{ flex: 1 }} maw={320} label={t('monitoring.status')} value={status} onChange={value => setStatus(value ?? 'all')} allowDeselect={false} data={[{ value: 'all', label: t('common.all') }, { value: 'offline', label: t('nodes.offline') }, { value: 'unpaired', label: t('nodes.unpaired') }, { value: 'doctor', label: t('dashboard.lastCheckFailed') }, { value: 'monitor', label: t('nodeMode.monitor') }]} /></Group>
       <Card p={0}>
         <Table.ScrollContainer minWidth={720}>
           <Table>
             <Table.Thead><Table.Tr>
-              <Table.Th>{t('nodes.name')}</Table.Th><Table.Th>{t('nodes.status')}</Table.Th><Table.Th>{t('nodes.publicAddr')}</Table.Th>
+              <Table.Th>{t('nodes.name')}</Table.Th><Table.Th>{t('monitoring.group')}</Table.Th><Table.Th>{t('nodes.status')}</Table.Th><Table.Th>{t('nodes.publicAddr')}</Table.Th>
               <Table.Th>{t('nodes.inbounds')}</Table.Th><Table.Th>{t('nodes.trafficToday')}</Table.Th><Table.Th>{t('nodes.version')}</Table.Th><Table.Th>{t('nodes.lastSeen')}</Table.Th>
             </Table.Tr></Table.Thead>
             <Table.Tbody>
               {filtered.map((n) => (
                 <Table.Tr key={n.id}>
                   <Table.Td><Anchor component={Link} to={`/nodes/${n.id}`} fw={600}>{n.name}</Anchor>{n.mode === 'monitor' && <Badge ml="xs" size="xs" color="cyan">{t('nodeMode.monitor')}</Badge>}<Text size="xs" c="dimmed">{n.hostname}</Text></Table.Td>
+                  <Table.Td><Text size="sm">{n.monitor_group || t('nodeLayout.ungrouped')}</Text></Table.Td>
                   <Table.Td><Group gap={4}><NodeStatus n={n} />{n.cert_problem && <Badge color="red" size="xs" title={t('nodes.certProblem')}>TLS</Badge>}{n.doctor_fail && <Badge color="red" size="xs" variant="light" title={t('nodes.doctorFailHint')}>{t('nodes.doctor')}</Badge>}</Group></Table.Td>
                   <Table.Td><Code>{n.public_addr || '—'}</Code><Text size="xs" c="dimmed">{n.domain}</Text>{(n.domain_shared || n.domain_conflict) && <Tooltip label={t(n.domain_shared ? 'nodes.domainSharedHint' : 'nodes.domainLegacyHint')}><Badge size="xs" color={n.domain_shared ? 'blue' : 'orange'}>{t(n.domain_shared ? 'nodes.domainExternal' : 'nodes.domainDuplicate')}</Badge></Tooltip>}</Table.Td>
                   <Table.Td>{n.inbounds}</Table.Td>
@@ -96,11 +104,12 @@ export default function NodesPage() {
                   <Table.Td>{ago(n.last_seen_at)}</Table.Td>
                 </Table.Tr>
               ))}
-              {q.data && filtered.length === 0 && <Table.Tr><Table.Td colSpan={7}><Text c="dimmed" ta="center" py="lg">{t('common.empty')}</Text></Table.Td></Table.Tr>}
+              {q.data && filtered.length === 0 && <Table.Tr><Table.Td colSpan={8}><Text c="dimmed" ta="center" py="lg">{t('common.empty')}</Text></Table.Td></Table.Tr>}
             </Table.Tbody>
           </Table>
         </Table.ScrollContainer>
       </Card>
+      {organizing && layout.data && <NodeLayoutEditor initial={layout.data} nodes={q.data ?? []} onSaved={() => setNodeGroup(null)} close={() => setOrganizing(false)} />}
       <Modal opened={opened} onClose={() => { close(); setCreated(null) }} title={created ? t('nodes.pairTitle') : t('nodes.create')} size="lg">
         {created ? <PairCodeBox code={created.pair_code ?? ''} mode={created.mode} /> : (
           <form onSubmit={form.onSubmit((v) => create.mutate(v))}>

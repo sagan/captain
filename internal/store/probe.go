@@ -158,6 +158,8 @@ func (s *Store) DeletePingTask(ctx context.Context, id int64) error {
 
 // NodeProbe is the per-node probe configuration and monthly traffic state.
 type NodeProbe struct {
+	RegionMode       string               `json:"region_mode"`
+	RegionDetection  RegionDetection      `json:"region_detection"`
 	Resources        spec.ResourceOptions `json:"resources"`
 	counters         networkCounters
 	NodeID           int64         `json:"node_id"`
@@ -202,13 +204,17 @@ func (p NodeProbe) Billed() int64 {
 func scanNodeProbe(row interface{ Scan(...any) error }) (*NodeProbe, error) {
 	var p NodeProbe
 	var hidden int
-	var info, resources, counters string
+	var info, resources, counters, observation, detection string
 	var start int64
-	if err := row.Scan(&p.NodeID, &hidden, &info, &p.LimitBytes, &p.ResetDay, &p.Mode, &start, &p.UsedUp, &p.UsedDown, &p.lastUp, &p.lastDown, &p.PrevUsed, &resources, &counters); err != nil {
+	if err := row.Scan(&p.NodeID, &hidden, &info, &p.LimitBytes, &p.ResetDay, &p.Mode, &start, &p.UsedUp, &p.UsedDown, &p.lastUp, &p.lastDown, &p.PrevUsed, &resources, &counters, &p.RegionMode, &observation, &detection); err != nil {
 		return nil, wrapNotFound(err)
 	}
 	p.Hidden = hidden == 1
 	_ = json.Unmarshal([]byte(info), &p.Info)
+	var obs AddressObservation
+	_ = json.Unmarshal([]byte(observation), &obs)
+	_ = json.Unmarshal([]byte(detection), &p.RegionDetection)
+	p.RegionMode, p.RegionDetection = resolveRegion(&p.Info, p.RegionMode, obs, p.RegionDetection)
 	_ = json.Unmarshal([]byte(resources), &p.Resources)
 	_ = json.Unmarshal([]byte(counters), &p.counters)
 	if start > 0 {
@@ -217,7 +223,7 @@ func scanNodeProbe(row interface{ Scan(...any) error }) (*NodeProbe, error) {
 	return &p, nil
 }
 
-const nodeProbeCols = `id, probe_hidden, probe_info_json, traffic_limit_bytes, traffic_reset_day, traffic_mode, traffic_period_start, traffic_used_up, traffic_used_down, traffic_last_up, traffic_last_down, traffic_prev_used, probe_resources_json, probe_counters_json`
+const nodeProbeCols = `id, probe_hidden, probe_info_json, traffic_limit_bytes, traffic_reset_day, traffic_mode, traffic_period_start, traffic_used_up, traffic_used_down, traffic_last_up, traffic_last_down, traffic_prev_used, probe_resources_json, probe_counters_json, region_mode, address_json, region_detection_json`
 
 func (s *Store) NodeProbe(ctx context.Context, nodeID int64) (*NodeProbe, error) {
 	return scanNodeProbe(s.db.QueryRowContext(ctx, `SELECT `+nodeProbeCols+` FROM nodes WHERE id = ?`, nodeID))
@@ -242,6 +248,16 @@ func (s *Store) ListNodeProbes(ctx context.Context) (map[int64]*NodeProbe, error
 
 // UpdateNodeProbe stores the admin-edited part (not the counters).
 func (s *Store) UpdateNodeProbe(ctx context.Context, nodeID int64, hidden bool, info NodeProbeInfo, limit int64, resetDay int, mode string, resources ...*spec.ResourceOptions) error {
+	var opts *spec.ResourceOptions
+	if len(resources) > 0 {
+		opts = resources[0]
+	}
+	return s.UpdateNodeProbeWithRegion(ctx, nodeID, hidden, info, limit, resetDay, mode, opts, nil)
+}
+
+// Omitted mode preserves auto when a legacy client echoes the effective region.
+// A changed country from an old client remains an explicit manual/off choice.
+func (s *Store) UpdateNodeProbeWithRegion(ctx context.Context, nodeID int64, hidden bool, info NodeProbeInfo, limit int64, resetDay int, mode string, resources *spec.ResourceOptions, requested *string) error {
 	if resetDay < 1 || resetDay > 28 {
 		resetDay = 1
 	}
@@ -251,18 +267,48 @@ func (s *Store) UpdateNodeProbe(ctx context.Context, nodeID int64, hidden bool, 
 		mode = "sum"
 	}
 	info.Region = strings.ToUpper(strings.TrimSpace(info.Region))
-	b, _ := json.Marshal(info)
 	var resourceJSON any
-	if len(resources) > 0 && resources[0] != nil {
-		if err := resources[0].Validate(); err != nil {
+	if resources != nil {
+		if err := resources.Validate(); err != nil {
 			return err
 		}
-		raw, _ := json.Marshal(resources[0])
+		raw, _ := json.Marshal(resources)
 		resourceJSON = string(raw)
 	}
-	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET probe_hidden = ?, probe_info_json = ?, traffic_limit_bytes = ?, traffic_reset_day = ?, traffic_mode = ?, probe_resources_json = COALESCE(?, probe_resources_json), updated_at = ? WHERE id = ?`,
-		boolInt(hidden), string(b), limit, resetDay, mode, resourceJSON, now(), nodeID)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	old, err := scanNodeProbe(tx.QueryRowContext(ctx, `SELECT `+nodeProbeCols+` FROM nodes WHERE id=?`, nodeID))
+	if err != nil {
+		return err
+	}
+	selected := old.RegionMode
+	if requested != nil {
+		selected = *requested
+	} else if info.Region != old.Info.Region {
+		selected = "manual"
+		if info.Region == "" {
+			selected = "off"
+		}
+	}
+	switch selected {
+	case "auto", "off":
+		info.Region = ""
+	case "manual":
+		if !ValidRegion(info.Region) {
+			return ErrNodeRegion
+		}
+	default:
+		return ErrNodeRegion
+	}
+	b, _ := json.Marshal(info)
+	_, err = tx.ExecContext(ctx, `UPDATE nodes SET probe_hidden=?,probe_info_json=?,traffic_limit_bytes=?,traffic_reset_day=?,traffic_mode=?,probe_resources_json=COALESCE(?,probe_resources_json),region_mode=?,updated_at=? WHERE id=?`, boolInt(hidden), string(b), limit, resetDay, mode, resourceJSON, selected, now(), nodeID)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ResetNodeTraffic zeroes the current period by hand.

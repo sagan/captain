@@ -1,3 +1,4 @@
+import { NodeRegionSelect, type RegionDetection } from './NodeRegionSelect'
 import { ReturnRoutesCard } from './ReturnRoutesCard'
 import { AvailabilityCard } from './AvailabilityCard'
 import { NetworkQualityCard } from './NetworkQualityCard'
@@ -16,7 +17,8 @@ import { bytes } from '../lib/format'
 import { toast } from '../lib/notify'
 
 interface NodeProbe {
-  probe: { resources?: ResourceOptions; node_id: number; hidden: boolean; info: { region?: string; provider?: string; provider_url?: string; price?: string; expires_at?: string; note?: string }; limit_bytes: number; reset_day: number; mode: string; period_start: string; used_up: number; used_down: number; prev_used: number }
+  region_countries: string[]
+  probe: { region_mode: string; region_detection: RegionDetection; resources?: ResourceOptions; node_id: number; hidden: boolean; info: { region?: string; provider?: string; provider_url?: string; price?: string; expires_at?: string; note?: string }; limit_bytes: number; reset_day: number; mode: string; period_start: string; used_up: number; used_down: number; prev_used: number }
   billed: number
   live?: { at: string; host: ResourceHost }
 }
@@ -29,8 +31,9 @@ export function NodeProbeCard({ nodeID, reportedHost }: { nodeID: number; report
   const q = useQuery({ queryKey: ['node-probe', nodeID], queryFn: () => api.get<NodeProbe>(`/api/admin/nodes/${nodeID}/probe`), refetchInterval: 10_000 })
   const loaded = useRef(false)
   const form = useForm({ initialValues: { Resources: {} as ResourceOptions, Hidden: false, region: '', provider: '', provider_url: '', price: '', expires_at: '', note: '', LimitGB: 0, ResetDay: 1, Mode: 'sum' } })
-  useEffect(() => { const p = q.data?.probe; if (p && !loaded.current) { loaded.current = true; form.setValues({ Resources: p.resources ?? {}, Hidden: p.hidden, region: p.info.region ?? '', provider: p.info.provider ?? '', provider_url: p.info.provider_url ?? '', price: p.info.price ?? '', expires_at: p.info.expires_at ?? '', note: p.info.note ?? '', LimitGB: +(p.limit_bytes / 2 ** 30).toFixed(0), ResetDay: p.reset_day, Mode: p.mode }) } }, [q.data, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
-  const save = useMutation({ mutationFn: (v: typeof form.values) => api.put(`/api/admin/nodes/${nodeID}/probe`, { Hidden: v.Hidden, Info: { region: v.region.toUpperCase(), provider: v.provider, provider_url: v.provider_url, price: v.price, expires_at: v.expires_at, note: v.note }, LimitBytes: Math.round(v.LimitGB * 2 ** 30), ResetDay: v.ResetDay, Mode: v.Mode, Resources: v.Resources }), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['node-probe', nodeID] }) }, onError: toast.err })
+  useEffect(() => { const p = q.data?.probe; if (p && !loaded.current) { loaded.current = true; form.setValues({ Resources: p.resources ?? {}, Hidden: p.hidden, region: p.region_mode === 'auto' ? 'auto' : p.region_mode === 'off' ? 'off' : p.info.region || 'off', provider: p.info.provider ?? '', provider_url: p.info.provider_url ?? '', price: p.info.price ?? '', expires_at: p.info.expires_at ?? '', note: p.info.note ?? '', LimitGB: +(p.limit_bytes / 2 ** 30).toFixed(0), ResetDay: p.reset_day, Mode: p.mode }) } }, [q.data, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
+  const save = useMutation({ mutationFn: (v: typeof form.values) => api.put(`/api/admin/nodes/${nodeID}/probe`, { Hidden: v.Hidden, RegionMode: v.region === 'auto' || v.region === 'off' ? v.region : 'manual', Info: { region: v.region === 'auto' || v.region === 'off' ? '' : v.region.toUpperCase(), provider: v.provider, provider_url: v.provider_url, price: v.price, expires_at: v.expires_at, note: v.note }, LimitBytes: Math.round(v.LimitGB * 2 ** 30), ResetDay: v.ResetDay, Mode: v.Mode, Resources: v.Resources }), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['node-probe', nodeID] }) }, onError: toast.err })
+  const detect = useMutation({ mutationFn: () => api.post<NodeProbe>(`/api/admin/nodes/${nodeID}/region-detect`), onSuccess: data => qc.setQueryData(['node-probe', nodeID], data), onError: toast.err })
   const reset = useMutation({ mutationFn: () => api.post(`/api/admin/nodes/${nodeID}/probe/reset-traffic`), onSuccess: () => { toast.ok(t('common.saved')); qc.invalidateQueries({ queryKey: ['node-probe', nodeID] }) }, onError: toast.err })
   const p = q.data?.probe
   const used = q.data?.billed ?? 0
@@ -61,7 +64,7 @@ export function NodeProbeCard({ nodeID, reportedHost }: { nodeID: number; report
           <Select label={t('nodeProbe.mode')} description={t('nodeProbe.modeHint')} data={[{ value: 'sum', label: t('nodeProbe.modes.sum') }, { value: 'up', label: t('nodeProbe.modes.up') }, { value: 'down', label: t('nodeProbe.modes.down') }, { value: 'max', label: t('nodeProbe.modes.max') }]} allowDeselect={false} {...form.getInputProps('Mode')} />
         </SimpleGrid>
         <SimpleGrid cols={{ base: 1, sm: 3 }}>
-          <TextInput label={t('nodeProbe.region')} description={t('nodeProbe.regionHint')} inputWrapperOrder={['label', 'input', 'description', 'error']} placeholder="JP" maxLength={2} {...form.getInputProps('region')} />
+          <NodeRegionSelect value={form.values.region || 'off'} onChange={v => form.setFieldValue('region', v)} countries={q.data?.region_countries ?? []} detection={p?.region_detection} detect={() => detect.mutate()} pending={detect.isPending} disabled={!p || q.isError || save.isPending} />
           <TextInput label={t('nodeProbe.provider')} placeholder="Vultr" {...form.getInputProps('provider')} />
           <TextInput label={t('nodeProbe.providerURL')} placeholder="https://…" {...form.getInputProps('provider_url')} />
           <TextInput label={t('nodeProbe.price')} placeholder="$5 / mo" {...form.getInputProps('price')} />
@@ -70,7 +73,7 @@ export function NodeProbeCard({ nodeID, reportedHost }: { nodeID: number; report
         </SimpleGrid>
         <Group justify="space-between">
           <Switch label={t('nodeProbe.hidden')} {...form.getInputProps('Hidden', { type: 'checkbox' })} />
-          <Group gap="xs"><Button size="xs" variant="subtle" color="gray" onClick={() => reset.mutate()}>{t('nodeProbe.reset')}</Button><Button type="submit" size="xs" loading={save.isPending}>{t('common.save')}</Button></Group>
+          <Group gap="xs"><Button size="xs" variant="subtle" color="gray" onClick={() => reset.mutate()}>{t('nodeProbe.reset')}</Button><Button type="submit" size="xs" disabled={!p || q.isError} loading={save.isPending}>{t('common.save')}</Button></Group>
         </Group>
       </Stack></form>
     </Card></>

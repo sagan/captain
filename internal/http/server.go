@@ -62,6 +62,7 @@ type Server struct {
 	probeSvc      *service.Probe
 	dnsHealth     *service.DNSHealth
 	nodeAddresses *service.NodeAddresses
+	nodeRegions   *service.NodeRegions
 	heartbeat     *service.Heartbeat
 	hooks         *webhook.Hub
 	bot           *telegram.Bot
@@ -135,6 +136,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger, opts ...Options)
 		notifier.Admin(ctx, fmt.Sprintf("💰 Order %s paid: %.2f via %s\n%s", o.No, float64(o.AmountCents)/100, o.Gateway, email))
 	}
 	s.probeSvc = &service.Probe{Store: st, Notify: notifier, Log: log}
+	s.nodeRegions = &service.NodeRegions{Store: st, Probe: s.probeSvc}
 	s.dnsHealth = &service.DNSHealth{Store: st, Probe: s.probeSvc, Log: log}
 	s.state = &service.AgentState{Store: st, PullSeconds: cfg.Agent.PullSeconds, PushSeconds: cfg.Agent.PushSeconds, EnforceDevices: cfg.EnforceDevices(), Probe: s.probeSvc}
 	s.nodeAddresses = &service.NodeAddresses{Store: st, DNS: &service.DNS{Store: st, Log: log, Base: dnsBase}, State: s.state, Log: log}
@@ -171,7 +173,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger, opts ...Options)
 	s.certs = &service.Certs{Store: st, Issuer: certIssuer, Log: log, Notify: notifier}
 	s.probe = probe.Register(s.mux, probe.Deps{Store: st, Probe: s.probeSvc, SiteName: cfg.SiteName, Resolve: resolve, Page: web.Probe(), GlassPage: web.ProbeGlass()})
 	dyn := &service.DynLimit{Store: st, State: s.state, Notify: notifier, Hooks: s.hooks, Log: log, PushSeconds: cfg.Agent.PushSeconds}
-	admin.Register(s.mux, admin.Deps{Store: st, Log: log, Dyn: dyn, Sessions: sessions, State: s.state, Metrics: s.metricsHandler(st), Backups: s.backups, Certs: s.certs, DNS: &service.DNS{Store: st, Log: log, Base: dnsBase}, DNSHealth: s.dnsHealth, BaseURL: base, Version: cfg.Version, Logins: logins, Secure: secure, SubLinks: s.subLinks, Mail: mailer, SiteName: cfg.SiteName, Notify: notifier, Bot: s.bot, Hooks: s.hooks, Probe: s.probeSvc, External: s.external, Allow: allow, Heartbeat: s.heartbeat,
+	admin.Register(s.mux, admin.Deps{NodeRegions: s.nodeRegions, Store: st, Log: log, Dyn: dyn, Sessions: sessions, State: s.state, Metrics: s.metricsHandler(st), Backups: s.backups, Certs: s.certs, DNS: &service.DNS{Store: st, Log: log, Base: dnsBase}, DNSHealth: s.dnsHealth, BaseURL: base, Version: cfg.Version, Logins: logins, Secure: secure, SubLinks: s.subLinks, Mail: mailer, SiteName: cfg.SiteName, Notify: notifier, Bot: s.bot, Hooks: s.hooks, Probe: s.probeSvc, External: s.external, Allow: allow, Heartbeat: s.heartbeat,
 		Updater:       &selfupdate.Client{Repo: "zeptop-dev/captain", Binary: "captain", Version: cfg.Version, MinVersion: captainUpdateFloor(cfg.MinVersion)},
 		BosunReleases: &selfupdate.Client{Repo: "zeptop-dev/bosun", Binary: "bosun", Version: "v0.0.0"},
 		Registration:  cfg.Portal.Registration,
@@ -548,3 +550,5 @@ func captainUpdateFloor(configured string) string {
 }
 
 func (s *Server) NodeAddresses() *service.NodeAddresses { return s.nodeAddresses }
+
+func (s *Server) NodeRegions() *service.NodeRegions { return s.nodeRegions }

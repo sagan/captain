@@ -40,7 +40,7 @@ export default function App({ snap }: { snap: UseQueryResult<Snapshot, Error> })
         </Group>
       </Container>
       <Container size="lg" pb={60}>
-        <SimpleGrid cols={{ base: 1, sm: 3 }} mb="md"><TextInput aria-label={t('page.search')} placeholder={t('page.search')} value={search} onChange={(e) => setSearch(e.currentTarget.value)} /><Select aria-label={t('page.group')} placeholder={t('page.group')} clearable data={[...new Set(s.nodes.map((n) => n.group).filter((g): g is string => !!g))].sort()} value={group} onChange={setGroup} /><Select aria-label={t('page.status')} placeholder={t('page.status')} clearable value={status} onChange={setStatus} data={['online', 'offline'].map((value) => ({ value, label: t(`page.${value}`) }))} /></SimpleGrid>
+        <SimpleGrid cols={{ base: 1, sm: 3 }} mb="md"><TextInput aria-label={t('page.search')} placeholder={t('page.search')} value={search} onChange={(e) => setSearch(e.currentTarget.value)} /><Select aria-label={t('page.group')} placeholder={t('page.group')} clearable data={[...new Set(s.nodes.map((n) => n.group).filter((g): g is string => !!g))]} value={group} onChange={setGroup} /><Select aria-label={t('page.status')} placeholder={t('page.status')} clearable value={status} onChange={setStatus} data={['online', 'offline'].map((value) => ({ value, label: t(`page.${value}`) }))} /></SimpleGrid>
         <SimpleGrid cols={s.layout === 'compact' ? 1 : { base: 1, sm: 2, lg: 3 }} spacing="md">
           {filtered.map((n) => <NodeCard key={n.id} n={n} snapshot={s} onOpen={() => setOpen(n.id)} />)}
         </SimpleGrid>

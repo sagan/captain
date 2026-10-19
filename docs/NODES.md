@@ -4,6 +4,31 @@ How a server becomes a node, what it serves, and how traffic gets in and
 out of it. Version notes name the bosun release a feature needs; Captain
 1.2 ships against bosun 0.49.
 
+## Groups and display order
+
+Use **Nodes → Groups and order** to create, rename, delete and reorder monitoring
+groups. Drag a handle, use the up/down buttons, or focus a handle and use
+Space plus arrow keys. Select a group to reorder its nodes; select several
+nodes to move them together. Changes remain a draft until **Save**. **Cancel**
+discards them. A concurrent node creation, deletion or layout change rejects
+an outdated save; cancel and reopen to load the latest layout.
+
+Node management and the public status page share this order. Groups follow the
+configured sequence, with Ungrouped last; nodes retain their configured order
+within each group. Migration preserves the existing node order until the first
+layout edit; new nodes append at the end. Deleting a group moves its nodes to
+Ungrouped without deleting them. Empty groups remain available in administration
+but do not appear publicly. Node details also offer a single-node group selector;
+moving a node appends it to the destination group.
+
+Group names are public on the status page. They are independent of user and
+billing groups. Hidden and unpaired nodes remain excluded from the public page;
+changing groups does not change visibility. Traffic/peak or visitor-selected
+column sorting temporarily overrides the configured default order. Operators
+and administrators can edit layout; support users cannot. No bosun update is
+needed. The legacy `/api/admin/nodes/{id}/monitor-group` endpoint remains valid;
+`GET/PUT /api/admin/nodes/layout` adds revision-checked bulk layout management.
+
 ## Adding a node
 
 Admin → Nodes → new node gives you a one-time pairing code and two ways to

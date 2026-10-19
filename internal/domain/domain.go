@@ -140,6 +140,7 @@ func (s *Subscription) Usable(t time.Time) bool {
 }
 
 type Node struct {
+	MonitorGroup         string
 	ModeRevision         uint64
 	ReportedModeRevision uint64
 	ModeManaged          bool

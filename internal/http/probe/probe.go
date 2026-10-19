@@ -200,7 +200,7 @@ func (h *handlers) snapshot(w http.ResponseWriter, r *http.Request) {
 		}
 		last := n.LastSeenAt
 		snapshot := snapshots[n.ID]
-		v.Group = snapshot.Group
+		v.Group = n.MonitorGroup
 		if snapshot.Host != nil {
 			v.Host = publicHost(*snapshot.Host, s)
 		}

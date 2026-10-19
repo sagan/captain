@@ -309,4 +309,6 @@ MIT — see [LICENSE](LICENSE).
 
 ### Host management
 
+Automatic listener firewall rules show their sources and synchronization state; shared ports stay open until their last reference disappears. Manual and ambiguous legacy rules are retained (bosun v0.72.0+).
+
 Captain node details expose observed host state, individual changes and operation history. Native root Debian/Ubuntu systemd nodes support bounded management jobs with independent local recovery for access/network changes. Other environments are read-only; missing system packages are not installed automatically.

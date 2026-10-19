@@ -2471,5 +2471,31 @@
       "swap": "Creates one dedicated swap file, preserving existing provider/Quench swap. Existing managed swap cannot be resized here; creation can fail on unsupported filesystems or insufficient space."
     },
     "keep": "変更しない"
+  },
+  "hostFirewall": {
+    "title": "待受ポートの自動許可",
+    "hint": "インバウンド、転送、WG の待受設定に同期し、最後の参照がなくなると削除します。クラウドのセキュリティグループ、NAT、転送ポリシーは変更しません。同期済みでも外部からの接続を保証しません。",
+    "minimum": "bosun を v0.72.0 以降に更新し、再読み込みするとルールの参照元と同期結果を確認できます。",
+    "noReferences": "参照なし。削除または確認待ち",
+    "states": {
+      "synced": "同期済み",
+      "pending": "同期待ち",
+      "error": "同期失敗",
+      "external": "既存の外部ルールを維持",
+      "retained": "確認のため維持",
+      "unavailable": "有効な UFW / firewalld 未検出",
+      "disabled": "自動許可は無効"
+    },
+    "warnings": {
+      "legacy_rules_retained": "旧版の記録では所有権を証明できないため既存ルールを維持します。サービス削除後に手動で確認してください。",
+      "ownership_conflict": "外部での変更、または防火壁のバックエンド／ゾーン変更により自動削除しません。確認してください。"
+    },
+    "sources": {
+      "inbound": "インバウンド",
+      "forward": "転送",
+      "wireguard": "WG 接続",
+      "certificate": "証明書検証",
+      "system": "システム待受"
+    }
   }
 }

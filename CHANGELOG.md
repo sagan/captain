@@ -6,6 +6,8 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
+- **v1.24.0** (2026-10-19) — Show automatic firewall listener sources and synchronization results in node Host management, including manual/legacy retention and failed cleanup. Explain local listener versus remote outbound ports and cloud/NAT/forwarding boundaries; requires bosun v0.72.0 for detailed status.
+
 - **v1.23.0** (2026-10-18) — Add administrator-only node Host management with actual-state observations, independent edit/review flows, access-change confirmation/recovery and persistent operation history. Gate writes by online bosun v0.71.0 and actual node capabilities; stale, offline and unsupported states stay explicit. No onboarding score or mandatory workflow.
 
 - **v1.22.0** (2026-10-18) — Add return-route tool checks and one-click NextTrace installation, with node-version and administrator guards, installation results and IPv4/IPv6 ICMP permission status. Keep tool jobs separate from route history; require bosun v0.70.0 for management and retain v0.69.0 route support. Hide empty route metadata.

@@ -832,3 +832,22 @@ reject stale plans and duplicate execution. Recovery files and receipts live in
 `data_dir/host-management` with restrictive permissions. Captain retains up to
 200 operations for 180 days plus the latest checks; ordinary job cleanup does
 not delete this history. This is separate from proxy core backups and updates.
+
+### Automatic listener firewall rules (Captain 1.24 / bosun 0.72)
+
+The Firewall item in Host management includes automatic rules with their inbound,
+forward, WG link, certificate or system-listener sources and last synchronization
+time. Refresh host state for a fresh snapshot. Older nodes show an upgrade hint.
+Only active UFW/firewalld listener allowances are managed; cloud security groups,
+NAT mappings, raw nftables/iptables policies and WG forwarding rules are separate.
+An outbound destination port is not a local listener. TCP and UDP are separate,
+and shared rules remain until their last listener disappears. Synchronization
+runs on configuration changes and retries every minute.
+
+UFW comments and journal-owned firewalld rich rules identify new managed rules.
+Existing operator allowances are preserved. Legacy records lack ownership proof:
+those old openings remain and must be reviewed manually after removing services.
+Externally edited rules or a changed firewall backend/zone are retained for review.
+Firewalld synchronization uses the recorded default zone, runtime and permanent
+configuration, without reloading unrelated rules. A synchronized allowance is
+not a public connectivity test or a guarantee against earlier deny rules.

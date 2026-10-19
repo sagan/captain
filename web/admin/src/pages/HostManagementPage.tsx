@@ -10,7 +10,8 @@ import { PageHeader } from '../components/PageHeader'
 
 interface Item { id: string; state: string; values: Record<string, string>; editable: boolean; reason?: string }
 interface Pending { id: string; section: string; deadline: number; phase: string }
-interface Snapshot { checked_at: number; environment: string; revision: string; items: Item[]; pending?: Pending }
+interface Firewall { kind: string; state: string; checked_at: number; warning?: string; error?: string; rules: { port: number; protocol: string; sources: string[]; state: string; detail?: string }[] }
+interface Snapshot { firewall?: Firewall; checked_at: number; environment: string; revision: string; items: Item[]; pending?: Pending }
 interface Request { action: string; section?: string; values?: Record<string, string>; revision?: string; transaction?: string; verified?: boolean }
 interface Result { state?: Snapshot; outcome: string; message?: string }
 type Job = Omit<NodeJob, 'params' | 'result'> & { params: Request; result?: Result }
@@ -88,6 +89,16 @@ export default function HostManagementPage() {
           const item = snapshot?.items.find(x => x.id === itemID)
           return <div key={itemID}>{i > 0 && <Divider mb="md" />}<Group justify="space-between" align="flex-start" wrap="nowrap"><Stack gap={4} style={{ minWidth: 0, flex: 1 }}><Group gap="xs"><Text fw={600}>{t('host.items.' + itemID)}</Text><Badge color={item?.state === 'known' ? 'gray' : 'orange'} variant="light">{t(item?.state === 'known' ? 'host.observed' : 'host.unknown')}</Badge></Group>
             {item && Object.entries(item.values).map(([name, value]) => <Text key={name} size="sm" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}><Text span c="dimmed">{label(name)}: </Text>{value || '—'}</Text>)}
+            {itemID === 'firewall' && <Stack gap="xs" mt="xs">
+              <Text size="sm" fw={600}>{t('hostFirewall.title')}</Text>
+              <Text size="xs" c="dimmed">{t('hostFirewall.hint')}</Text>
+              {!snapshot?.firewall ? <Text size="sm" c="dimmed">{t('hostFirewall.minimum')}</Text> : <>
+                <Group gap="xs"><Badge color={snapshot.firewall.state === 'error' ? 'orange' : 'gray'}>{t('hostFirewall.states.' + snapshot.firewall.state, { defaultValue: snapshot.firewall.state || t('host.unknown') })}</Badge><Text size="xs" c="dimmed">{snapshot.firewall.kind || '—'} · {snapshot.firewall.checked_at ? new Date(snapshot.firewall.checked_at * 1000).toLocaleString() : t('host.noData')}</Text></Group>
+                {snapshot.firewall.warning && <Alert color="orange">{t('hostFirewall.warnings.' + snapshot.firewall.warning, { defaultValue: snapshot.firewall.warning })}</Alert>}
+                {snapshot.firewall.error && <Text size="sm" c="red" style={{ overflowWrap: 'anywhere' }}>{snapshot.firewall.error}</Text>}
+                {snapshot.firewall.rules?.map(rule => <Card key={rule.protocol + ':' + rule.port} withBorder padding="xs"><Group justify="space-between"><Text size="sm" fw={600}>{rule.port}/{rule.protocol.toUpperCase()}</Text><Badge color={rule.state === 'error' || rule.state === 'retained' ? 'orange' : 'gray'}>{t('hostFirewall.states.' + rule.state, { defaultValue: rule.state })}</Badge></Group><Text size="xs" style={{ overflowWrap: 'anywhere' }}>{rule.sources?.length ? rule.sources.map(source => { const split = source.indexOf(':'); return t('hostFirewall.sources.' + source.slice(0, split), { defaultValue: source.slice(0, split) }) + ': ' + source.slice(split + 1) }).join(' · ') : t('hostFirewall.noReferences')}</Text>{rule.detail && <Text size="xs" c="red" style={{ overflowWrap: 'anywhere' }}>{rule.detail}</Text>}</Card>)}
+              </>}
+            </Stack>}
             {item && !item.editable && <Text size="xs" c="dimmed">{t('host.reasons.' + item.reason, { defaultValue: item.reason })}</Text>}
           </Stack><Button variant="default" size="xs" disabled={!item?.editable || !online || busy || !!pending || stale} onClick={() => item && open(item)}>{t('common.edit')}</Button></Group></div>
         })}</Stack></Card>)}

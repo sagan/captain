@@ -2471,5 +2471,31 @@
       "swap": "Creates one dedicated swap file, preserving existing provider/Quench swap. Existing managed swap cannot be resized here; creation can fail on unsupported filesystems or insufficient space."
     },
     "keep": "Keep unchanged"
+  },
+  "hostFirewall": {
+    "title": "Automatic listener rules",
+    "hint": "Follows inbound, forwarding and WG listeners; rules are removed after the last reference disappears. Does not change cloud security groups, NAT mappings or forwarding policy. Synced rules do not prove public reachability.",
+    "minimum": "Upgrade bosun to v0.72.0 and refresh to see rule sources and synchronization results.",
+    "noReferences": "No remaining references; awaiting cleanup or review",
+    "states": {
+      "synced": "Synced",
+      "pending": "Pending",
+      "error": "Sync failed",
+      "external": "External rule retained",
+      "retained": "Retained for review",
+      "unavailable": "No active UFW / firewalld detected",
+      "disabled": "Automatic opening disabled"
+    },
+    "warnings": {
+      "legacy_rules_retained": "Old records cannot prove ownership. Existing allowances are retained and need manual review after removing their services.",
+      "ownership_conflict": "External rule edits or a changed firewall backend/zone prevent automatic deletion. Review required."
+    },
+    "sources": {
+      "inbound": "Inbound",
+      "forward": "Forward",
+      "wireguard": "WG link",
+      "certificate": "Certificate validation",
+      "system": "System listener"
+    }
   }
 }

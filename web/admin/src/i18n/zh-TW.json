@@ -2471,5 +2471,31 @@
       "swap": "Creates one dedicated swap file, preserving existing provider/Quench swap. Existing managed swap cannot be resized here; creation can fail on unsupported filesystems or insufficient space."
     },
     "keep": "保持現狀"
+  },
+  "hostFirewall": {
+    "title": "自動連接埠放行",
+    "hint": "隨入站、轉發和 WG 監聽同步；最後一個使用者移除後才撤銷。僅管理本機監聽規則，不修改雲端安全群組、NAT 對應或轉發策略。規則已同步不代表公網實際可達。",
+    "minimum": "升級 bosun 至 v0.72.0 後重新整理，可查看規則來源與同步結果。",
+    "noReferences": "已無使用者，等待清理或人工確認",
+    "states": {
+      "synced": "已同步",
+      "pending": "待同步",
+      "error": "同步失敗",
+      "external": "保留既有外部規則",
+      "retained": "保留待確認",
+      "unavailable": "未偵測到啟用的 UFW / firewalld",
+      "disabled": "自動放行已關閉"
+    },
+    "warnings": {
+      "legacy_rules_retained": "舊版記錄無法證明規則歸屬，原有放行規則予以保留；刪除服務後仍需人工確認。",
+      "ownership_conflict": "規則被外部修改或防火牆後端／區域已變更，未自動刪除，請確認。"
+    },
+    "sources": {
+      "inbound": "入站",
+      "forward": "轉發",
+      "wireguard": "WG 連線",
+      "certificate": "憑證驗證",
+      "system": "系統監聽"
+    }
   }
 }

@@ -2471,5 +2471,31 @@
       "swap": "创建专用 Swap 文件，保留服务商或 Quench 已有 Swap。暂不调整已有专用 Swap；文件系统不支持或空间不足会失败。"
     },
     "keep": "保持现状"
+  },
+  "hostFirewall": {
+    "title": "自动端口放行",
+    "hint": "随入站、转发和 WG 监听同步；最后一个使用者移除后才撤销。只管理本机监听规则，不修改云安全组、NAT 映射或转发策略。规则已同步不等于公网实际可达。",
+    "minimum": "升级 bosun 至 v0.72.0 后刷新，可查看规则来源与同步结果。",
+    "noReferences": "已无使用者，等待清理或人工核对",
+    "states": {
+      "synced": "已同步",
+      "pending": "待同步",
+      "error": "同步失败",
+      "external": "已有外部规则，保留",
+      "retained": "保留待核对",
+      "unavailable": "未检测到启用的 UFW / firewalld",
+      "disabled": "自动放行已关闭"
+    },
+    "warnings": {
+      "legacy_rules_retained": "旧版本记录无法证明规则归属，原有放行规则予以保留；删除业务后仍需人工核对这些旧规则。",
+      "ownership_conflict": "规则被外部修改或防火墙后端/区域发生变化，未自动删除，请核对。"
+    },
+    "sources": {
+      "inbound": "入站",
+      "forward": "转发",
+      "wireguard": "WG 连接",
+      "certificate": "证书验证",
+      "system": "系统监听"
+    }
   }
 }

@@ -56,7 +56,7 @@ func TestHostManagementDeliveryPermissionsAndHistory(t *testing.T) {
 	if !found {
 		t.Fatal("task not delivered")
 	}
-	raw := json.RawMessage(`{"outcome":"ok","state":{"checked_at":1,"environment":"restricted","revision":"test","items":[]}}`)
+	raw := json.RawMessage(`{"outcome":"ok","state":{"checked_at":1,"environment":"restricted","revision":"test","items":[],"firewall":{"kind":"ufw","state":"synced","checked_at":1,"rules":[{"port":443,"protocol":"tcp","sources":["inbound:test"],"state":"external"}]}}}`)
 	call(r.agent, "POST", "/api/agent/report", agentproto.Report{Version: spec.HostManagementMinimumVersion, Jobs: []agentproto.JobResult{{ID: id, Kind: spec.HostManagementKind, Result: raw}}}, 200)
 	data := mustJSON[struct {
 		State             *spec.HostSnapshot
@@ -65,6 +65,9 @@ func TestHostManagementDeliveryPermissionsAndHistory(t *testing.T) {
 	}](t, call(r.c, "GET", path, nil, 200))
 	if data.State == nil || len(data.History) != 1 || data.History[0].DoneAt == nil || !data.Supported || !data.Online {
 		t.Fatal(data)
+	}
+	if data.State.Firewall == nil || len(data.State.Firewall.Rules) != 1 || data.State.Firewall.Rules[0].Sources[0] != "inbound:test" {
+		t.Fatal("firewall details lost in host snapshot")
 	}
 	// Generic cleanup must not erase host observations or operation history.
 	if e := r.st.CreateNodeJob(context.Background(), "other", r.nodeID, "reality_scan", nil); e != nil {

@@ -16,7 +16,7 @@ import (
 // Node jobs: one-off tasks (REALITY target scans) the panel hands a node
 // through its state. The node answers in its next report; the UI polls.
 
-var jobKinds = map[string]bool{spec.CoreManagementKind: true, "reality_scan": true, "warp_register": true, "rollback": true, spec.NetworkDiagnosticKind: true}
+var jobKinds = map[string]bool{spec.PrivateAccessCheckKind: true, spec.CoreManagementKind: true, "reality_scan": true, "warp_register": true, "rollback": true, spec.NetworkDiagnosticKind: true}
 
 func (h *handlers) createNodeJob(w http.ResponseWriter, r *http.Request) {
 	h.Store.Topology.Lock()
@@ -41,6 +41,43 @@ func (h *handlers) createNodeJob(w http.ResponseWriter, r *http.Request) {
 	}
 	if (in.Kind == spec.CoreManagementKind || in.Kind == "warp_register" || in.Kind == "reality_scan") && !h.requireProxyNode(w, r, id) {
 		return
+	}
+	if in.Kind == spec.PrivateAccessCheckKind {
+		if !userFrom(r).IsAdmin() {
+			fail(w, 403, "admin only")
+			return
+		}
+		if !h.requireProxyNode(w, r, id) {
+			return
+		}
+		supported := false
+		for _, c := range h.nodeCoreCandidates(r.Context(), n) {
+			if c.Capabilities.PrivateAccessReadiness != nil {
+				supported = true
+			}
+		}
+		if !n.Paired || !supported {
+			fail(w, 409, "requires a paired online node with private access readiness support; upgrade bosun and wait for its report")
+			return
+		}
+		pending, err := h.Store.PendingNodeJobs(r.Context(), id)
+		if err != nil {
+			serverErr(w, err)
+			return
+		}
+		for _, job := range pending {
+			if job.Kind == spec.PrivateAccessCheckKind {
+				if time.Since(job.CreatedAt) < 2*time.Minute {
+					ok(w, map[string]string{"id": job.ID})
+					return
+				}
+				if err := h.Store.CompleteNodeJob(r.Context(), id, job.ID, nil, "readiness check expired"); err != nil {
+					serverErr(w, err)
+					return
+				}
+			}
+		}
+		in.Params = json.RawMessage(`{}`)
 	}
 	jobID := auth.Token(12)
 	if in.Kind == spec.CoreManagementKind {

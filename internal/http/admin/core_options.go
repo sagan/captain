@@ -25,7 +25,19 @@ func (h *handlers) nodeCoreCandidates(ctx context.Context, n *domain.Node) []spe
 	if json.Unmarshal(status.Cores, &cores) != nil {
 		return nil
 	}
-	return agentproto.CoreCandidates(cores)
+	candidates := agentproto.CoreCandidates(cores)
+	for i := range candidates {
+		c := &candidates[i].Capabilities
+		if readiness := c.PrivateAccessReadiness; readiness != nil {
+			age := time.Now().Unix() - readiness.CheckedAt
+			if readiness.CheckedAt <= 0 || age >= 180 || age < -30 {
+				c.PrivateAccessReadiness = nil
+				c.PrivateAccess = false
+				c.CoreOnlyPrivateAccess = false
+			}
+		}
+	}
+	return candidates
 }
 
 func (h *handlers) coreOptions(w http.ResponseWriter, r *http.Request) {

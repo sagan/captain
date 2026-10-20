@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/zeptop-dev/bosun/pkg/agentproto"
 	"github.com/zeptop-dev/bosun/pkg/spec"
@@ -180,6 +181,16 @@ func (s *Store) PrivateAccessCapable(ctx context.Context, nodeID int64, ib spec.
 		return false
 	}
 	candidates := agentproto.CoreCandidates(cs)
+	for i := range candidates {
+		c := &candidates[i].Capabilities
+		if r := c.PrivateAccessReadiness; r != nil {
+			age := time.Now().Unix() - r.CheckedAt
+			if r.CheckedAt <= 0 || age >= 180 || age < -30 {
+				c.PrivateAccess = false
+				c.CoreOnlyPrivateAccess = false
+			}
+		}
+	}
 	if candidates == nil {
 		return false
 	}

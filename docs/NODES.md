@@ -880,3 +880,55 @@ not a public connectivity test or a guarantee against earlier deny rules.
 In the group/order editor, drag a node handle onto a group card (including Ungrouped) to append it to that group. The target highlights during dragging and group counts update in the draft. Save applies the change; Cancel discards it.
 
 The hostname shown below a node name follows regular reports from agents that support hostname reporting. The administrator-assigned node name stays unchanged. Older agents and missing or invalid hostname readings retain the last known hostname. Both Captain and bosun need the hostname-reporting update; restarting an older bosun alone does not refresh this field.
+
+### Private-access readiness
+
+Node details and the inbound editor show the reported prerequisites for
+per-inbound private access. The checks distinguish Linux support, a non-root
+proxy account, nftables, egress protection, global exemptions and process
+capabilities. Full administrators can request **Recheck**, a read-only node job
+that additionally tests kernel nftables access. It neither restarts proxies nor
+changes network policy. Concurrent pending requests reuse the same job.
+
+After fixing a reported condition, recheck without closing the inbound form.
+Readiness data expires after three minutes; offline or older agents show an
+unknown state, not a successful check. Upgrade bosun and enable a supported
+sing-box/Xray adapter to obtain detailed reports. Older capability reports retain
+the existing validation behavior. Passing prerequisites does not bypass protocol,
+route or runtime policy checks and does not guarantee destination reachability.
+
+The displayed preparation command creates the configured non-root account but
+preserves configuration and firewall rules. Configuration changes require a
+bosun restart and interrupt proxy connections. Existing Docker deployments may
+need `cap_add: [NET_ADMIN]` and container recreation; new full installations add
+this automatically. Do not enable privileged mode just to satisfy this check.
+
+#### Automatic protection mode
+
+Ordinary inbound private-access settings show the current guard-derived mode;
+there is no separate mode selector. With the egress guard enabled, authorization
+uses dual protection. With `cores.egress_guard: false`, a full administrator must
+explicitly acknowledge the absence of nft destination isolation before granting
+access, and the adapter must support independent address/DNS enforcement. A
+missing acknowledgement or unsupported combination blocks saving and execution.
+Changing this node configuration requires restarting bosun; the panel does not
+disable a firewall remotely.
+
+Automatic intent and acknowledgement are stored separately from the derived mode.
+Re-enabling the guard restores dual protection. Removing permission clears the
+acknowledgement. Existing policies retain their original behavior until edited;
+older nodes without automatic-policy capabilities cannot receive new automatic
+policies. Adapter features and runtime prerequisites are reported separately.
+
+This mode currently supports direct sing-box / Extended exits. It uses core
+address/transport/port rules instead of nft destination isolation, while retaining
+the non-root account and existing control API protection. It therefore does not
+remove every nft or agent capability prerequisite. Global exemptions remain
+unsupported. Xray and managed reverse tunnels are unavailable in this mode;
+Xray's existing dual-layer permissions are unaffected.
+
+DNS answers containing both an authorized and an unauthorized private address
+are rejected. An enabled authorization belongs to the entire inbound's permitted
+users, as before. Changing the scope or protection mode interrupts existing proxy
+connections so old permissions cannot linger. Old nodes without the new explicit
+capability cannot receive this policy.

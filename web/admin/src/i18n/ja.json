@@ -390,7 +390,11 @@
         "reverse": "このプロトコルまたはコアはユーザー別計測付き VLESS Reverse に対応していません。",
         "privateAccess": "対応ノード・コアからの最新の機能報告が必要です。",
         "listenAddress": "この Mieru ビルドは特定の IP にバインドできません。mita を使用してください。",
-        "wireguardReverse": "リバース WireGuard には、対応 Linux ノードと Xray コアからの最新の機能レポートが必要です。"
+        "wireguardReverse": "リバース WireGuard には、対応 Linux ノードと Xray コアからの最新の機能レポートが必要です。",
+        "privateAccessCoreOnly": "対応する sing-box、無効な送信保護、新しい報告が必要です。Xray と管理リバーストンネルは非対応です。",
+        "privateAccessPolicyUnknown": "自動ポリシーには独立した能力と新しい実行状態の報告が必要です。",
+        "privateAccessRuntime": "実行条件が満たされていません。ノードの準備状況を確認してください。",
+        "privateAccessConfirmation": "保存前にコアのみの保護による承認を確認してください。"
       }
     }
   },
@@ -2220,7 +2224,15 @@
     "portEnd": "終了ポート",
     "portsHint": "両方 0：全ポート。終了が 0：開始ポートのみ。",
     "add": "ルールを追加",
-    "remove": "ルールを削除"
+    "remove": "ルールを削除",
+    "enforcement": "保護方式",
+    "dual": "二重保護（既定）",
+    "coreOnly": "コアポリシーのみ",
+    "enforcementHint": "cores.egress_guard の明示的な無効化と新しい能力報告が必要です。",
+    "coreOnlyHint": "sing-box / Extended の直接出口のみ対応。nft による宛先隔離は使用しませんが、非 root と制御 API 保護は必要です。Xray、管理リバーストンネル、プロキシチェーンは非対応。変更時は接続が中断されます。",
+    "actualMode": "実際の保護方式",
+    "runtimeUnknown": "実行状態不明",
+    "confirmCoreOnly": "nft による宛先隔離が無効であることを理解し、このインバウンドのコアのみの保護を承認します。"
   },
   "coreManager": {
     "title": "コア管理",
@@ -2549,5 +2561,34 @@
     "dateRequired": "有効期限を入力するか、リセット日を手動指定してください。",
     "resetHint": "毎月 {{day}} 日にリセット。短い月は月末です。",
     "resetNextHint": "毎月 {{day}} 日の翌日にリセット。月末に調整してから1日加算します。"
+  },
+  "privateReady": {
+    "title": "プライベートアクセスの準備状況",
+    "refresh": "再確認",
+    "hint": "インストールの前提条件のみ確認します。プロトコル、経路、ポリシー適用は別途検証します。再確認はファイアウォール変更や再起動を行いません。",
+    "unknown": "新しい報告がありません。接続と bosun の更新を確認し、sing-box または Xray を有効にして報告を待ってください。",
+    "ready": "前提条件を満たしています。宛先への到達を保証するものではありません。",
+    "prepare": "ノードまたはコンテナ内でサービス管理者として実行します。設定済みの非 root アカウントのみ作成し、設定やルールは保持します。設定・権限変更後は bosun の再起動が必要で、接続が中断されます。",
+    "checks": {
+      "linux": "Linux",
+      "user": "非 root プロキシアカウント",
+      "nft": "nftables のインストール",
+      "guard": "送信保護の有効化",
+      "allow": "全体の例外がないこと",
+      "capabilities": "親・子プロセスの権限",
+      "kernel": "カーネルの nftables アクセス",
+      "guardDisabled": "宛先の送信隔離が無効"
+    },
+    "fixes": {
+      "linux": "Linux ノードが必要です。",
+      "user": "cores.user に専用の非 root アカウント（例 bosun-proxy）を設定し、準備コマンド後に再起動してください。bosun 自体は root で構いません。",
+      "nft": "ノード内で apt-get、apk または dnf を使い nftables をインストールし、再確認してください。",
+      "guard": "cores.egress_guard を有効にして再起動してください。隔離が適用され接続が中断されます。",
+      "allow": "cores.egress_allow の全体例外を見直し削除してください。再起動後、従来許可された通信が遮断される場合があります。",
+      "capabilities": "親には SETUID/SETGID/SETPCAP/NET_ADMIN、子には NET_BIND_SERVICE/NET_ADMIN が必要です。Docker の標準設定に cap_add: [NET_ADMIN] を追加し再作成してください（接続中断）。privileged は不要です。",
+      "kernel": "bosun のネットワーク名前空間で nft list tables を実行し、カーネルと権限を確認してください。コマンドの導入だけでは不十分です。",
+      "guardDisabled": "宛先保護を自分で管理する場合のみ cores.egress_guard: false を設定して再起動してください。制御 API 保護は維持します。"
+    },
+    "kernelPending": "カーネルの nftables アクセスは未確認です。「再確認」で検証してください。"
   }
 }

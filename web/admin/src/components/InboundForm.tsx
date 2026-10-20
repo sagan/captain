@@ -1,3 +1,5 @@
+import { normalizePrivateAccess } from '../lib/privateAccess'
+import { PrivateAccessReadiness } from './PrivateAccessReadiness'
 import { Button, Card, Group, JsonInput, NumberInput, Select, SimpleGrid, Stack, Switch, Text, TextInput, UnstyledButton } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { useEffect, useState } from 'react'
@@ -86,7 +88,7 @@ export type InboundValues = { Tag: string; Protocol: string; Listen: string; Por
 
 export function toValues(ib?: Inbound): InboundValues {
   return ib
-    ? { Tag: ib.Tag, Protocol: ib.Protocol, Listen: ib.Listen, Port: ib.Port, Core: ib.Core, GroupID: ib.GroupID ? String(ib.GroupID) : '', Enabled: ib.Enabled, Settings: JSON.stringify(stripIdentity(ib.Settings), null, 2), IngressID: ib.IngressID ? String(ib.IngressID) : '' }
+    ? { Tag: ib.Tag, Protocol: ib.Protocol, Listen: ib.Listen, Port: ib.Port, Core: ib.Core, GroupID: ib.GroupID ? String(ib.GroupID) : '', Enabled: ib.Enabled, Settings: JSON.stringify(normalizePrivateAccess(stripIdentity(ib.Settings)), null, 2), IngressID: ib.IngressID ? String(ib.IngressID) : '' }
     : { Tag: '', Protocol: 'vless', Listen: '', Port: 443, Core: '', GroupID: '', Enabled: true, Settings: '{}', IngressID: '' }
 }
 
@@ -247,7 +249,8 @@ export function InboundForm({ initial, groups, onSubmit, busy, onCancel, domain,
             </Card>
           )
         })()}
-        <PrivateAccessFields json={form.values.Settings} onChange={(s) => form.setFieldValue('Settings', s)} disabled={me?.role !== 'admin'} />
+        {nodeID && coreInbound?.private_access && (coreInbound.private_access as { mode?: string }).mode !== 'off' ? <PrivateAccessReadiness key={nodeID} nodeID={nodeID} compact /> : null}
+        <PrivateAccessFields allowCoreOnly runtimeMode={coreSelection.runtimeMode} json={form.values.Settings} onChange={(s) => form.setFieldValue('Settings', s)} disabled={me?.role !== 'admin'} />
         <JsonInput label={t('inbounds.settings')} description={t('inbounds.settingsHint')} autosize minRows={4} maxRows={16} formatOnBlur {...form.getInputProps('Settings')} />
         <Group justify="flex-end"><Button variant="default" onClick={onCancel}>{t('common.cancel')}</Button><Button type="submit" loading={busy} disabled={coreSelection.blocked}>{t('common.save')}</Button></Group>
       </Stack>

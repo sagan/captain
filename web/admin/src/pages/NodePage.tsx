@@ -1,3 +1,4 @@
+import { PrivateAccessReadiness } from '../components/PrivateAccessReadiness'
 import { NodeGroupCard } from '../components/NodeGroupCard'
 import { NodeAddressesCard } from '../components/NodeAddressesCard'
 import { NodeModeCard } from '../components/NodeModeCard'
@@ -89,6 +90,7 @@ export default function NodePage() {
         invalidate()
         qc.invalidateQueries({ queryKey: ['core-options'] })
       }} />}
+      {proxyAllowed && <PrivateAccessReadiness key={n.id} nodeID={n.id} />}
       {proxyAllowed && <NodeWorkflow node={n} inbounds={d.inbounds} cores={d.status?.cores} />}
       {!n.paired && n.pair_code && <Card mb="lg"><Title order={5} mb="sm">{t('nodes.pairTitle')}</Title><PairCodeBox code={n.pair_code} mode={n.mode} /></Card>}
       {n.paired && <NodeProbeCard key={n.id} nodeID={n.id} reportedHost={host} />}

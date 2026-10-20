@@ -390,7 +390,11 @@
         "reverse": "This protocol or core does not support managed VLESS Reverse with per-user accounting.",
         "privateAccess": "Private access requires a recent capability report from a supported node and core.",
         "listenAddress": "This Mieru build cannot bind a specific listening IP. Use mita.",
-        "wireguardReverse": "Reverse WireGuard requires a fresh capability report from a supported Linux node and Xray core."
+        "wireguardReverse": "Reverse WireGuard requires a fresh capability report from a supported Linux node and Xray core.",
+        "privateAccessCoreOnly": "Core-only needs a supported sing-box node, disabled egress guard and a fresh capability report; Xray and managed reverse tunnels are unsupported.",
+        "privateAccessPolicyUnknown": "Automatic policy requires a fresh node report with separate policy capabilities.",
+        "privateAccessRuntime": "The runtime prerequisites are not satisfied. Check the node readiness details.",
+        "privateAccessConfirmation": "Confirm authorization under core-only protection before saving."
       }
     }
   },
@@ -2220,7 +2224,15 @@
     "portEnd": "Last port",
     "portsHint": "Both 0: all ports. Last port 0: first port only.",
     "add": "Add rule",
-    "remove": "Remove rule"
+    "remove": "Remove rule",
+    "enforcement": "Protection mode",
+    "dual": "Dual protection (default)",
+    "coreOnly": "Core policy only",
+    "enforcementHint": "Core-only requires explicitly disabled cores.egress_guard and a current capability report.",
+    "coreOnlyHint": "Only sing-box / Extended with direct exits. No nft destination isolation; non-root and control API protection remain required. Xray, managed reverse tunnels and proxy chains are unsupported. Changing policy interrupts connections.",
+    "actualMode": "Effective protection",
+    "runtimeUnknown": "Runtime unknown",
+    "confirmCoreOnly": "I understand nft destination isolation is disabled and authorize this inbound to use core-only protection."
   },
   "coreManager": {
     "title": "Core management",
@@ -2549,5 +2561,34 @@
     "dateRequired": "Enter an expiry date or choose a manual traffic reset day.",
     "resetHint": "Resets on day {{day}} each month, clamped to month end.",
     "resetNextHint": "Resets one day after day {{day}} each month, after clamping to month end."
+  },
+  "privateReady": {
+    "title": "Private access prerequisites",
+    "refresh": "Recheck",
+    "hint": "Checks installation prerequisites only. Inbound protocol, routing and successful policy application are validated separately. Recheck does not change firewall rules or restart proxies.",
+    "unknown": "No recent readiness report. Check node connectivity and upgrade bosun; wait for its next report.",
+    "ready": "Installation prerequisites passed. This does not guarantee private destination reachability.",
+    "prepare": "Run inside the node or bosun container as the service administrator. This creates only the configured non-root account and checks prerequisites; it preserves existing configuration and firewall rules. Configuration or container permission changes require restarting bosun and interrupt proxy connections.",
+    "checks": {
+      "linux": "Linux platform",
+      "user": "Non-root proxy account",
+      "nft": "nftables installed",
+      "guard": "Egress guard enabled",
+      "allow": "No global private-network exemptions",
+      "capabilities": "Agent and child process capabilities",
+      "kernel": "Kernel nftables access",
+      "guardDisabled": "Egress destination isolation disabled"
+    },
+    "fixes": {
+      "linux": "Use a Linux node for per-inbound private access.",
+      "user": "Set cores.user to a dedicated non-root account, for example bosun-proxy. Run the preparation command and restart bosun. Installing bosun as root is supported.",
+      "nft": "Install nftables using apt-get, apk or dnf inside the node/container. Recheck after installation.",
+      "guard": "Review cores.egress_guard and enable it. Restarting bosun applies isolation and interrupts proxy connections.",
+      "allow": "Review cores.egress_allow and remove global exceptions before using per-inbound grants. Restarting may block traffic previously covered by those exceptions.",
+      "capabilities": "The agent needs SETUID, SETGID, SETPCAP and NET_ADMIN; proxy children need NET_BIND_SERVICE and NET_ADMIN. For standard Docker defaults add cap_add: [NET_ADMIN], then recreate the container (connections are interrupted). Do not enable privileged mode.",
+      "kernel": "Run nft list tables in the bosun network namespace. Check kernel nftables support and container/service permissions; installing the command alone is insufficient.",
+      "guardDisabled": "Set cores.egress_guard: false only if you intend to manage destination protection yourself, then restart bosun. Control API protection remains enabled."
+    },
+    "kernelPending": "Kernel nftables access has not been tested. Use Recheck to verify it."
   }
 }

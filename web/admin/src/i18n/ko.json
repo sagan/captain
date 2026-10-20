@@ -390,7 +390,11 @@
         "reverse": "이 프로토콜 또는 코어는 사용자별 집계가 있는 VLESS Reverse를 지원하지 않습니다.",
         "privateAccess": "지원되는 노드와 코어의 최신 기능 보고가 필요합니다.",
         "listenAddress": "이 Mieru 빌드는 특정 수신 IP에 바인딩할 수 없습니다. mita를 사용하세요.",
-        "wireguardReverse": "역방향 WireGuard에는 지원되는 Linux 노드와 Xray 코어의 최신 기능 보고가 필요합니다."
+        "wireguardReverse": "역방향 WireGuard에는 지원되는 Linux 노드와 Xray 코어의 최신 기능 보고가 필요합니다.",
+        "privateAccessCoreOnly": "지원되는 sing-box, 비활성화된 출력 보호 및 최신 보고가 필요합니다. Xray와 관리형 역방향 터널은 지원하지 않습니다.",
+        "privateAccessPolicyUnknown": "자동 정책에는 독립 기능과 최신 실행 상태 보고가 필요합니다.",
+        "privateAccessRuntime": "실행 전제 조건을 충족하지 않습니다. 노드 준비 상태를 확인하세요.",
+        "privateAccessConfirmation": "저장 전에 코어 정책만으로 접근을 허용하는 데 동의하세요."
       }
     }
   },
@@ -2220,7 +2224,15 @@
     "portEnd": "종료 포트",
     "portsHint": "둘 다 0: 모든 포트. 종료가 0: 시작 포트만.",
     "add": "규칙 추가",
-    "remove": "규칙 삭제"
+    "remove": "규칙 삭제",
+    "enforcement": "보호 방식",
+    "dual": "이중 보호 (기본값)",
+    "coreOnly": "코어 정책만",
+    "enforcementHint": "cores.egress_guard를 명시적으로 끄고 최신 기능 보고가 있어야 합니다.",
+    "coreOnlyHint": "sing-box / Extended의 직접 출구만 지원합니다. nft 목적지 격리는 사용하지 않지만 비 root 계정 및 제어 API 보호는 필요합니다. Xray, 관리형 역방향 터널, 프록시 체인은 지원하지 않습니다. 변경 시 연결이 끊깁니다.",
+    "actualMode": "실제 보호 방식",
+    "runtimeUnknown": "실행 상태 알 수 없음",
+    "confirmCoreOnly": "nft 목적지 격리가 비활성화된 것을 이해하며 이 인바운드에 코어 정책만으로 사설망 접근을 허용합니다."
   },
   "coreManager": {
     "title": "코어 관리",
@@ -2549,5 +2561,34 @@
     "dateRequired": "만료일을 입력하거나 트래픽 초기화일을 직접 지정하세요.",
     "resetHint": "매월 {{day}}일 초기화. 짧은 달은 말일을 사용합니다.",
     "resetNextHint": "매월 {{day}}일 다음 날 초기화. 말일로 조정한 뒤 하루를 더합니다."
+  },
+  "privateReady": {
+    "title": "사설망 접근 준비 상태",
+    "refresh": "다시 확인",
+    "hint": "설치 전제 조건만 확인합니다. 프로토콜, 경로, 정책 적용은 별도로 검증합니다. 재검사는 방화벽을 변경하거나 프록시를 재시작하지 않습니다.",
+    "unknown": "최근 보고가 없습니다. 연결과 bosun 업데이트를 확인하고 sing-box 또는 Xray를 활성화한 후 보고를 기다리세요.",
+    "ready": "전제 조건을 충족합니다. 사설망 대상에 대한 연결을 보장하지는 않습니다.",
+    "prepare": "노드 또는 컨테이너에서 서비스 관리자로 실행하세요. 설정된 비 root 계정만 생성하며 설정과 방화벽은 보존합니다. 설정이나 컨테이너 권한 변경 후에는 bosun 재시작이 필요하며 연결이 끊깁니다.",
+    "checks": {
+      "linux": "Linux 플랫폼",
+      "user": "비 root 프록시 계정",
+      "nft": "nftables 설치",
+      "guard": "출력 보호 활성화",
+      "allow": "전역 사설망 예외 없음",
+      "capabilities": "부모 및 자식 프로세스 권한",
+      "kernel": "커널 nftables 접근",
+      "guardDisabled": "출력 목적지 격리 비활성화"
+    },
+    "fixes": {
+      "linux": "Linux 노드가 필요합니다.",
+      "user": "cores.user를 전용 비 root 계정(예: bosun-proxy)으로 설정하고 준비 명령 실행 후 재시작하세요. bosun 자체는 root로 설치할 수 있습니다.",
+      "nft": "노드에서 apt-get, apk 또는 dnf로 nftables를 설치하고 다시 확인하세요.",
+      "guard": "cores.egress_guard를 활성화하고 재시작하세요. 격리가 적용되며 연결이 끊깁니다.",
+      "allow": "cores.egress_allow의 전역 예외를 검토하고 제거하세요. 재시작 후 기존 예외 트래픽이 차단될 수 있습니다.",
+      "capabilities": "부모에는 SETUID/SETGID/SETPCAP/NET_ADMIN, 자식에는 NET_BIND_SERVICE/NET_ADMIN이 필요합니다. Docker 기본 설정에 cap_add: [NET_ADMIN]을 추가하고 컨테이너를 재생성하세요(연결 중단). privileged는 필요하지 않습니다.",
+      "kernel": "bosun 네트워크 네임스페이스에서 nft list tables를 실행하고 커널 지원과 권한을 확인하세요. 명령 설치만으로는 충분하지 않습니다.",
+      "guardDisabled": "목적지 보호를 직접 관리할 때만 cores.egress_guard: false를 설정하고 재시작하세요. 제어 API 보호는 유지됩니다."
+    },
+    "kernelPending": "커널 nftables 접근은 아직 검사하지 않았습니다. 다시 확인을 눌러 검증하세요."
   }
 }

@@ -50,6 +50,7 @@ mita（mieru）、Hysteria、snell-server 和 realm 作为子进程拉起来。
 
 - 节点域名冲突检查与显式共享／外部 DNS 模式防止误覆盖记录；DNS 健康检查、持续异常告警和自动变更历史帮助定位问题，并按已保存的旧值手动恢复。[DNS 运维说明](docs/MONITORING.md)。
 - 在节点详情下载已审核的内核包并激活指定版本（bosun ≥ 0.64）。官方与 Extended sing-box 可同时运行；SSH TCP 代理订阅带有持久主机公钥验证。[内核管理与支持范围](docs/NODES.md#managing-node-core-packages)。
+- Captain v1.27 / bosun v0.74 将私网策略能力与 nft 运行状态分开报告，提供前提检查并自动判定防护方式；仅内核授权须管理员明确确认，继续支持指定地址、协议和端口。[自动防护方式](docs/NODES.md#automatic-protection-mode)。
 - 管理员可逐入站授权私网目的地址，限定 CIDR、协议和端口，其他入站保持默认隔离；托管 Reverse 在落地端按连接独立执行。需要 bosun ≥ 0.63 及支持此功能的 Linux nft、sing-box/Xray 配置。[使用方式与支持范围](docs/NODES.md#per-inbound-private-access-captain-114--bosun-063)。
 - 节点路由支持管理员配置限定端口、协议的私网上游例外（需要 bosun ≥ 0.62）；转发状态区分 TCP 探测与未检测的 UDP，nft 支持同地址族 IPv6 转发。
 - 后台常用页面直接显示，低频工具收进“更多”；首页优先展示节点异常和日常待办，并直达对应筛选列表。设置提供分类搜索和独立编辑页，支持草稿保护、响应式表单，以及用户到订阅、节点到入口的直接衔接。[导航与设置说明](docs/ADMIN.md#finding-a-task)。

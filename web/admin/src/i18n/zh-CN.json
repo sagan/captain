@@ -390,7 +390,11 @@
         "reverse": "此协议或内核不支持带用户计费的托管 VLESS Reverse。",
         "privateAccess": "私网访问需要支持此功能的节点、内核及最近的能力上报。",
         "listenAddress": "此 Mieru 构建不能绑定指定监听 IP，请使用 mita。",
-        "wireguardReverse": "反向 WireGuard 需要支持此功能的 Linux 节点和 Xray 内核上报最新能力。"
+        "wireguardReverse": "反向 WireGuard 需要支持此功能的 Linux 节点和 Xray 内核上报最新能力。",
+        "privateAccessCoreOnly": "仅内核策略需要支持的 sing-box 节点、已关闭的出站防护及新鲜上报；暂不支持 Xray 或托管反向隧道。",
+        "privateAccessPolicyUnknown": "自动策略需要节点上报独立的内核能力及新鲜运行状态，请升级节点后重新检查。",
+        "privateAccessRuntime": "运行前提尚未满足，请查看节点就绪检查中的具体原因。",
+        "privateAccessConfirmation": "请先确认同意在仅内核防护下授权此入站，再保存。"
       }
     }
   },
@@ -2220,7 +2224,15 @@
     "portEnd": "结束端口",
     "portsHint": "均为 0：全部端口；结束端口为 0：仅起始端口。",
     "add": "添加规则",
-    "remove": "删除规则"
+    "remove": "删除规则",
+    "enforcement": "防护方式",
+    "dual": "双层防护（默认）",
+    "coreOnly": "仅内核策略",
+    "enforcementHint": "仅内核策略要求显式关闭 cores.egress_guard，并有新鲜的节点能力上报。",
+    "coreOnlyHint": "仅支持 sing-box／Extended 直连出站。不使用 nft 目的地址隔离，仍要求非 root 账户和控制 API 保护。不支持 Xray、托管反向隧道或代理链。修改策略会中断连接。",
+    "actualMode": "实际防护方式",
+    "runtimeUnknown": "运行状态未知",
+    "confirmCoreOnly": "我理解当前未启用 nft 目的地址隔离，同意此入站在仅内核防护下授权私网访问。"
   },
   "coreManager": {
     "title": "内核管理",
@@ -2549,5 +2561,34 @@
     "dateRequired": "请填写到期日，或手动指定流量重置日。",
     "resetHint": "每月 {{day}} 日重置，短月份取月底。",
     "resetNextHint": "每月 {{day}} 日的次日重置；先按短月份月底调整，再顺延一天。"
+  },
+  "privateReady": {
+    "title": "私网访问就绪检查",
+    "refresh": "重新检查",
+    "hint": "仅检查安装前提；入站协议、路由与策略套用另行校验。重新检查不会修改防火墙或重启代理。",
+    "unknown": "没有新鲜的就绪报告。请检查节点连接并升级 bosun，等待下一次上报。",
+    "ready": "安装前提已通过，不代表私网目标一定可达。",
+    "prepare": "在节点或 bosun 容器内以服务管理员身份运行。此命令仅创建配置指定的非 root 账户并检查前提，不覆盖配置、不修改防火墙。调整配置或容器权限后需要重启 bosun，会中断代理连接。",
+    "checks": {
+      "linux": "Linux 平台",
+      "user": "非 root 代理账户",
+      "nft": "已安装 nftables",
+      "guard": "已启用出站防护",
+      "allow": "没有全局私网豁免",
+      "capabilities": "主进程与子进程权限",
+      "kernel": "内核 nftables 访问",
+      "guardDisabled": "已关闭出站目的地址隔离"
+    },
+    "fixes": {
+      "linux": "逐入站私网授权需要 Linux 节点。",
+      "user": "将 cores.user 设为专用非 root 账户，例如 bosun-proxy，运行准备命令后重启 bosun。bosun 本身使用 root 安装是受支持的。",
+      "nft": "在节点或容器内通过 apt-get、apk 或 dnf 安装 nftables，然后重新检查。",
+      "guard": "检查并启用 cores.egress_guard。重启 bosun 后生效，会启用隔离并中断代理连接。",
+      "allow": "检查 cores.egress_allow，移除全局豁免后再使用逐入站授权。重启后原先依赖这些豁免的访问可能被阻止。",
+      "capabilities": "主进程需要 SETUID、SETGID、SETPCAP、NET_ADMIN；代理子进程需要 NET_BIND_SERVICE、NET_ADMIN。Docker 默认权限下添加 cap_add: [NET_ADMIN]，再重建容器（会中断连接），不需要开启 privileged。",
+      "kernel": "在 bosun 所在网络命名空间运行 nft list tables，检查内核 nftables 支持及容器或服务权限；仅安装 nft 命令还不够。",
+      "guardDisabled": "仅在准备自行管理目的地址防护时设置 cores.egress_guard: false，再重启 bosun；控制 API 保护仍保留。"
+    },
+    "kernelPending": "内核 nftables 访问：尚未检测，点击“重新检查”验证。"
   }
 }

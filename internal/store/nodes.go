@@ -5,7 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/zeptop-dev/bosun/pkg/agentproto"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/zeptop-dev/bosun/pkg/spec"
 
@@ -64,8 +67,8 @@ func (s *Store) CreateNodeWithAddressPolicy(ctx context.Context, n *domain.Node,
 		return err
 	}
 	ts := now()
-	res, err := tx.ExecContext(ctx, `INSERT INTO nodes (name, pair_code, pair_code_expires_at, public_addr, internal_addr, v6_addr, domain, monitor_url, dstatus_sid, created_at, updated_at, domain_shared, node_mode, mode_managed, mode_revision, address_auto_v4, address_auto_v6, display_order, region_mode)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(display_order),0)+1 FROM nodes), 'auto')`,
+	res, err := tx.ExecContext(ctx, `INSERT INTO nodes (name, pair_code, pair_code_expires_at, public_addr, internal_addr, v6_addr, domain, monitor_url, dstatus_sid, created_at, updated_at, domain_shared, node_mode, mode_managed, mode_revision, address_auto_v4, address_auto_v6, display_order, region_mode, probe_info_json)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(display_order),0)+1 FROM nodes), 'auto', '{"traffic_reset":{"mode":"expiry"}}')`,
 		n.Name, pairCode, time.Now().Add(ttl).Unix(), n.PublicAddr, n.InternalAddr, n.V6Addr, n.Domain, n.MonitorURL, n.DStatusSID, ts, ts, boolInt(n.DomainShared), n.Mode, boolInt(n.Mode == spec.NodeMonitor), n.ModeRevision, boolInt(auto4), boolInt(auto6))
 	if err != nil {
 		return err
@@ -470,4 +473,14 @@ func (s *Store) TrafficSeqSeen(ctx context.Context, nodeID int64, seq uint64) (b
 	}
 	n, _ := res.RowsAffected()
 	return n == 0, nil
+}
+
+// ObserveNodeHostname preserves the last known name for old agents and failed
+// reads. A report from a replaced pairing must not update the new identity.
+func (s *Store) ObserveNodeHostname(ctx context.Context, id int64, tokenHash, hostname string) error {
+	if hostname == "" || len(hostname) > 255 || !utf8.ValidString(hostname) || strings.IndexFunc(hostname, func(r rune) bool { return unicode.IsControl(r) || unicode.IsSpace(r) }) >= 0 {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET hostname = ? WHERE id = ? AND token_hash = ? AND hostname <> ?`, hostname, id, tokenHash, hostname)
+	return err
 }

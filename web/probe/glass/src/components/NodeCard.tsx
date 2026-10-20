@@ -1,13 +1,13 @@
 import type { HTMLAttributes, KeyboardEvent } from 'react'
 import { Icon } from '@iconify/react'
 import { language, t } from '@shared/i18n'
-import { shows, snapshot } from '@shared/captain'
+import { shows, snapshot, captainPrice } from '@shared/captain'
 import { selectPings } from '@shared/ping-selection'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatNumber, getStatus, getUptimeDays } from '@shared/utils/helper'
 import { getDiskPercentage, getMemoryPercentage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@shared/utils/nodeMetricsHelper'
 import { getOSImage, getOSName } from '@shared/utils/osImageHelper'
 import { getRegionCode, getRegionDisplayName } from '@shared/utils/regionHelper'
-import { formatCurrencyValue, formatPriceWithCycle, getDaysUntilExpired, getExpireStatus, getRemainingValue, isFreePrice, parseTags } from '@shared/utils/tagHelper'
+import { formatCurrencyValue, getDaysUntilExpired, getExpireStatus, getRemainingValue, isFreePrice, parseTags } from '@shared/utils/tagHelper'
 import ThreeNetworkPing from '@/components/ThreeNetworkPing'
 import { Badge } from '@/components/ui/badge'
 import { CardX } from '@/components/ui/card-x'
@@ -120,7 +120,7 @@ export default function NodeCard({ node, reduceMotion = false, pingEnabled = tru
     ? '—'
     : language === 'zh-CN' ? `在线 ${getUptimeDays(node.uptime)} 天` : `${t('在线')} ${getUptimeDays(node.uptime)} ${t('天')}`
 
-  const priceText = node.price === 0 || !showPrice ? '' : formatPriceWithCycle(node.price, node.billing_cycle, node.currency, app.lang)
+  const priceText = showPrice ? captainPrice(node.uuid, app.lang) : ''
 
   const remainingInfoTags: RemainingInfoTag[] = (() => {
     if (node.price === 0 || (!Number.isFinite(node.price) && !node.expired_at))
@@ -142,7 +142,7 @@ export default function NodeCard({ node, reduceMotion = false, pingEnabled = tru
       items.push({ icon: 'tabler:calendar-stats', prefix: t('剩余'), value: String(days), unit: t('天'), className: expiryClass })
     else
       items.push({ icon: 'tabler:calendar-stats', prefix: 'left', value: String(days), unit: 'days', className: expiryClass })
-    if (showPrice) {
+    if (showPrice && Number.isFinite(node.price)) {
       const text = isFreePrice(node.price)
         ? lang === 'zh-CN' ? t('无') : 'N/A'
         : formatCurrencyValue(getRemainingValue(node.price, node.billing_cycle, node.expired_at), node.currency)

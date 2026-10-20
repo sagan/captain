@@ -134,6 +134,7 @@ features it has never heard of, which the node page shows as an orange
 
 | Captain | needs bosun | for |
 |---|---|---|
+| 1.26.0 | ≥ 0.73.0 for live hostname updates | Older agents retain their last paired hostname. Node cost and reset settings need no agent update. |
 | 1.24.0 | ≥ 0.72.0 for detailed firewall status | Automatic listener ownership, references and synchronization diagnostics. Older host-management snapshots remain supported. No migration. |
 | 1.23.0 | ≥ 0.71.0 for host management | Typed host tasks, actual-state UI and independent recovery. Older nodes remain usable without host actions. No migration. |
 | 1.22.0 | ≥ 0.70.0 for route-tool management | Explicit NextTrace installation and tool/ICMP checks; route collection remains available on 0.69.0. No migration. |

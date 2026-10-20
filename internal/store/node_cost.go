@@ -1,0 +1,114 @@
+package store
+
+import (
+	"errors"
+	"regexp"
+	"strings"
+	"time"
+
+	"golang.org/x/text/currency"
+)
+
+var ErrNodeCost = errors.New("invalid node cost, expiry date or traffic reset policy")
+var costAmount = regexp.MustCompile(`^(0|[1-9][0-9]{0,11})(\.[0-9]{1,4})?$`)
+var costYears = regexp.MustCompile(`^(0|[1-9][0-9]{0,2})(\.[0-9]{1,4})?$`)
+
+// Decimal strings preserve entered amounts without binary floating-point rounding.
+type NodeCost struct {
+	Amount   string `json:"amount"`
+	Currency string `json:"currency"`
+	Cycle    string `json:"cycle"`
+	Years    string `json:"years,omitempty"`
+}
+type NodeTrafficReset struct {
+	Mode string `json:"mode"`
+}
+
+func normalizeNodeCost(info *NodeProbeInfo, old NodeProbeInfo) error {
+	if info.Billing == nil {
+		// Legacy clients can edit their free-text price; unchanged echoes preserve structure.
+		if info.Price == old.Price {
+			info.Billing = old.Billing
+		}
+	}
+	if info.TrafficReset == nil {
+		info.TrafficReset = old.TrafficReset
+	}
+	if info.ExpiresAt != "" {
+		date, err := time.Parse("2006-01-02", info.ExpiresAt)
+		if err != nil || date.Year() < 1 {
+			return ErrNodeCost
+		}
+	}
+	if b := info.Billing; b != nil {
+		b.Currency = strings.ToUpper(b.Currency)
+		unit, err := currency.ParseISO(b.Currency)
+		if err != nil || unit.String() != b.Currency || b.Currency == "XXX" || b.Currency == "XTS" {
+			return ErrNodeCost
+		}
+		if b.Amount != "" && !costAmount.MatchString(b.Amount) {
+			return ErrNodeCost
+		}
+		switch b.Cycle {
+		case "monthly", "quarterly", "semiannual", "annual":
+			b.Years = ""
+		case "custom":
+			if !costYears.MatchString(b.Years) || strings.Trim(b.Years, "0.") == "" {
+				return ErrNodeCost
+			}
+		default:
+			return ErrNodeCost
+		}
+		info.Price = b.Display()
+	}
+	if r := info.TrafficReset; r != nil {
+		switch r.Mode {
+		case "manual":
+		case "expiry", "expiry_next":
+			if info.ExpiresAt == "" && (old.ExpiresAt != "" || old.TrafficReset == nil || old.TrafficReset.Mode != r.Mode) {
+				return ErrNodeCost
+			}
+		default:
+			return ErrNodeCost
+		}
+	}
+	return nil
+}
+func (b NodeCost) Display() string {
+	if b.Amount == "" {
+		return ""
+	}
+	cycle := map[string]string{"monthly": "month", "quarterly": "quarter", "semiannual": "6 months", "annual": "year"}[b.Cycle]
+	if b.Cycle == "custom" {
+		cycle = b.Years + " years"
+	}
+	return b.Currency + " " + b.Amount + " / " + cycle
+}
+
+func monthlyBoundary(at time.Time, offset, day, after int) time.Time {
+	month := time.Date(at.Year(), at.Month()+time.Month(offset), 1, 0, 0, 0, 0, at.Location())
+	last := month.AddDate(0, 1, -1).Day()
+	if day > last {
+		day = last
+	}
+	return month.AddDate(0, 0, day-1+after)
+}
+func nodePeriodStart(at time.Time, p *NodeProbe) time.Time {
+	day, after := p.ResetDay, 0
+	if r := p.Info.TrafficReset; r != nil && r.Mode != "manual" {
+		if date, err := time.Parse("2006-01-02", p.Info.ExpiresAt); err == nil {
+			day = date.Day()
+			if r.Mode == "expiry_next" {
+				after = 1
+			}
+		}
+	}
+	if day < 1 || day > 31 {
+		day = 1
+	}
+	start := monthlyBoundary(at, 0, day, after)
+	if start.After(at) {
+		start = monthlyBoundary(at, -1, day, after)
+	}
+	return start
+}

@@ -31,7 +31,7 @@ async function refresh(): Promise<boolean> {
         themeMode: scheme === 'auto' ? (system.matches ? 'dark' : 'light') : scheme,
         dataUpdateInterval: s.beat_seconds, visitorInfoEnabled: false, hideEarth: !s.show_globe || !shows('system'),
         defaultViewMode: s.layout === 'compact' ? 'list' : 'card',
-        hidePriceWhenLoggedOut: true,
+        hidePriceWhenLoggedOut: !shows('info'),
         // No billing/currency inference from Captain's free-form price strings.
         generalCardKeys: [...(shows('memory') ? ['memory'] : []), ...(shows('disk') ? ['disk'] : []), ...(shows('system') ? ['remainingValue'] : ['onlineNodes']), ...(shows('traffic') ? ['totalTraffic'] : []), ...(shows('network') ? ['uploadSpeed', 'downloadSpeed'] : [])].join(','),
       },

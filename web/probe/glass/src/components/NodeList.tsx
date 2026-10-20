@@ -2,14 +2,14 @@ import type { CSSProperties, HTMLAttributes, KeyboardEvent, ReactNode, Ref } fro
 import { Fragment, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { t } from '@shared/i18n'
-import { shows } from '@shared/captain'
+import { shows, captainPrice } from '@shared/captain'
 import { UI_CONFIG } from '@shared/constants/ui'
 import { formatCityNameZh } from '@shared/utils/cityNameHelper'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatNumber, formatUptimeWithFormat, getStatus } from '@shared/utils/helper'
 import { getRealtimeTotalSpeed, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@shared/utils/nodeMetricsHelper'
 import { getOSImage, getOSName } from '@shared/utils/osImageHelper'
 import { getRegionCode, getRegionDisplayName } from '@shared/utils/regionHelper'
-import { formatPriceWithCycle, getDaysUntilExpired, getExpireStatus, parseTags } from '@shared/utils/tagHelper'
+import { getDaysUntilExpired, getExpireStatus, parseTags } from '@shared/utils/tagHelper'
 import NodePingListCell from '@/components/NodePingListCell'
 import TrafficProgress from '@/components/TrafficProgress'
 import TransitionGroup from '@/components/TransitionGroup'
@@ -191,7 +191,8 @@ export default function NodeList({ nodes, transitionKey, sortResetKey, pingEnabl
       else if (status === 'long_term')
         tags.push(lang === 'zh-CN' ? t('长期') : 'Long-term')
       else tags.push(lang === 'zh-CN' ? `剩余 ${days} 天` : `${days} days left`)
-      tags.push(formatPriceWithCycle(node.price, node.billing_cycle, node.currency, lang))
+      const price = captainPrice(node.uuid, lang)
+      if (price) tags.push(price)
     }
     return tags
   }

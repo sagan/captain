@@ -876,3 +876,7 @@ Externally edited rules or a changed firewall backend/zone are retained for revi
 Firewalld synchronization uses the recorded default zone, runtime and permanent
 configuration, without reloading unrelated rules. A synchronized allowance is
 not a public connectivity test or a guarantee against earlier deny rules.
+
+In the group/order editor, drag a node handle onto a group card (including Ungrouped) to append it to that group. The target highlights during dragging and group counts update in the draft. Save applies the change; Cancel discards it.
+
+The hostname shown below a node name follows regular reports from agents that support hostname reporting. The administrator-assigned node name stays unchanged. Older agents and missing or invalid hostname readings retain the last known hostname. Both Captain and bosun need the hostname-reporting update; restarting an older bosun alone does not refresh this field.

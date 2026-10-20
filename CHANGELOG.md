@@ -6,6 +6,8 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
+- **v1.26.0** (2026-10-20) — Add structured node cost (decimal amount, currency and payment cycle), date selection, and monthly traffic resets following the expiry day or the following day. Preserve legacy text/manual settings and accumulated traffic when editing schedules; handle short months and leap years. Refresh node hostnames from authenticated bosun reports without changing administrator-assigned names; preserve the last value for older agents and empty/invalid observations. Allow dragging nodes directly onto group cards, including Ungrouped, in the shared layout editor. Highlight drop targets, show group counts, and retain draft/save behavior and existing sorting controls.
+
 - **v1.25.0** (2026-10-19) — Manage shared node/status-page groups and display order from Nodes. Add drag handles, keyboard and arrow controls, batch moves, per-node group editing, and group filtering. Save the complete layout atomically with conflict detection; preserve existing order on migration, keep hidden nodes private, and retain the legacy monitoring-group API. Migration 76; no bosun upgrade required.
   - Add an automatic/manual/hidden country selector with localized searchable flag options, panel-side Country.is lookup of observed machine IPs, per-IP caching, IPv4 preference, dual-stack disagreement hints, and stale-result rejection. Migration 77 preserves legacy manual/hidden choices; new nodes default to automatic.
 

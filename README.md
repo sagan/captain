@@ -314,3 +314,5 @@ MIT — see [LICENSE](LICENSE).
 Automatic listener firewall rules show their sources and synchronization state; shared ports stay open until their last reference disappears. Manual and ambiguous legacy rules are retained (bosun v0.72.0+).
 
 Captain node details expose observed host state, individual changes and operation history. Native root Debian/Ubuntu systemd nodes support bounded management jobs with independent local recovery for access/network changes. Other environments are read-only; missing system packages are not installed automatically.
+
+Node probe settings support structured amounts/currencies/payment cycles, calendar expiry dates, and monthly traffic resets linked to the expiry day or following day. Legacy price text and manual reset settings are preserved; see [Monitoring](docs/MONITORING.md#node-cost-and-expiry-linked-traffic-reset).

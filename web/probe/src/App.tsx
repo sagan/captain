@@ -1,3 +1,4 @@
+import { nodePrice } from './lib/node-price'
 import { Badge, Box, Card, Container, Group, Progress, SimpleGrid, Stack, Text, Title, Tooltip, Select, TextInput } from '@mantine/core'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { IconServer, IconArrowUp, IconArrowDown } from '@tabler/icons-react'
@@ -52,7 +53,7 @@ export default function App({ snap }: { snap: UseQueryResult<Snapshot, Error> })
 }
 
 function NodeCard({ n, snapshot, onOpen }: { n: Node; snapshot: Snapshot; onOpen: () => void }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const show = (section: string) => publicShows(snapshot, section)
   const h = n.host
   const cpu = !h || h.valid?.cpu === false ? null : h.cpu_percent ?? 0
@@ -94,7 +95,7 @@ function NodeCard({ n, snapshot, onOpen }: { n: Node; snapshot: Snapshot; onOpen
           <Progress value={trafficPct} size="sm" color={trafficPct > 90 ? 'red' : trafficPct > 70 ? 'orange' : 'teal'} />
         </Stack>
       ) : <Text size="xs" c="dimmed" mt="xs">{t('page.traffic')} {bytes(tr.used)}</Text>)}
-      {n.info.expires_at && <Text size="xs" c="dimmed" mt={4}>{t('page.expires')} {n.info.expires_at}{n.info.price ? ` · ${n.info.price}` : ''}</Text>}
+      {(n.info.expires_at || n.info.price) && <Text size="xs" c="dimmed" mt={4}>{[n.info.expires_at ? `${t('page.expires')} ${n.info.expires_at}` : '', nodePrice(n.info, i18n.language)].filter(Boolean).join(' · ')}</Text>}
     </Card>
   )
 }

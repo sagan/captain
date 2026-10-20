@@ -1,3 +1,4 @@
+import { nodePrice } from '../src/lib/node-price.ts'
 /** Read-only Captain transport for the MIT Glassmorphism public frontend.
  * Only the public probe API is used: no Komari RPC, agent tokens or admin data.
  */
@@ -199,4 +200,9 @@ export async function captainCall<T>(method: string, parameters?: Record<string,
   }
   signal?.throwIfAborted()
   return result as T
+}
+
+export function captainPrice(id: string, lang: string): string {
+ const node = snapshot.value?.nodes.find(n => String(n.id) === id)
+ return node ? nodePrice(node.info, lang) : ""
 }

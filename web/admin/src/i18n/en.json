@@ -2499,7 +2499,7 @@
   },
   "nodeLayout": {
     "title": "Groups and order",
-    "hint": "Groups and order are shared by node management and the public status page. Drag the handles or use the arrow buttons, then save. Ungrouped nodes appear last.",
+    "hint": "Groups and order are shared by node management and the public status page. Drag the handles or use the arrow buttons, then save. Ungrouped nodes appear last. You can also drop a node onto a group card above to move it to the end of that group.",
     "ungrouped": "Ungrouped",
     "drag": "Drag to reorder",
     "up": "Move up",
@@ -2527,5 +2527,27 @@
     "detect": "Detect / refresh country",
     "noIP": "Waiting for bosun to report the machine public IP. Manually configured entry addresses are not used.",
     "stale": "The public IP observation has expired. Wait for a fresh bosun report before detecting again."
+  },
+  "nodeCost": {
+    "amount": "Total per cycle",
+    "amountHint": "Blank hides the price; 0 means free.",
+    "currency": "Currency",
+    "cycle": "Payment cycle",
+    "monthly": "Monthly",
+    "quarterly": "Quarterly",
+    "semiannual": "Semiannual",
+    "annual": "Annual",
+    "custom": "Custom",
+    "years": "Cycle (years)",
+    "yearsHint": "Positive decimals allowed, e.g. 1.5 years.",
+    "expiryHint": "Select or enter a date; changing the cycle does not extend it.",
+    "legacyHint": "Legacy price text is preserved. Check the amount and currency when converting.",
+    "convert": "Use amount and cycle",
+    "reset_expiry": "Follow expiry day (automatic)",
+    "reset_expiry_next": "Day after expiry (automatic)",
+    "reset_manual": "Manual",
+    "dateRequired": "Enter an expiry date or choose a manual traffic reset day.",
+    "resetHint": "Resets on day {{day}} each month, clamped to month end.",
+    "resetNextHint": "Resets one day after day {{day}} each month, after clamping to month end."
   }
 }

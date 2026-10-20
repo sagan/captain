@@ -177,12 +177,14 @@ type NodeProbe struct {
 
 // NodeProbeInfo is what the public page may show about a server.
 type NodeProbeInfo struct {
-	Region      string `json:"region,omitempty"`   // ISO country code, e.g. "JP"
-	Provider    string `json:"provider,omitempty"` //
-	ProviderURL string `json:"provider_url,omitempty"`
-	Price       string `json:"price,omitempty"`      // free text, "$5/mo"
-	ExpiresAt   string `json:"expires_at,omitempty"` // YYYY-MM-DD
-	Note        string `json:"note,omitempty"`
+	Billing      *NodeCost         `json:"billing,omitempty"`
+	TrafficReset *NodeTrafficReset `json:"traffic_reset,omitempty"`
+	Region       string            `json:"region,omitempty"`   // ISO country code, e.g. "JP"
+	Provider     string            `json:"provider,omitempty"` //
+	ProviderURL  string            `json:"provider_url,omitempty"`
+	Price        string            `json:"price,omitempty"`      // free text, "$5/mo"
+	ExpiresAt    string            `json:"expires_at,omitempty"` // YYYY-MM-DD
+	Note         string            `json:"note,omitempty"`
 }
 
 // Billed returns the bytes that count against the limit under Mode.
@@ -258,7 +260,7 @@ func (s *Store) UpdateNodeProbe(ctx context.Context, nodeID int64, hidden bool, 
 // Omitted mode preserves auto when a legacy client echoes the effective region.
 // A changed country from an old client remains an explicit manual/off choice.
 func (s *Store) UpdateNodeProbeWithRegion(ctx context.Context, nodeID int64, hidden bool, info NodeProbeInfo, limit int64, resetDay int, mode string, resources *spec.ResourceOptions, requested *string) error {
-	if resetDay < 1 || resetDay > 28 {
+	if resetDay < 1 || resetDay > 31 {
 		resetDay = 1
 	}
 	switch mode {
@@ -284,6 +286,9 @@ func (s *Store) UpdateNodeProbeWithRegion(ctx context.Context, nodeID int64, hid
 	if err != nil {
 		return err
 	}
+	if err := normalizeNodeCost(&info, old.Info); err != nil {
+		return err
+	}
 	selected := old.RegionMode
 	if requested != nil {
 		selected = *requested
@@ -303,6 +308,15 @@ func (s *Store) UpdateNodeProbeWithRegion(ctx context.Context, nodeID int64, hid
 	default:
 		return ErrNodeRegion
 	}
+	// A schedule edit keeps accumulated usage; the next new boundary resets it.
+	next := *old
+	next.Info, next.ResetDay = info, resetDay
+	at := time.Now()
+	if !nodePeriodStart(at, old).Equal(nodePeriodStart(at, &next)) {
+		if _, err := tx.ExecContext(ctx, `UPDATE nodes SET traffic_period_start=? WHERE id=?`, nodePeriodStart(at, &next).Unix(), nodeID); err != nil {
+			return err
+		}
+	}
 	b, _ := json.Marshal(info)
 	_, err = tx.ExecContext(ctx, `UPDATE nodes SET probe_hidden=?,probe_info_json=?,traffic_limit_bytes=?,traffic_reset_day=?,traffic_mode=?,probe_resources_json=COALESCE(?,probe_resources_json),region_mode=?,updated_at=? WHERE id=?`, boolInt(hidden), string(b), limit, resetDay, mode, resourceJSON, selected, now(), nodeID)
 	if err != nil {
@@ -319,15 +333,10 @@ func (s *Store) ResetNodeTraffic(ctx context.Context, nodeID int64, at time.Time
 
 // periodStart returns the start of the billing period containing at.
 func periodStart(at time.Time, resetDay int) time.Time {
-	if resetDay < 1 || resetDay > 28 {
+	if resetDay < 1 || resetDay > 31 {
 		resetDay = 1
 	}
-	y, m, d := at.Date()
-	start := time.Date(y, m, resetDay, 0, 0, 0, 0, at.Location())
-	if d < resetDay {
-		start = start.AddDate(0, -1, 0)
-	}
-	return start
+	return nodePeriodStart(at, &NodeProbe{ResetDay: resetDay})
 }
 
 // RecordBeat folds one host sample into the minute/hour/day buckets and the
@@ -374,7 +383,7 @@ func (s *Store) RecordBeat(ctx context.Context, nodeID int64, h spec.SystemStatu
 	}
 
 	// Monthly NIC traffic.
-	start := periodStart(at, p.ResetDay)
+	start := nodePeriodStart(at, p)
 	usedUp, usedDown, prev := p.UsedUp, p.UsedDown, p.PrevUsed
 	if p.PeriodStart.IsZero() || start.After(p.PeriodStart) {
 		if !p.PeriodStart.IsZero() {

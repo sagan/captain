@@ -212,6 +212,11 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "invalid address observation or node identity")
 		return
 	}
+	if err := h.Store.ObserveNodeHostname(r.Context(), n.ID, tokenHash, rep.Hostname); err != nil {
+		h.Log.Error("save node hostname", "err", err)
+		fail(w, 500, "internal error")
+		return
+	}
 	metrics.NodeReports.Inc(nil)
 	ctx := r.Context()
 	now := time.Now()

@@ -2,11 +2,10 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Icon } from '@iconify/react'
 import { t } from '@shared/i18n'
-import { shows } from '@shared/captain'
+import { shows, captainPrice } from '@shared/captain'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatUptimeWithFormat } from '@shared/utils/helper'
 import { getDiskPercentage, getMemoryPercentage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@shared/utils/nodeMetricsHelper'
 import { isNodeMatchSearch } from '@shared/utils/nodeSearch'
-import { formatPriceWithCycle, isFreePrice } from '@shared/utils/tagHelper'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { vclass } from '@/lib/vclass'
@@ -76,7 +75,7 @@ export default function NodeComparePanel({ nodes }: { nodes: NodeData[] }) {
     metrics.push({
       key: 'price',
       label: '价格',
-      value: node => node.price > 0 || isFreePrice(node.price) ? formatPriceWithCycle(node.price, node.billing_cycle, node.currency, app.lang) : '-',
+      value: node => captainPrice(node.uuid, app.lang) || '-',
     })
   }
   const compareMetrics = metrics.filter(metric => !['traffic', 'trafficQuota'].includes(metric.key) || shows('traffic'))

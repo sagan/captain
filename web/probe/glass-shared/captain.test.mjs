@@ -117,3 +117,13 @@ test('period counters and live rates obey independent visibility, missing counte
   assert(Number.isNaN(statusFor({...n,traffic:{...n.traffic,used_up:value}}).net_total_up))
  }
 })
+
+test('structured prices preserve decimal years, free and hidden meanings', async () => {
+ const { nodePrice } = await import('../src/lib/node-price.ts')
+ assert.equal(nodePrice({price:'legacy text'},'zh-CN'),'legacy text')
+ const billing={amount:'36.3600',currency:'USD',cycle:'custom',years:'1.5'}
+ assert.equal(nodePrice({billing},'zh-CN'),'USD 36.3600 / 1.5 年')
+ assert.equal(nodePrice({billing:{...billing,amount:'0'}},'zh-CN'),'免费')
+ assert.equal(nodePrice({price:'old text',billing:{...billing,amount:''}},'zh-CN'),'')
+ assert.equal(nodePrice({billing:{...billing,cycle:'annual'}},'en-US'),'USD 36.3600 / year')
+})

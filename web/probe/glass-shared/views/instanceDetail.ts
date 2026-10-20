@@ -1,7 +1,7 @@
 // Pure view logic of the glass instance detail page, shared by the Vue and
 // React views so both compute identical card values, labels and classes.
 import { t } from '@shared/i18n'
-import type { Snapshot } from '@shared/captain'
+import { captainPrice, type Snapshot } from '@shared/captain'
 import type { NodeProviderMetadata } from '@shared/services/provider.service'
 import type { DetailMetricCardKey, Lang } from '@shared/stores/app-settings'
 import type { NodeData } from '@shared/types/node'
@@ -11,7 +11,7 @@ import { formatCityNameZh } from '@shared/utils/cityNameHelper'
 import * as financeHelper from '@shared/utils/financeHelper'
 import { gpuUsageFromStatus } from '@shared/utils/gpuHelper'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatNumber, formatUptimeWithFormat } from '@shared/utils/helper'
-import { formatPrice, formatPriceWithCycle, getExpireStatus, getExpireText, isFreePrice } from '@shared/utils/tagHelper'
+import { formatPrice, getExpireStatus, getExpireText, isFreePrice } from '@shared/utils/tagHelper'
 
 /** Inputs the Vue view reads from its stores and refs. */
 export interface DetailContext {
@@ -88,9 +88,7 @@ export function detailFormatters(ctx: DetailContext) {
 export function nodePriceText(ctx: DetailContext): string {
   if (!ctx.data)
     return '-'
-  if (Number(ctx.data.price) <= 0)
-    return formatPrice(0, ctx.data.currency, ctx.lang)
-  return formatPriceWithCycle(ctx.data.price, ctx.data.billing_cycle, ctx.data.currency, ctx.lang)
+  return captainPrice(ctx.data.uuid, ctx.lang) || '-'
 }
 
 export function monthlyAverageCostText(ctx: DetailContext): string {

@@ -673,3 +673,33 @@ The overview retains six default cards: memory, disk, remaining value, cumulativ
 traffic, upload rate and download rate (subject to public section controls).
 Unknown remaining value displays a dash. A local static globe remains available
 when WebGL cannot initialize or loses its context.
+
+### Node cost and expiry-linked traffic reset
+
+Node probe settings accept an amount for the complete payment cycle, a currency,
+and monthly, quarterly, semiannual, annual or custom cycles. Custom cycles are
+positive decimal years (up to four decimal places); amounts are stored as decimal
+strings. Blank amounts hide the price, while zero means free. Existing free-text
+prices remain editable until explicitly converted. Both public themes display
+structured prices without interpreting custom years as a fixed number of days;
+this does not enable automatic renewal, currency conversion or remaining-value estimates.
+
+The expiry input is a calendar/date field stored as YYYY-MM-DD, without timezone
+conversion or automatic extension. Monthly NIC traffic may reset on a manually
+chosen day (1–31), the expiry day-of-month, or its following day. A short month
+clamps the anniversary to its last day before applying the optional one-day offset.
+For example, an expiry on the 31st with the next-day option resets on March 1 after
+February. Payment frequency does not change monthly traffic accounting.
+
+Existing nodes keep their manual reset days. New nodes default to following the
+expiry day; before an expiry is supplied they retain the default day-1 fallback.
+The editor requires an expiry for automatic mode or an explicit manual choice.
+Changing the schedule or expiry preserves accumulated usage and starts using the
+new reset boundary; it does not reconstruct historical usage. The current period
+label may change to the newly selected boundary. Existing server-local time semantics
+for the monthly boundary are unchanged.
+
+The additive `info.billing` and `info.traffic_reset` objects live in the existing
+probe-info JSON; no database migration or bosun update is needed for this feature.
+Legacy clients that omit these objects preserve them when echoing the price.
+An explicit change to the legacy price returns that price to free-text mode.

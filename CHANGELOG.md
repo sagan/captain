@@ -6,6 +6,8 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
+- **Unreleased** — Record advertised server bandwidth in Mbps/Gbps with symmetric or separate RX/TX capacities. Add opt-in public display in both probe themes; strip private capacity from the public API and preserve records when older clients save other settings. Metadata only, with no shaping changes, migration, or bosun upgrade.
+
 - **v1.28.0** (2026-10-20) — Add per-connection managed WG forwarding and domain address preference (migration 78). New UI connections select IPv4 preference and automatic forwarding; existing links retain empty/IPv6-first routing and manual firewall management. Preserve omitted/null update fields, accept explicit resets, and require fresh A/B capabilities at save and delivery; withhold both transports and the entire subscriber inbound when support disappears.
   - Show B's forwarding check separately from the handshake, reject stale checks, and surface automatic setup failures. Support UFW with unambiguous main-table routes; firewalld, multiple backends, custom policy routing and disabled global auto-open require explicit resolution. Domain preference does not translate literals, provide IPv6 connectivity or retry another family after failure.
   - Gate core-only private grants with split routing on fresh bosun capabilities; preserve existing WARP, proxy and balancer decisions instead of adding direct routes.

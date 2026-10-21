@@ -2779,5 +2779,16 @@
       "failover": "Primary / backup",
       "roundrobin": "Weighted round robin"
     }
+  },
+  "nodeBandwidth": {
+    "title": "Advertised bandwidth",
+    "hint": "Record the provider’s bandwidth capacity only; this does not change speed limits. Empty means unknown. RX is received by the server; TX is sent.",
+    "separate": "Set inbound and outbound separately",
+    "inbound": "Inbound (RX)",
+    "outbound": "Outbound (TX)",
+    "symmetric": "Inbound / outbound",
+    "unknown": "Unknown",
+    "unit": "Unit",
+    "public": "Show bandwidth on the public status page"
   }
 }

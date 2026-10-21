@@ -2779,5 +2779,16 @@
       "failover": "主備",
       "roundrobin": "加權輪詢"
     }
+  },
+  "nodeBandwidth": {
+    "title": "標稱頻寬",
+    "hint": "僅記錄服務商提供的頻寬規格，不改變實際限速；留空表示未知。入站為伺服器接收（RX），出站為傳送（TX）。",
+    "separate": "分別設定入站與出站",
+    "inbound": "入站頻寬（RX）",
+    "outbound": "出站頻寬（TX）",
+    "symmetric": "入站 / 出站頻寬",
+    "unknown": "未知",
+    "unit": "單位",
+    "public": "在公開狀態頁顯示頻寬"
   }
 }

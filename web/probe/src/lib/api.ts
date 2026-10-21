@@ -15,7 +15,7 @@ export interface Host {
 export interface Node {
   ping_tasks?: PublicPingTask[]
   id: number; name: string; group?: string; online: boolean; addr?: string; version?: string; last_seen: string | null
-  info: { billing?: import('./node-price').NodeCost; region?: string; provider?: string; provider_url?: string; price?: string; expires_at?: string; note?: string }
+  info: { bandwidth?: import('./node-bandwidth').NodeBandwidth; billing?: import('./node-price').NodeCost; region?: string; provider?: string; provider_url?: string; price?: string; expires_at?: string; note?: string }
   host: Host | null
   traffic: { used: number; used_up?: number; used_down?: number; limit: number; prev: number; mode: string; period_start: number; reset_day: number }
   recent: Sample[]

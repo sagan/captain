@@ -223,7 +223,7 @@ func (h *handlers) snapshot(w http.ResponseWriter, r *http.Request) {
 		v.LastSeen = last
 		v.Online = last != nil && now.Sub(*last) <= grace
 		if np != nil {
-			v.Info = np.Info
+			v.Info = np.Info.PublicInfo()
 			v.Traffic.UsedB, v.Traffic.LimitB, v.Traffic.PrevB, v.Traffic.Mode, v.Traffic.ResetDay = np.Billed(), np.LimitBytes, np.PrevUsed, np.Mode, np.ResetDay
 			v.Traffic.UsedUpB, v.Traffic.UsedDownB = np.UsedUp, np.UsedDown
 			if !np.PeriodStart.IsZero() {

@@ -703,3 +703,23 @@ The additive `info.billing` and `info.traffic_reset` objects live in the existin
 probe-info JSON; no database migration or bosun update is needed for this feature.
 Legacy clients that omit these objects preserve them when echoing the price.
 An explicit change to the legacy price returns that price to free-text mode.
+
+### Advertised server bandwidth
+
+Node details → Probe and monthly traffic includes **Advertised bandwidth**.
+Enter a numeric capacity in Mbps or Gbps (1 Gbps = 1000 Mbps). By default the
+same value applies to both directions; enable separate values for asymmetric
+links. Inbound/RX is received by the server; outbound/TX is sent. Empty or zero
+means unknown. Each direction accepts up to 1,000,000 Mbps.
+
+This is provider capacity metadata, not a speed test or a rate limit. It does
+not change bosun, proxy shaping, monthly traffic accounting, or alert thresholds.
+Public display is off by default. When enabled, both status-page themes show
+the capacity; asymmetric links label RX and TX separately. The global public
+Information section must also be enabled. Private bandwidth is stripped from
+the public API response, rather than only hidden in the interface.
+
+The optional `info.bandwidth` object stores `inbound_mbps`, `outbound_mbps`, and
+`public`. Older API clients omitting it (or sending null) preserve the record;
+an explicit empty object or two zero rates clears it. It uses the existing node
+metadata storage and requires neither a migration nor a bosun upgrade.

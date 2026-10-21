@@ -177,6 +177,7 @@ type NodeProbe struct {
 
 // NodeProbeInfo is what the public page may show about a server.
 type NodeProbeInfo struct {
+	Bandwidth    *NodeBandwidth    `json:"bandwidth,omitempty"`
 	Billing      *NodeCost         `json:"billing,omitempty"`
 	TrafficReset *NodeTrafficReset `json:"traffic_reset,omitempty"`
 	Region       string            `json:"region,omitempty"`   // ISO country code, e.g. "JP"
@@ -284,6 +285,9 @@ func (s *Store) UpdateNodeProbeWithRegion(ctx context.Context, nodeID int64, hid
 	defer tx.Rollback()
 	old, err := scanNodeProbe(tx.QueryRowContext(ctx, `SELECT `+nodeProbeCols+` FROM nodes WHERE id=?`, nodeID))
 	if err != nil {
+		return err
+	}
+	if err := normalizeNodeBandwidth(&info, old.Info); err != nil {
 		return err
 	}
 	if err := normalizeNodeCost(&info, old.Info); err != nil {

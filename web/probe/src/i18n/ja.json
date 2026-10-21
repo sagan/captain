@@ -20,7 +20,8 @@
     "expires": "有効期限",
     "history": "リソース履歴",
     "network": "ネットワーク",
-    "gaps": "空白は測定データがない区間です。"
+    "gaps": "空白は測定データがない区間です。",
+    "bandwidth": "公称帯域幅"
   },
   "networkQuality": {
     "title": "ネットワーク品質",

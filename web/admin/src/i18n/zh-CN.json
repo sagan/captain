@@ -2779,5 +2779,16 @@
       "failover": "主备",
       "roundrobin": "加权轮询"
     }
+  },
+  "nodeBandwidth": {
+    "title": "标称带宽",
+    "hint": "仅记录服务商提供的带宽规格，不改变实际限速；留空表示未知。入站为服务器接收（RX），出站为发送（TX）。",
+    "separate": "分别设置入站和出站",
+    "inbound": "入站带宽（RX）",
+    "outbound": "出站带宽（TX）",
+    "symmetric": "入站 / 出站带宽",
+    "unknown": "未知",
+    "unit": "单位",
+    "public": "在公开探针显示带宽"
   }
 }

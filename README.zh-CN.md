@@ -53,6 +53,7 @@ mita（mieru）、Hysteria、snell-server 和 realm 作为子进程拉起来。
 
 ## 功能特性
 
+- 在同一页面管理订阅节点与可复用线路：创建直连节点、发布 relay/nft/realm 转发路径，或将两个订阅节点组成受支持的客户端链。服务器详情展示关联配置与实际上报状态。线路支持 TCP 主备及加权候选，并明确传输协议和宿主防火墙的限制。[线路](docs/NODES.md#managed-server-lines) · [客户端链](docs/SUBSCRIPTIONS.md#managed-server-lines-and-client-chains)。
 - 节点域名冲突检查与显式共享／外部 DNS 模式防止误覆盖记录；DNS 健康检查、持续异常告警和自动变更历史帮助定位问题，并按已保存的旧值手动恢复。[DNS 运维说明](docs/MONITORING.md)。
 - 在节点详情下载已审核的内核包并激活指定版本（bosun ≥ 0.64）。官方与 Extended sing-box 可同时运行；SSH TCP 代理订阅带有持久主机公钥验证。[内核管理与支持范围](docs/NODES.md#managing-node-core-packages)。
 - Captain v1.27 / bosun v0.74 将私网策略能力与 nft 运行状态分开报告，提供前提检查并自动判定防护方式；仅内核授权须管理员明确确认，继续支持指定地址、协议和端口。[自动防护方式](docs/NODES.md#automatic-protection-mode)。

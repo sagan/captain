@@ -114,3 +114,63 @@ func TestClientChainTransitiveDependency(t *testing.T) {
 		t.Fatalf("dependent descendants leaked: %v %v", got, err)
 	}
 }
+
+func TestClientChainRejectsRawProxyReplacement(t *testing.T) {
+	for _, format := range []string{"clash", "stash", "singbox"} {
+		for _, key := range []string{"type", "Type", "server", "port", "server_port", "Server-Port", "udp", "UDP"} {
+			for _, position := range []int{0, 1} {
+				lines := chainFixture()
+				value := any("direct")
+				if key == "server" {
+					value = "other.example.com"
+				}
+				if key == "port" || key == "server_port" {
+					value = 1443
+				}
+				lines[position].Extra = map[string]any{key: value}
+				got, err := ClientLines(lines, format)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, l := range got {
+					if l.Name == "Home via front" {
+						t.Fatalf("%s position %d extra %s bypassed managed path", format, position, key)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestClientChainCanonicalDialerAndTemplateNames(t *testing.T) {
+	for _, format := range []string{"clash", "stash"} {
+		for _, key := range []string{"dialer_proxy", "Dialer-Proxy", "DETOUR"} {
+			lines := chainFixture()
+			lines[0].Extra = map[string]any{key: "DIRECT"}
+			got, err := ClientLines(lines, format)
+			if err != nil || len(got) != 1 {
+				t.Fatalf("alias %s leaked dependency: %+v %v", key, got, err)
+			}
+			lines = chainFixture()
+			lines[1].Extra = map[string]any{key: "DIRECT", "Interface_Name": "en0"}
+			got, err = ClientLines(lines, format)
+			if err != nil || len(got) != 2 || got[1].Extra[key] != nil || got[1].Extra["dialer-proxy"] != lines[0].Name {
+				t.Fatalf("alias conflict: %+v %v", got, err)
+			}
+			if format == "stash" && got[1].Extra["Interface_Name"] != nil {
+				t.Fatal("Stash interface-name conflict")
+			}
+		}
+		lines := chainFixture()
+		template := "proxy-groups:\n  - name: '" + lines[0].Name + "'\n    type: select\n    proxies: [DIRECT]\nrules: []\n"
+		got, err := ClientLines(lines, format, template)
+		if err != nil || len(got) != 1 {
+			t.Fatalf("actual template collision: %+v %v", got, err)
+		}
+		lines[0].Name = "DIRECT"
+		got, err = ClientLines(lines, format)
+		if err != nil || len(got) != 1 {
+			t.Fatalf("reserved name was a dialer: %+v %v", got, err)
+		}
+	}
+}

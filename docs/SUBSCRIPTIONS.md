@@ -109,7 +109,9 @@ referenced node, inbound, server or owned reverse connection cannot be deleted
 until its client-chain references are removed. Saving a server-line binding and
 a client-dialer binding on the same node is rejected; a front node may itself
 publish a server-line endpoint. Advanced client extra fields remain available,
-but managed dialer fields take precedence; Stash's conflicting `interface-name`
+but replacing `type`, `server` or the endpoint port through extras makes a
+managed chain or dependency ineligible. Managed dialer fields take precedence;
+Stash's conflicting `interface-name`
 is removed on a chained destination. Arbitrary custom templates that rename or
 remove rendered proxies must preserve these dependency references.
 

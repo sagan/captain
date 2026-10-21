@@ -231,7 +231,7 @@ func (h *handlers) previewSubscriptionProfile(w http.ResponseWriter, r *http.Req
 		}
 		body = global[rd.Name()]
 	}
-	lines, err := service.ClientLines(published, rd.Name())
+	lines, err := service.ClientLines(published, rd.Name(), body)
 	if err != nil {
 		serverErr(w, err)
 		return

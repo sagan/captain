@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"maps"
+	"strings"
 
 	"github.com/zeptop-dev/bosun/pkg/subscription"
 	"github.com/zeptop-dev/captain/internal/store"
@@ -53,7 +54,7 @@ func AvailablePublications(lines []PublishedLine) []PublishedLine {
 // ClientLines resolves references only within the already authorized lines.
 // Missing, hidden, unsupported or ambiguous dependencies remove the dependent
 // node; they never turn it into an ordinary direct node.
-func ClientLines(lines []PublishedLine, format string) ([]subscription.Line, error) {
+func ClientLines(lines []PublishedLine, format string, templates ...string) ([]subscription.Line, error) {
 	supportedFormat := format == "clash" || format == "stash" || format == "singbox"
 	hasChain := false
 	for _, l := range lines {
@@ -72,7 +73,11 @@ func ClientLines(lines []PublishedLine, format string) ([]subscription.Line, err
 	// Use the existing renderer as the protocol/transport capability source.
 	// This avoids maintaining a second protocol matrix in Captain. The built-in
 	// template also reveals collisions with selector and ShadowTLS carrier names.
-	data, err := subscription.Pick(format, "").Render(plain, subscription.Account{})
+	template := ""
+	if len(templates) > 0 {
+		template = templates[0]
+	}
+	data, err := subscription.Pick(format, "").RenderWith(plain, subscription.Account{}, template)
 	if err != nil {
 		return nil, err
 	}
@@ -114,17 +119,31 @@ func ClientLines(lines []PublishedLine, format string) ([]subscription.Line, err
 		if depth > store.MaxClientChainDepth || seen[l.EntryID] || counts[l.Name] != 1 || !supports(l) {
 			return false
 		}
-		// A raw name/tag override cannot silently redirect a managed reference.
-		key := "name"
-		if format == "singbox" {
-			key = "tag"
+		// Client decoders may accept case/underscore aliases. A raw type can
+		// even replace this proxy with a direct outbound that ignores dialers.
+		for field, value := range l.Extra {
+			canonical := strings.ToLower(strings.ReplaceAll(field, "_", "-"))
+			switch canonical {
+			case "type", "server", "port", "server-port", "udp":
+				return false
+			case "name", "tag":
+				if value != l.Name {
+					return false
+				}
+			case "dialer-proxy", "detour":
+				if l.DialerEntryID == 0 && value != nil {
+					return false
+				}
+			}
 		}
-		if name, exists := l.Extra[key]; exists && name != l.Name {
-			return false
+		if format != "singbox" {
+			switch strings.ToUpper(l.Name) {
+			case "DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE", "GLOBAL":
+				return false
+			}
 		}
 		if l.DialerEntryID == 0 {
-			// Unmanaged dialers can point outside the authorized dependency set.
-			return l.Extra["dialer-proxy"] == nil && l.Extra["detour"] == nil
+			return true
 		}
 		if format == "singbox" && l.Inbound.ShadowTLS != nil {
 			// The current shared renderer owns the ShadowTLS carrier detour.
@@ -152,12 +171,11 @@ func ClientLines(lines []PublishedLine, format string) ([]subscription.Line, err
 		if line.Extra == nil {
 			line.Extra = map[string]any{}
 		}
-		delete(line.Extra, "dialer-proxy")
-		delete(line.Extra, "detour")
-		// Stash treats interface-name and dialer-proxy as mutually exclusive;
-		// the explicit managed chain owns how this destination is dialed.
-		if format == "stash" {
-			delete(line.Extra, "interface-name")
+		for field := range line.Extra {
+			canonical := strings.ToLower(strings.ReplaceAll(field, "_", "-"))
+			if canonical == "dialer-proxy" || canonical == "detour" || format == "stash" && canonical == "interface-name" {
+				delete(line.Extra, field)
+			}
 		}
 		key := "dialer-proxy"
 		if format == "singbox" {

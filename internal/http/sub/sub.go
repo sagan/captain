@@ -206,7 +206,7 @@ func Register(mux *http.ServeMux, d Deps) {
 			body, err = renderProfilePage(r, profile.Settings.Page, acct)
 		} else {
 			var lines []subscription.Line
-			lines, err = service.ClientLines(published, rd.Name())
+			lines, err = service.ClientLines(published, rd.Name(), template)
 			if err == nil {
 				body, err = rd.RenderWith(lines, acct, template)
 			}

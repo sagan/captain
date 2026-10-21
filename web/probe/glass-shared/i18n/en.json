@@ -110,5 +110,6 @@
   "本周期出站": "Period outbound",
   "本周期入站": "Period inbound",
   "周期流量说明": "Current period traffic stored in the database. Retained across restarts; cleared on the reset day or by a manual reset.",
-  "汇总周期流量说明": "Outbound plus inbound for each selected node’s current period; reset days may differ."
+  "汇总周期流量说明": "Outbound plus inbound for each selected node’s current period; reset days may differ.",
+  "标称带宽": "Advertised bandwidth"
 }

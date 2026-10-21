@@ -1,7 +1,7 @@
 import type { HTMLAttributes, KeyboardEvent } from 'react'
 import { Icon } from '@iconify/react'
 import { language, t } from '@shared/i18n'
-import { shows, snapshot, captainPrice } from '@shared/captain'
+import { shows, snapshot, captainPrice, captainBandwidth } from '@shared/captain'
 import { selectPings } from '@shared/ping-selection'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatNumber, getStatus, getUptimeDays } from '@shared/utils/helper'
 import { getDiskPercentage, getMemoryPercentage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@shared/utils/nodeMetricsHelper'
@@ -120,6 +120,7 @@ export default function NodeCard({ node, reduceMotion = false, pingEnabled = tru
     ? '—'
     : language === 'zh-CN' ? `在线 ${getUptimeDays(node.uptime)} 天` : `${t('在线')} ${getUptimeDays(node.uptime)} ${t('天')}`
 
+  const bandwidthText = captainBandwidth(node.uuid, app.lang)
   const priceText = showPrice ? captainPrice(node.uuid, app.lang) : ''
 
   const remainingInfoTags: RemainingInfoTag[] = (() => {
@@ -291,6 +292,8 @@ export default function NodeCard({ node, reduceMotion = false, pingEnabled = tru
             </span>
           )}
         </div>
+
+        {bandwidthText && <div className="mt-1 text-[11px] text-muted-foreground break-words">{t('标称带宽')}: {bandwidthText}</div>}
 
         {isMiniNodeCard
           ? (

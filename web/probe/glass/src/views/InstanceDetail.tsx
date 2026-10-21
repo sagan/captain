@@ -3,7 +3,7 @@ import { asyncComponent } from '@/lib/asyncComponent'
 import type { ChangeEvent, Ref } from 'react'
 import { Icon } from '@iconify/react'
 import { t } from '@shared/i18n'
-import { shows, snapshot } from '@shared/captain'
+import { shows, snapshot, captainBandwidth } from '@shared/captain'
 import { LOAD_RECORD_MAX_COUNT } from '@shared/constants/load'
 import { loadNodeLoadRecords } from '@shared/services/history.service'
 import { getCpuBenchmarkRating, getPassMarkCpuLookupUrl } from '@shared/utils/cpuBenchmark'
@@ -333,6 +333,7 @@ export default function InstanceDetail({ ref }: { ref?: Ref<HTMLDivElement> }) {
 
               {overview && (
                 <div className="px-4 gap-4 grid grid-cols-1 lg:grid-cols-2">
+                  {captainBandwidth(data.uuid, app.lang) && <CardX title={t('标称带宽')} className="col-span-full"><p className="px-4 pb-4 text-sm break-words">{captainBandwidth(data.uuid, app.lang)}</p></CardX>}
                   {shows('system') && (
                     <CardX
                       title={t('硬件信息')}

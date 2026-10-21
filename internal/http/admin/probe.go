@@ -205,7 +205,7 @@ func (h *handlers) putNodeProbe(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := h.Store.UpdateNodeProbeWithRegion(r.Context(), idOf(r), in.Hidden, in.Info, in.LimitBytes, in.ResetDay, in.Mode, in.Resources, in.RegionMode); err != nil {
-		if errors.Is(err, store.ErrNodeRegion) || errors.Is(err, store.ErrNodeCost) {
+		if errors.Is(err, store.ErrNodeRegion) || errors.Is(err, store.ErrNodeCost) || errors.Is(err, store.ErrNodeBandwidth) {
 			fail(w, 400, err.Error())
 			return
 		}

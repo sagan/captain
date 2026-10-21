@@ -20,7 +20,8 @@
     "expires": "到期",
     "history": "資源歷史",
     "network": "網路",
-    "gaps": "曲線斷開表示缺少測量資料。"
+    "gaps": "曲線斷開表示缺少測量資料。",
+    "bandwidth": "標稱頻寬"
   },
   "networkQuality": {
     "title": "網路品質",

@@ -20,7 +20,8 @@
     "expires": "만료",
     "history": "리소스 이력",
     "network": "네트워크",
-    "gaps": "공백은 측정 데이터가 없는 구간입니다."
+    "gaps": "공백은 측정 데이터가 없는 구간입니다.",
+    "bandwidth": "명목 대역폭"
   },
   "networkQuality": {
     "title": "네트워크 품질",

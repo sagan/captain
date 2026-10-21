@@ -20,7 +20,8 @@
     "expires": "Expires",
     "history": "Resource history",
     "network": "Network",
-    "gaps": "Gaps indicate missing measurements."
+    "gaps": "Gaps indicate missing measurements.",
+    "bandwidth": "Advertised bandwidth"
   },
   "networkQuality": {
     "title": "Network quality",

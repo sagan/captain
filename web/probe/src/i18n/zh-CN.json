@@ -20,7 +20,8 @@
     "expires": "到期",
     "history": "资源历史",
     "network": "网络",
-    "gaps": "曲线断开表示缺少测量数据。"
+    "gaps": "曲线断开表示缺少测量数据。",
+    "bandwidth": "标称带宽"
   },
   "networkQuality": {
     "title": "网络质量",

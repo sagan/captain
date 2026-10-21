@@ -1,3 +1,4 @@
+import { nodeBandwidth } from './lib/node-bandwidth'
 import { nodePrice } from './lib/node-price'
 import { Badge, Box, Card, Container, Group, Progress, SimpleGrid, Stack, Text, Title, Tooltip, Select, TextInput } from '@mantine/core'
 import type { UseQueryResult } from '@tanstack/react-query'
@@ -95,6 +96,7 @@ function NodeCard({ n, snapshot, onOpen }: { n: Node; snapshot: Snapshot; onOpen
           <Progress value={trafficPct} size="sm" color={trafficPct > 90 ? 'red' : trafficPct > 70 ? 'orange' : 'teal'} />
         </Stack>
       ) : <Text size="xs" c="dimmed" mt="xs">{t('page.traffic')} {bytes(tr.used)}</Text>)}
+      {nodeBandwidth(n.info.bandwidth, i18n.language) && <Text size="xs" c="dimmed" mt={4}>{t('page.bandwidth')}: {nodeBandwidth(n.info.bandwidth, i18n.language)}</Text>}
       {(n.info.expires_at || n.info.price) && <Text size="xs" c="dimmed" mt={4}>{[n.info.expires_at ? `${t('page.expires')} ${n.info.expires_at}` : '', nodePrice(n.info, i18n.language)].filter(Boolean).join(' · ')}</Text>}
     </Card>
   )

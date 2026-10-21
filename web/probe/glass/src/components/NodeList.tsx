@@ -2,7 +2,7 @@ import type { CSSProperties, HTMLAttributes, KeyboardEvent, ReactNode, Ref } fro
 import { Fragment, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { t } from '@shared/i18n'
-import { shows, captainPrice } from '@shared/captain'
+import { shows, captainPrice, captainBandwidth } from '@shared/captain'
 import { UI_CONFIG } from '@shared/constants/ui'
 import { formatCityNameZh } from '@shared/utils/cityNameHelper'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatNumber, formatUptimeWithFormat, getStatus } from '@shared/utils/helper'
@@ -199,6 +199,8 @@ export default function NodeList({ nodes, transitionKey, sortResetKey, pingEnabl
 
   function buildNodeMetadataItems(node: NodeData): NodeMetadataItem[] {
     const items: NodeMetadataItem[] = []
+    const bandwidth = captainBandwidth(node.uuid, app.lang)
+    if (bandwidth) items.push({ key: 'bandwidth', value: bandwidth, title: `${t('标称带宽')}: ${bandwidth}`, icon: 'tabler:network', variant: 'secondary', class: 'max-w-full' })
     const providerMetadata = getNodeProviderMetadata(node)
     for (const field of app.nodeListMetadataFields) {
       switch (field) {

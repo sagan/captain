@@ -127,3 +127,18 @@ test('structured prices preserve decimal years, free and hidden meanings', async
  assert.equal(nodePrice({price:'old text',billing:{...billing,amount:''}},'zh-CN'),'')
  assert.equal(nodePrice({billing:{...billing,cycle:'annual'}},'en-US'),'USD 36.3600 / year')
 })
+
+test('bandwidth metadata uses decimal bit rates and respects publication', async () => {
+ const { nodeBandwidth } = await import('../src/lib/node-bandwidth.ts')
+ const { captainBandwidth } = await import('./captain.ts')
+ const b = { inbound_mbps: 1500, outbound_mbps: 100.5, public: true }
+ assert.equal(nodeBandwidth(b), 'RX 1.5 Gbps · TX 100.5 Mbps')
+ assert.equal(nodeBandwidth({...b,outbound_mbps:1500}), '1.5 Gbps')
+ assert.equal(nodeBandwidth({...b,inbound_mbps:0}), 'RX — · TX 100.5 Mbps')
+ assert.equal(nodeBandwidth({...b,public:false}), '')
+ assert.equal(nodeBandwidth({...b,inbound_mbps:0,outbound_mbps:0}), '')
+ snapshot.value.nodes[0].info.bandwidth = b
+ assert.equal(captainBandwidth('1','en'), nodeBandwidth(b))
+ snapshot.value.public_sections=['network']
+ assert.equal(captainBandwidth('1','en'), '')
+})

@@ -97,7 +97,8 @@ Node  (bosun agent: addresses{public, internal, v6}, domain, token hash, version
        default outbound, DNS servers, WARP account, per-core overrides; decoy site, node speed limit, mita quotas)
 Ingress (per node: bind IP, far-end IP, public entry host, port range and offset, reserved ports)
 Inbound (node, tag, protocol, listen, port, core, spec.Inbound settings, group, ingress)
-Entry  (what users see: display host + port on top of an Inbound, tags, region, client extra fields, sort)
+Entry  (subscriber node: connection host + port on an Inbound; optional line/member or client-dialer reference)
+ForwardLine (versioned ordered groups, target inbound, generated owned forwards)
 Domain / Certificate (registered zones with a Cloudflare token; PEM pairs issued, uploaded or received by webhook)
 ExternalSource ──< ExternalNode (imported share links and airport subscriptions)
 NodeJob (one-off task carried in the state, answered in the report)
@@ -110,11 +111,17 @@ NodeJob (one-off task carried in the state, answered in the report)
   Accounting happens at the landing, so a user's traffic is counted once
   whichever entry they use. Group-restricted inbounds only appear for their
   group; `user_entry_blocks` hides single entries from single users.
-- **Relays** are per-node port forwards (`nodes.forwards_json`, one
-  `spec.Forward` per rule) rather than chain objects: a rule on the relay
-  node targets a landing inbound and an entry advertises the relay's
-  address. The `chains` table and `entries.chain_id` from the first schema
-  are not used by the store.
+- **Relays** still use per-server `spec.Forward` rules in
+  `nodes.forwards_json`. Versioned `forward_lines` now compile ordered groups
+  into owned rules and derive bound Entry endpoints in one transaction.
+  Existing unowned rules remain independently editable. The historical
+  `chains` table and `entries.chain_id` are still unused.
+- **Client chains** use `entries.client_dialer_entry_id`, a self-reference
+  independent of server forwarding. Subscription assembly resolves IDs after
+  authorization and profile/flag naming, then uses the existing renderers to
+  check protocol support and produce the appropriate client dialer reference.
+  Missing or unsupported dependencies remove the dependent publication.
+  A chain can incur accounting at both authenticated proxy inbounds.
 - **Line ingresses** cover the IPLC case without a relay: the inbound binds
   to the line's local address and the entry advertises the provider's
   entrance on the mapped port.

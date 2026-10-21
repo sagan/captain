@@ -201,7 +201,7 @@ func (h *handlers) previewSubscriptionProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 	svc := &service.Subscription{Store: h.Store}
-	lines, acct, err := svc.LinesWithProfile(r.Context(), u, time.Now(), &in.Profile)
+	published, acct, err := svc.PublishedLinesWithProfile(r.Context(), u, time.Now(), &in.Profile)
 	if errors.Is(err, service.ErrDisabled) {
 		fail(w, 409, "user is banned")
 		return
@@ -230,6 +230,11 @@ func (h *handlers) previewSubscriptionProfile(w http.ResponseWriter, r *http.Req
 			return
 		}
 		body = global[rd.Name()]
+	}
+	lines, err := service.ClientLines(published, rd.Name())
+	if err != nil {
+		serverErr(w, err)
+		return
 	}
 	rendered, err := rd.RenderWith(lines, acct, body)
 	if err != nil {

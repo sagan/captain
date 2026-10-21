@@ -71,6 +71,48 @@ Each entry can carry **client extra fields** — a JSON object merged into
 its mihomo, Stash and sing-box proxy (`tfo`, `smux`, `dialer-proxy`,
 `ip-version` …) for the knobs only some clients understand.
 
+### Managed server lines and client chains
+
+The **Nodes & lines** page keeps subscription nodes and reusable server lines
+in separate tabs. A subscription node can use an existing inbound, a managed
+server line, or a client-side proxy chain. The server detail page shows the
+applied resources and links back to their editors. The UI calls the agent host
+a **server**; the existing Node/Inbound/Entry API names remain unchanged.
+
+**Connection address and port** are the real endpoint exported to the client.
+Typing a different port does not create a listener, NAT rule, or port forward.
+For a direct/manual node, arrange that path first. For a managed server line,
+Captain derives the endpoint from the selected first-group member and keeps
+it synchronized when the line or its ingress mapping changes. Several
+subscription nodes can still publish different endpoints for one inbound.
+
+**Client-side chains** select another subscription node by ID as the front.
+The client connects through that front to the destination's connection address;
+Captain does not deploy an extra server forward. Renaming either node, adding
+region flags, or applying a subscription profile keeps the reference intact.
+Both nodes authenticate the subscriber independently and may charge traffic;
+this differs from raw server forwarding, where only the landing inbound bills.
+
+The full mihomo, recent Stash and sing-box subscription formats render managed
+client chains (`dialer-proxy` / `detour`). Stash requires iOS/tvOS 3.2.5+ or
+macOS 4.1+ for full configurations; old Clash implementations are not promised.
+Both ends must be supported by the chosen renderer and visible to this user.
+Disabled, group-restricted, user-blocked, missing, ambiguously named or
+unsupported dependencies cause the dependent node to be omitted, never silently
+exported as a direct node. Other formats and single-node share URIs omit managed
+client chains. The portal marks them as requiring a full supported subscription.
+The current sing-box renderer cannot chain a destination's ShadowTLS carrier,
+so that combination is omitted. UDP support still depends on every hop.
+
+The chain limit is eight nodes. Cycles and self-references are rejected. A
+referenced node, inbound, server or owned reverse connection cannot be deleted
+until its client-chain references are removed. Saving a server-line binding and
+a client-dialer binding on the same node is rejected; a front node may itself
+publish a server-line endpoint. Advanced client extra fields remain available,
+but managed dialer fields take precedence; Stash's conflicting `interface-name`
+is removed on a chained destination. Arbitrary custom templates that rename or
+remove rendered proxies must preserve these dependency references.
+
 **External nodes** (Admin → External nodes) are offered alongside your own
 entries: paste share links (vless, vmess, trojan, ss, hysteria2, tuic,
 anytls) or add an airport subscription (base64 or URI list, re-synced

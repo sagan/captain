@@ -139,7 +139,8 @@
   "servers": {
     "title": "節點",
     "empty": "目前沒有可用節點",
-    "copyLink": "複製節點連結"
+    "copyLink": "複製節點連結",
+    "clientChain": "用戶端鏈式節點：請匯入完整的 mihomo、Stash 或 sing-box 訂閱，不提供單獨分享連結。"
   },
   "invite": {
     "title": "邀請好友",

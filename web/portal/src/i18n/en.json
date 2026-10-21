@@ -139,7 +139,8 @@
   "servers": {
     "title": "Servers",
     "empty": "No servers available",
-    "copyLink": "Copy server link"
+    "copyLink": "Copy server link",
+    "clientChain": "Client proxy chain. Import the complete mihomo, Stash or sing-box subscription; this node has no standalone share link."
   },
   "invite": {
     "title": "Invite friends",

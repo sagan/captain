@@ -22,6 +22,7 @@ export default function ServersPage() {
               {s.uri && <CopyLink value={s.uri} label={t('servers.copyLink')} />}
             </Group>
           </Group>
+          {s.client_chain && <Text size="xs" c="dimmed" mt="xs">{t('servers.clientChain')}</Text>}
         </Card>
       ))}
     </Stack>

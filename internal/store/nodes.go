@@ -258,6 +258,9 @@ func (s *Store) ResetPairCode(ctx context.Context, id int64, code string, ttl ti
 }
 
 func (s *Store) DeleteNode(ctx context.Context, id int64) error {
+	if err := s.CheckClientChainRemoval(ctx, "node", id); err != nil {
+		return err
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -378,6 +381,9 @@ func (s *Store) UpdateInbound(ctx context.Context, ib *domain.Inbound) error {
 }
 
 func (s *Store) DeleteInbound(ctx context.Context, id int64) error {
+	if err := s.CheckClientChainRemoval(ctx, "inbound", id); err != nil {
+		return err
+	}
 	_, err := s.db.ExecContext(ctx, `DELETE FROM inbounds WHERE id = ?`, id)
 	return err
 }

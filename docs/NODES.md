@@ -245,9 +245,49 @@ ingress or a domain stand in front of the same inbound. Tags, regions,
 ordering and auto flags are described in
 [SUBSCRIPTIONS.md](SUBSCRIPTIONS.md#entries-what-each-user-sees).
 
+## Managed server lines
+
+**Nodes & lines → Create line → Port forwarding** builds an ordered series of
+server groups ending at an existing or newly created inbound. Each member has
+its own listener port and optional NAT/IPLC ingress. The compiler creates the
+owned raw forwards on those servers; clients still authenticate at the final
+inbound. Creating the line and publishing a subscription node are separate
+steps, so one line can be reused by several subscriber-visible nodes.
+
+Select a first-group member when publishing a node. Multiple entry members do
+not automatically configure DNS load balancing. Later groups support ordered
+TCP failover or weighted round-robin with the built-in relay. UDP/both
+multi-candidate groups allow round-robin only: the existing TCP probes do not
+establish UDP health. Established connections remain on their selected target.
+The first version accepts at most eight groups, eight members per group, and
+no repeated server. It does not implement least-connections, remaining-quota,
+lowest-latency or calendar-based scheduling.
+
+`relay`, `nft` and `realm` are forwarding backends, not different kinds of
+reverse tunnel. This editor permits multiple next-hop candidates only with
+`relay`. `nft` requires literal same-family targets; `realm` is a managed
+userspace process. Listener/protocol, ingress ranges, reserved ports, existing
+listeners, monitor mode and agent version are checked before saving. A target
+using mieru BOTH needs a dual-port model and is not supported by this editor.
+
+Line edits update owned forwards and all associated subscription endpoints in
+one database transaction. Existing individual forwards remain independent and
+are never silently adopted. Owned forwards must be edited through their line;
+used lines and resources cannot be deleted accidentally. Updates carry a
+version so an outdated editor cannot overwrite another administrator's work.
+Status describes each forward's **next-hop TCP probe**, not a full end-to-end
+proxy test; UDP is explicitly untested. Agent application and real connectivity
+must still be checked after saving.
+
+The same page offers **Reverse WireGuard** and **VLESS Reverse**, reusing their
+existing capability checks and ownership rules. These are complete reverse
+connections with A-side authentication/accounting and B-side initiated tunnels,
+not arbitrary edges in a multihop forwarding graph. Their creation and editing
+are centralized here; server details remain a resource/status overview.
+
 ## Port forwards (relay tunnels)
 
-Node page → Port forwards: listen on a port of this node and relay raw TCP,
+Nodes & lines → Lines → Existing port forwards: listen on a port of this node and relay raw TCP,
 UDP or both to a landing server. Clients connect to the relay while the
 landing inbound keeps doing authentication and per-user accounting. Pick
 another managed node's inbound as the target and one click creates an entry

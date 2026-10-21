@@ -16,6 +16,14 @@ type Subscription struct {
 	Store *store.Store
 }
 
+func (s *Subscription) PublishedLines(ctx context.Context, u *domain.User, at time.Time) ([]PublishedLine, subscription.Account, error) {
+	profile, err := s.Store.SubscriptionProfileForUser(ctx, u.ID)
+	if err != nil {
+		return nil, subscription.Account{}, err
+	}
+	return s.PublishedLinesWithProfile(ctx, u, at, profile)
+}
+
 // ErrNoAccess means the user has no usable subscription (expired, out of
 // quota, never bought one): the document is empty but the usage header
 // still tells the client what happened.
@@ -37,6 +45,19 @@ func (s *Subscription) Lines(ctx context.Context, u *domain.User, at time.Time) 
 // LinesWithProfile previews or serves one explicit presentation policy. Access
 // groups, quota checks and node credentials remain determined by the customer.
 func (s *Subscription) LinesWithProfile(ctx context.Context, u *domain.User, at time.Time, profile *store.SubscriptionProfile) ([]subscription.Line, subscription.Account, error) {
+	lines, acct, err := s.PublishedLinesWithProfile(ctx, u, at, profile)
+	if err != nil {
+		return nil, acct, err
+	}
+	// Legacy callers request standalone connection profiles. A dependent node
+	// must not be exported as a direct connection by an unaware caller.
+	out, err := ClientLines(lines, "uri")
+	return out, acct, err
+}
+
+// PublishedLinesWithProfile keeps client-chain identity separate from optional
+// client fields. Only ClientLines translates those references into client names.
+func (s *Subscription) PublishedLinesWithProfile(ctx context.Context, u *domain.User, at time.Time, profile *store.SubscriptionProfile) ([]PublishedLine, subscription.Account, error) {
 	if u.Role != domain.RoleUser || u.Status != "active" {
 		return nil, subscription.Account{}, ErrDisabled
 	}
@@ -61,17 +82,21 @@ func (s *Subscription) LinesWithProfile(ctx context.Context, u *domain.User, at 
 	}
 	acct := account(usable)
 	vars := s.remarkVars(ctx, u, usable, acct, at)
-	lines := make([]subscription.Line, 0, len(rows)+len(ss.InfoLines))
+	lines := make([]PublishedLine, 0, len(rows)+len(ss.InfoLines))
 	for i, text := range ss.InfoLines {
 		if text = strings.TrimSpace(text); text != "" {
-			lines = append(lines, InfoLine(vars.Expand(text), i))
+			lines = append(lines, PublishedLine{Line: InfoLine(vars.Expand(text), i)})
 		}
 	}
 	for _, r := range rows {
-		lines = append(lines, subscription.Line{
+		line := PublishedLine{EntryID: r.Entry.ID, Line: subscription.Line{
 			Name: vars.Expand(prefix + subscription.WithFlag(r.Entry.Name, r.Entry.DisplayHost, r.Entry.Region, ss.AutoFlags)), Host: r.Entry.DisplayHost, Port: r.Entry.DisplayPort,
 			Inbound: r.Inbound.Spec(), UUID: u.UUID, UserID: u.AgentID, Password: u.UUID, Tags: r.Entry.Tags, Extra: r.Entry.ClientExtra,
-		})
+		}}
+		if r.Entry.ClientDialerEntryID != nil {
+			line.DialerEntryID = *r.Entry.ClientDialerEntryID
+		}
+		lines = append(lines, line)
 	}
 	// External nodes (imported share links) follow the panel's own entries.
 	groups, err := s.Store.AccessGroups(ctx, u, at)
@@ -88,7 +113,7 @@ func (s *Subscription) LinesWithProfile(ctx context.Context, u *domain.User, at 
 			continue
 		}
 		l.Name = vars.Expand(prefix + subscription.WithFlag(n.Name, l.Host, "", ss.AutoFlags))
-		lines = append(lines, l)
+		lines = append(lines, PublishedLine{Line: l})
 	}
 	return lines, acct, nil
 }
@@ -121,13 +146,14 @@ func usableSubs(subs []*domain.Subscription, at time.Time) []*domain.Subscriptio
 // EntryLink is one entry as one user would receive it, with the share URI
 // and whether the admin hid it from this user.
 type EntryLink struct {
-	EntryID  int64  `json:"entry_id"`
-	Name     string `json:"name"`
-	Protocol string `json:"protocol"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	URI      string `json:"uri"`
-	Blocked  bool   `json:"blocked"`
+	EntryID     int64  `json:"entry_id"`
+	Name        string `json:"name"`
+	Protocol    string `json:"protocol"`
+	Host        string `json:"host"`
+	Port        int    `json:"port"`
+	URI         string `json:"uri"`
+	Blocked     bool   `json:"blocked"`
+	ClientChain bool   `json:"client_chain,omitempty"`
 }
 
 // EntryLinks lists every entry the user's group allows, blacklist included
@@ -166,7 +192,11 @@ func (s *Subscription) EntryLinks(ctx context.Context, u *domain.User) ([]EntryL
 			Name: vars.Expand(prefix + subscription.WithFlag(r.Entry.Name, r.Entry.DisplayHost, r.Entry.Region, ss.AutoFlags)), Host: r.Entry.DisplayHost, Port: r.Entry.DisplayPort,
 			Inbound: r.Inbound.Spec(), UUID: u.UUID, UserID: u.AgentID, Password: u.UUID, Tags: r.Entry.Tags,
 		}
-		out = append(out, EntryLink{EntryID: r.Entry.ID, Name: l.Name, Protocol: string(r.Inbound.Protocol), Host: l.Host, Port: l.Port, URI: subscription.ShareURI(l), Blocked: hidden[r.Entry.ID]})
+		uri := subscription.ShareURI(l)
+		if r.Entry.ClientDialerEntryID != nil {
+			uri = ""
+		}
+		out = append(out, EntryLink{EntryID: r.Entry.ID, Name: l.Name, Protocol: string(r.Inbound.Protocol), Host: l.Host, Port: l.Port, URI: uri, Blocked: hidden[r.Entry.ID], ClientChain: r.Entry.ClientDialerEntryID != nil})
 	}
 	return out, nil
 }

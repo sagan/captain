@@ -222,6 +222,9 @@ type Entry struct {
 	// ClientExtra is merged into this entry's proxy in the map-shaped
 	// client formats (mihomo/Clash, Stash, sing-box): tfo, smux, dialer-proxy…
 	ClientExtra map[string]any
+	// ClientDialerEntryID selects an authorized subscription entry by stable
+	// identity. Renderers resolve its current name; it is never a server route.
+	ClientDialerEntryID *int64
 }
 
 // Order is a purchase of a plan. Status moves pending -> paid or cancelled;

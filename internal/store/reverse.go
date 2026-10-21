@@ -65,6 +65,31 @@ func (s *Store) ReverseOwnedEntry(ctx context.Context, id int64) bool {
 	return err != nil || n > 0
 }
 
+// EntryConnection is presentation-only ownership metadata for the unified
+// catalogue. Managed entries must be edited through their complete connection.
+type EntryConnection struct {
+	Type       string `json:"type"`
+	ExitNodeID int64  `json:"exit_node_id"`
+}
+
+func (s *Store) EntryConnections(ctx context.Context) (map[int64]*EntryConnection, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT entry_id,exit_id,'reverse' FROM node_reverse_links UNION ALL SELECT entry_id,exit_id,'wireguard' FROM node_wireguard_links`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]*EntryConnection{}
+	for rows.Next() {
+		var id int64
+		v := &EntryConnection{}
+		if err := rows.Scan(&id, &v.ExitNodeID, &v.Type); err != nil {
+			return nil, err
+		}
+		out[id] = v
+	}
+	return out, rows.Err()
+}
+
 type ReverseWrite struct {
 	Link           ReverseLink
 	User, Receiver domain.Inbound
@@ -140,6 +165,15 @@ func (s *Store) SaveReverseLinks(ctx context.Context, exitID int64, expected map
 	}
 	for id := range current {
 		if !keep[id] {
+			var userID, receiverID int64
+			if err = tx.QueryRowContext(ctx, `SELECT user_inbound_id,receiver_inbound_id FROM node_reverse_links WHERE id=?`, id).Scan(&userID, &receiverID); err != nil {
+				return err
+			}
+			for _, inboundID := range []int64{userID, receiverID} {
+				if err = checkClientChainRemoval(ctx, tx, "inbound", inboundID); err != nil {
+					return err
+				}
+			}
 			if _, err = tx.ExecContext(ctx, `DELETE FROM node_reverse_links WHERE id=?`, id); err != nil {
 				return err
 			}

@@ -186,18 +186,26 @@ func (s *Store) SaveWireGuardLink(ctx context.Context, w *WireGuardWrite) error 
 	return nil
 }
 func (s *Store) DeleteWireGuardLink(ctx context.Context, exitID int64, id string, version int64) error {
-	result, err := s.db.ExecContext(ctx, `DELETE FROM node_wireguard_links WHERE id=? AND exit_id=? AND version=?`, id, exitID, version)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n != 1 {
+	defer tx.Rollback()
+	var inboundID int64
+	err = tx.QueryRowContext(ctx, `SELECT user_inbound_id FROM node_wireguard_links WHERE id=? AND exit_id=? AND version=?`, id, exitID, version).Scan(&inboundID)
+	if errors.Is(err, sql.ErrNoRows) {
 		return ErrReverseConflict
 	}
-	return nil
+	if err != nil {
+		return err
+	}
+	if err = checkClientChainRemoval(ctx, tx, "inbound", inboundID); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM node_wireguard_links WHERE id=? AND exit_id=? AND version=?`, id, exitID, version); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // Reports have their own clock; resource heartbeats must not refresh an old

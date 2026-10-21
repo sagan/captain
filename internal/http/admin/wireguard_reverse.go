@@ -342,6 +342,9 @@ func (h *handlers) deleteWireGuard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Store.DeleteWireGuardLink(r.Context(), idOf(r), r.PathValue("link"), in.Version); err != nil {
+		if entryClientChainError(w, err) {
+			return
+		}
 		if errors.Is(err, store.ErrReverseConflict) {
 			fail(w, 409, err.Error())
 		} else {

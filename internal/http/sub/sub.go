@@ -85,7 +85,7 @@ func Register(mux *http.ServeMux, d Deps) {
 			http.Error(w, "internal error", 500)
 			return
 		}
-		lines, acct, err := d.Service.LinesWithProfile(r.Context(), u, time.Now(), profile)
+		published, acct, err := d.Service.PublishedLinesWithProfile(r.Context(), u, time.Now(), profile)
 		if errors.Is(err, service.ErrDisabled) {
 			// Like Xboard: a banned account gets nothing, not even its usage.
 			http.Error(w, "account disabled", http.StatusForbidden)
@@ -179,7 +179,7 @@ func Register(mux *http.ServeMux, d Deps) {
 					if msg := strings.TrimSpace(subs.HWID.Announce); msg != "" {
 						w.Header().Set("announce", "base64:"+base64.StdEncoding.EncodeToString([]byte(msg)))
 					}
-					lines = nil
+					published = nil
 					req.Response = "hwid-denied"
 					d.Log.Info("hwid device limit reached", "user", u.ID, "devices", n, "limit", limit)
 				}
@@ -205,7 +205,11 @@ func Register(mux *http.ServeMux, d Deps) {
 			req.Response = "page"
 			body, err = renderProfilePage(r, profile.Settings.Page, acct)
 		} else {
-			body, err = rd.RenderWith(lines, acct, template)
+			var lines []subscription.Line
+			lines, err = service.ClientLines(published, rd.Name())
+			if err == nil {
+				body, err = rd.RenderWith(lines, acct, template)
+			}
 		}
 		if err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)

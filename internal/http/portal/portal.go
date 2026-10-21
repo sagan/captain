@@ -319,18 +319,22 @@ func (h *handlers) plans(w http.ResponseWriter, r *http.Request) {
 
 // servers lists the user's entries with per-server share links.
 func (h *handlers) servers(w http.ResponseWriter, r *http.Request) {
-	lines, _, err := h.Subscription.Lines(r.Context(), userFrom(r), time.Now())
+	lines, _, err := h.Subscription.PublishedLines(r.Context(), userFrom(r), time.Now())
 	if err != nil && !errors.Is(err, service.ErrNoAccess) && !errors.Is(err, service.ErrDisabled) {
 		fail(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	out := make([]map[string]any, 0, len(lines))
-	for _, l := range lines {
+	for _, l := range service.AvailablePublications(lines) {
 		tags := l.Tags
 		if tags == nil {
 			tags = []string{}
 		}
-		out = append(out, map[string]any{"name": l.Name, "host": l.Host, "port": l.Port, "protocol": l.Inbound.Protocol, "uri": subscription.ShareURI(l), "tags": tags})
+		uri := subscription.ShareURI(l.Line)
+		if l.DialerEntryID != 0 {
+			uri = ""
+		}
+		out = append(out, map[string]any{"name": l.Name, "host": l.Host, "port": l.Port, "protocol": l.Inbound.Protocol, "uri": uri, "tags": tags, "client_chain": l.DialerEntryID != 0})
 	}
 	ok(w, out)
 }

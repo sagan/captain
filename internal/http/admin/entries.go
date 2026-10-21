@@ -2,12 +2,14 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 
 	"github.com/zeptop-dev/bosun/pkg/spec"
 
 	"github.com/zeptop-dev/captain/internal/domain"
+	"github.com/zeptop-dev/captain/internal/store"
 )
 
 func (h *handlers) listEntries(w http.ResponseWriter, r *http.Request) {
@@ -16,10 +18,20 @@ func (h *handlers) listEntries(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	if list == nil {
-		list = []*domain.Entry{}
+	connections, err := h.Store.EntryConnections(r.Context())
+	if err != nil {
+		serverErr(w, err)
+		return
 	}
-	ok(w, list)
+	type entryView struct {
+		*domain.Entry
+		ManagedConnection *store.EntryConnection `json:"ManagedConnection,omitempty"`
+	}
+	out := make([]entryView, 0, len(list))
+	for _, e := range list {
+		out = append(out, entryView{e, connections[e.ID]})
+	}
+	ok(w, out)
 }
 
 func (h *handlers) reorderEntries(w http.ResponseWriter, r *http.Request) {
@@ -110,6 +122,9 @@ func (h *handlers) createEntry(w http.ResponseWriter, r *http.Request) {
 	}
 	e.Enabled = true
 	if err := h.Store.CreateEntry(r.Context(), &e); err != nil {
+		if entryClientChainError(w, err) {
+			return
+		}
 		serverErr(w, err)
 		return
 	}
@@ -124,9 +139,24 @@ func (h *handlers) updateEntry(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, "edit this entry through its reverse connection")
 		return
 	}
-	var e domain.Entry
-	if !okID || !decode(r, &e) || e.Name == "" || e.InboundID == 0 {
+	var input struct {
+		domain.Entry
+		ClientDialerEntryID json.RawMessage
+	}
+	if !okID || !decode(r, &input) || input.Name == "" || input.InboundID == 0 {
 		fail(w, http.StatusBadRequest, "name and inbound_id are required")
+		return
+	}
+	e := input.Entry
+	previous, err := h.Store.EntryByID(r.Context(), id)
+	if err != nil {
+		fail(w, 404, "entry not found")
+		return
+	}
+	if len(input.ClientDialerEntryID) == 0 {
+		e.ClientDialerEntryID = previous.ClientDialerEntryID
+	} else if err := json.Unmarshal(input.ClientDialerEntryID, &e.ClientDialerEntryID); err != nil {
+		fail(w, 400, "invalid front node")
 		return
 	}
 	if err := h.fillEntryDefaults(r.Context(), &e); err != nil {
@@ -139,6 +169,9 @@ func (h *handlers) updateEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Store.UpdateEntry(r.Context(), &e); err != nil {
+		if entryClientChainError(w, err) {
+			return
+		}
 		serverErr(w, err)
 		return
 	}
@@ -158,8 +191,23 @@ func (h *handlers) deleteEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Store.DeleteEntry(r.Context(), id); err != nil {
+		if entryClientChainError(w, err) {
+			return
+		}
 		serverErr(w, err)
 		return
 	}
 	ok(w, map[string]bool{"ok": true})
+}
+
+func entryClientChainError(w http.ResponseWriter, err error) bool {
+	if errors.Is(err, store.ErrEntryClientChain) {
+		fail(w, 400, err.Error())
+		return true
+	}
+	if errors.Is(err, store.ErrEntryClientChainInUse) {
+		fail(w, 409, err.Error())
+		return true
+	}
+	return false
 }

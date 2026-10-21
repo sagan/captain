@@ -275,6 +275,9 @@ func (h *handlers) deleteNode(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := h.Store.DeleteNode(r.Context(), id); err != nil {
+		if entryClientChainError(w, err) {
+			return
+		}
 		serverErr(w, err)
 		return
 	}
@@ -446,6 +449,9 @@ func (h *handlers) deleteInbound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Store.DeleteInbound(r.Context(), id); err != nil {
+		if entryClientChainError(w, err) {
+			return
+		}
 		serverErr(w, err)
 		return
 	}

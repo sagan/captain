@@ -540,11 +540,12 @@ func limitBodies(next http.Handler) http.Handler {
 
 func (s *Server) DNSHealth() *service.DNSHealth { return s.dnsHealth }
 
-// Older panels discard WG domain preferences and automatic forwarding policy
-// when rebuilding node state. Keep rollback above that compatibility boundary.
+// Older panels ignore managed client dialers and line ownership, which could
+// publish a direct proxy or rewrite an owned hop. Keep rollback above the first
+// release that understands these subscription and topology fields.
 func captainUpdateFloor(configured string) string {
-	if !selfupdate.ValidTag(configured) || selfupdate.Newer("v1.28.0", configured) {
-		return "v1.28.0"
+	if !selfupdate.ValidTag(configured) || selfupdate.Newer("v1.29.0", configured) {
+		return "v1.29.0"
 	}
 	return configured
 }

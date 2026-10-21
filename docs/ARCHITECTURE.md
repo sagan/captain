@@ -108,8 +108,9 @@ NodeJob (one-off task carried in the state, answered in the report)
   settings are bosun's `spec.Inbound`, so there is no mapping layer.
 - **Entry** is the subscription line. Several entries may point at the same
   inbound (many relays, one landing); each is its own line in the client.
-  Accounting happens at the landing, so a user's traffic is counted once
-  whichever entry they use. Group-restricted inbounds only appear for their
+  For direct access and raw forwarding, accounting happens once at the landing;
+  a client-side chain can authenticate and incur traffic at each proxy hop.
+  Group-restricted inbounds only appear for their
   group; `user_entry_blocks` hides single entries from single users.
 - **Relays** still use per-server `spec.Forward` rules in
   `nodes.forwards_json`. Versioned `forward_lines` now compile ordered groups

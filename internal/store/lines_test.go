@@ -300,3 +300,122 @@ func TestLineMetadataPreservesRuntimeAndTransportChangesAtomically(t *testing.T)
 		t.Fatalf("reset retained lines: %d %v", count, err)
 	}
 }
+
+func TestLineRejectsRemovingMemberAndLanding(t *testing.T) {
+	for _, role := range []string{"member", "landing"} {
+		t.Run(role, func(t *testing.T) {
+			s, ns, _, l := lineFixture(t)
+			ctx := context.Background()
+			n := ns[0]
+			if role == "landing" {
+				n = ns[3]
+			}
+			if err := s.QueueNodeRemoval(ctx, "remove", n.ID, NodeRemovalParams{Mode: "uninstall", ExpiresAt: time.Now().Add(time.Minute).Unix()}); err != nil {
+				t.Fatal(err)
+			}
+			for _, completed := range []bool{false, true} {
+				if completed {
+					if _, err := s.db.Exec(`UPDATE node_jobs SET done_at=?,error='' WHERE id='remove'`, now()); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := s.SaveLine(ctx, cloneLine(l)); err == nil {
+					t.Fatalf("removal completed=%v allowed line", completed)
+				}
+				fs, err := s.NodeForwards(ctx, ns[0].ID)
+				if err != nil || len(fs) != 0 {
+					t.Fatalf("rejected line left forwards: %v %v", fs, err)
+				}
+			}
+			if _, err := s.db.Exec(`UPDATE node_jobs SET error='failed' WHERE id='remove'`); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.SaveLine(ctx, l); err != nil {
+				t.Fatalf("failed removal blocked line: %v", err)
+			}
+		})
+	}
+}
+
+func TestLineProtectsReverseExitLifecycle(t *testing.T) {
+	for _, kind := range []string{"wireguard", "vless"} {
+		t.Run(kind, func(t *testing.T) {
+			s, ns, ordinary, l := lineFixture(t)
+			ctx := context.Background()
+			a, b := ns[3], ns[2]
+			l.Groups = l.Groups[:1]
+			ib := domain.Inbound{NodeID: a.ID, Tag: "reverse-user", Protocol: spec.VLESS, Port: 24443, Core: "xray", Enabled: true}
+			entry := domain.Entry{Name: "reverse node", DisplayHost: "example.com", DisplayPort: 24443, Enabled: true}
+			var inboundID int64
+			var remove func() error
+			if kind == "wireguard" {
+				w := WireGuardWrite{Link: WireGuardLink{ID: "wg", TransitID: a.ID, ExitID: b.ID, Endpoint: "192.0.2.10:51820", ListenPort: 51820, MTU: 1380}, User: ib, Entry: entry}
+				if err := s.SaveWireGuardLink(ctx, &w); err != nil {
+					t.Fatal(err)
+				}
+				inboundID = w.User.ID
+				remove = func() error { return s.DeleteWireGuardLink(ctx, b.ID, w.Link.ID, w.Link.Version) }
+			} else {
+				receiver := ib
+				receiver.Tag, receiver.Port = "reverse-receiver", 25443
+				writes := []ReverseWrite{{Link: ReverseLink{ID: "reverse", ExitID: b.ID, TransitID: a.ID}, User: ib, Receiver: receiver, Entry: entry}}
+				if err := s.SaveReverseLinks(ctx, b.ID, map[string]int64{}, writes); err != nil {
+					t.Fatal(err)
+				}
+				inboundID = writes[0].User.ID
+				remove = func() error { return s.SaveReverseLinks(ctx, b.ID, map[string]int64{"reverse": 1}, nil) }
+			}
+			l.TargetInboundID = inboundID
+			if err := s.QueueNodeRemoval(ctx, "remove", b.ID, NodeRemovalParams{Mode: "uninstall", ExpiresAt: time.Now().Add(time.Minute).Unix()}); err != nil {
+				t.Fatal(err)
+			}
+			for _, completed := range []bool{false, true} {
+				if completed {
+					if _, err := s.db.Exec(`UPDATE node_jobs SET done_at=?,error='' WHERE id='remove'`, now()); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := s.SaveLine(ctx, cloneLine(l)); err == nil {
+					t.Fatalf("removing reverse exit completed=%v allowed line", completed)
+				}
+			}
+			unrelated := cloneLine(l)
+			unrelated.TargetInboundID = ordinary.ID
+			if err := s.SaveLine(ctx, unrelated); err != nil {
+				t.Fatalf("unrelated listener on A blocked: %v", err)
+			}
+			if err := s.DeleteLine(ctx, unrelated.ID, unrelated.Version); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.db.Exec(`UPDATE node_jobs SET error='failed' WHERE id='remove'`); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.SaveLine(ctx, l); err != nil {
+				t.Fatal(err)
+			}
+			before, _ := s.NodeForwards(ctx, ns[0].ID)
+			if used, err := s.NodeHasLines(ctx, b.ID); err != nil || !used {
+				t.Fatalf("reverse exit dependencies: %v %v", used, err)
+			}
+			if err := s.QueueNodeRemoval(ctx, "another-remove", b.ID, NodeRemovalParams{Mode: "uninstall"}); !errors.Is(err, ErrLineInUse) {
+				t.Fatalf("queued dependent exit removal: %v", err)
+			}
+			if err := remove(); !errors.Is(err, ErrLineInUse) {
+				t.Fatalf("deleted dependent connection: %v", err)
+			}
+			if err := s.DeleteNode(ctx, b.ID); !errors.Is(err, ErrLineInUse) {
+				t.Fatalf("deleted dependent exit: %v", err)
+			}
+			after, _ := s.NodeForwards(ctx, ns[0].ID)
+			if !reflect.DeepEqual(before, after) {
+				t.Fatal("refused deletion changed forward")
+			}
+			if err := s.DeleteLine(ctx, l.ID, l.Version); err != nil {
+				t.Fatal(err)
+			}
+			if err := remove(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

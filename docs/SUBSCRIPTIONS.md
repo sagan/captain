@@ -59,7 +59,7 @@ apply" writes every format's template at once.
 
 An entry is a server as users see it: a display host and port on top of a
 landing inbound's settings. An inbound restricted to a user group only
-appears for that group. Admin → Entries can drag entries into the order
+appears for that group. Admin → Nodes can drag subscription nodes into the order
 clients see, give them free-form tags (shown in the portal, usable as a
 filter and in the designer) and a region.
 
@@ -76,7 +76,7 @@ its mihomo, Stash and sing-box proxy (`tfo`, `smux`, `dialer-proxy`,
 The **Nodes & lines** page keeps subscription nodes and reusable server lines
 in separate tabs. A subscription node can use an existing inbound, a managed
 server line, or a client-side proxy chain. The server detail page shows the
-applied resources and links back to their editors. The UI calls the agent host
+saved configuration and latest reported status, with links back to the editors. The UI calls the agent host
 a **server**; the existing Node/Inbound/Entry API names remain unchanged.
 
 **Connection address and port** are the real endpoint exported to the client.
@@ -109,8 +109,9 @@ referenced node, inbound, server or owned reverse connection cannot be deleted
 until its client-chain references are removed. Saving a server-line binding and
 a client-dialer binding on the same node is rejected; a front node may itself
 publish a server-line endpoint. Advanced client extra fields remain available,
-but replacing `type`, `server` or the endpoint port through extras makes a
-managed chain or dependency ineligible. Managed dialer fields take precedence;
+but replacing `type`, `server`, the endpoint port or `udp`, changing the final
+`name`/`tag`, or attaching an unmanaged dialer to a front node makes the
+managed chain or dependency ineligible. Managed destination dialer fields take precedence;
 Stash's conflicting `interface-name`
 is removed on a chained destination. Arbitrary custom templates that rename or
 remove rendered proxies must preserve these dependency references.

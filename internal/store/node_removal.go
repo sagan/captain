@@ -37,11 +37,11 @@ func (s *Store) QueueNodeRemoval(ctx context.Context, id string, nodeID int64, p
 		return err
 	}
 	defer tx.Rollback()
-	var lineRefs int
-	if err = tx.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM forward_line_members WHERE node_id=?) + (SELECT COUNT(*) FROM forward_lines l JOIN inbounds i ON i.id=l.target_inbound_id WHERE i.node_id=?)`, nodeID, nodeID).Scan(&lineRefs); err != nil {
+	lineRefs, err := nodeHasLines(ctx, tx, nodeID)
+	if err != nil {
 		return err
 	}
-	if lineRefs > 0 {
+	if lineRefs {
 		return ErrLineInUse
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT id,params_json,result_json,done_at FROM node_jobs WHERE node_id = ? AND kind = ? AND (done_at IS NULL OR error = '')`, nodeID, NodeRemovalKind)

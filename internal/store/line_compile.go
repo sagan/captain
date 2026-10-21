@@ -62,11 +62,11 @@ func loadLineNode(ctx context.Context, tx *sql.Tx, id, lineID int64) (*lineNode,
 		return nil, spec.ErrMonitorOnly
 	}
 	var pending int
-	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM node_jobs WHERE node_id=? AND kind='node_remove' AND done_at IS NULL`, id).Scan(&pending); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM node_jobs WHERE node_id=? AND kind='node_remove' AND (done_at IS NULL OR error='')`, id).Scan(&pending); err != nil {
 		return nil, err
 	}
 	if pending > 0 {
-		return nil, errors.New("wait for node removal to finish before using this server")
+		return nil, errors.New("server is being removed or has already been removed")
 	}
 	x := &lineNode{node: n, ingresses: map[int64]*Ingress{}}
 	rows, err := tx.QueryContext(ctx, "SELECT "+ingressCols+" FROM ingresses WHERE node_id=?", id)
@@ -169,6 +169,17 @@ func compileLine(ctx context.Context, tx *sql.Tx, l *ForwardLine) (map[int64][]N
 	}
 	if ib.Settings.AcceptProxyProtocol && l.Backend == "nft" {
 		return nil, nil, errors.New("a PROXY protocol landing requires relay or realm")
+	}
+	// A reverse subscriber listener lives on A, but still depends on its owned
+	// exit B. Check only this listener's connection, not unrelated links on A.
+	var removingExit int
+	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM node_jobs WHERE kind='node_remove' AND (done_at IS NULL OR error='') AND node_id IN (
+	SELECT exit_id FROM node_reverse_links WHERE user_inbound_id=?
+	 UNION SELECT exit_id FROM node_wireguard_links WHERE user_inbound_id=?)`, ib.ID, ib.ID).Scan(&removingExit); err != nil {
+		return nil, nil, err
+	}
+	if removingExit > 0 {
+		return nil, nil, errors.New("landing reverse exit is being removed or has already been removed")
 	}
 	targetNode, err := loadLineNode(ctx, tx, ib.NodeID, l.ID)
 	if err != nil {

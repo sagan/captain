@@ -271,6 +271,11 @@ func (s *Store) DeleteNode(ctx context.Context, id int64) error {
 		return err
 	}
 	defer tx.Rollback()
+	if used, err := nodeHasLines(ctx, tx, id); err != nil {
+		return err
+	} else if used {
+		return ErrLineInUse
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM nodes WHERE id = ?`, id); err != nil {
 		return err
 	}

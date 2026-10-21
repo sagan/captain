@@ -169,7 +169,11 @@ features it has never heard of, which the node page shows as an orange
 | | ≥ 0.30 | baseline: pairing, state pull, reports, forwards, certificates |
 
 `min_version` in both `config.yaml` files is the floor a self-update or
-rollback may not go below; set it to the version you have tested.
+rollback may not go below; set it to the version you have tested. Managed server
+lines and client chains also impose a built-in Captain floor of v1.29.0: older
+panels do not understand line ownership or client dialer references and could
+export a chained node as direct. A higher configured floor still wins. This
+protects the built-in updater, not manual replacement of the executable.
 
 ## Database: SQLite only, and what that is good for
 
@@ -404,3 +408,30 @@ Old agents keep existing direct-only behavior; missing or stale capability canno
 silently enable a combination they cannot enforce. Dual protection stays direct-only.
 WireGuard prerequisite reports and typed jobs are additive and administrator-only;
 unsupported or older agents cannot execute installation jobs.
+
+
+### Managed lines and client chains (migrations 79–80, unreleased)
+
+Migration 79 adds reusable server lines, stable member identities and optional
+Entry line bindings; migration 80 adds an optional client-dialer Entry reference.
+The existing Node, Inbound, Entry and per-node forwards APIs retain their names
+and ordinary behavior. Omitted new Entry fields preserve existing bindings;
+explicit resets remove them. Legacy forward updates preserve line-owned rules
+and reject attempts to change those rules outside the line editor.
+
+The panel compiles lines to existing bosun Forward fields. Built-in single-target
+relay rules retain old-agent compatibility; candidate groups, realm and PROXY
+protocol require bosun ≥ 0.49, and managed nft lines require ≥ 0.62. Unsupported
+line rules are withheld when agent support disappears. No new agent protocol
+field or bosun build is required.
+
+Managed client chains require a complete supported mihomo, recent Stash or
+sing-box subscription. Missing permissions, incompatible formats or invalid
+references omit the dependent chain; single-node links never flatten it into a
+direct connection. See [subscription rules](SUBSCRIPTIONS.md).
+
+The first release containing this schema must be v1.29.0 or newer. The current
+built-in Captain update/rollback floor is v1.29.0, superseding the v1.28.0 floor
+above. Manually restoring an older binary requires its matching pre-upgrade
+database backup; an additive migration does not make these behaviors safe to
+ignore. bosun's own rollback floor is unchanged.

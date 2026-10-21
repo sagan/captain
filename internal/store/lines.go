@@ -509,8 +509,14 @@ func (s *Store) ResolveLineEntry(ctx context.Context, e *domain.Entry) error {
 }
 
 func (s *Store) NodeHasLines(ctx context.Context, id int64) (bool, error) {
+	return nodeHasLines(ctx, s.db, id)
+}
+
+func nodeHasLines(ctx context.Context, q interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, id int64) (bool, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM forward_line_members WHERE node_id=?) + (SELECT COUNT(*) FROM forward_lines l WHERE l.target_inbound_id IN (
+	err := q.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM forward_line_members WHERE node_id=?) + (SELECT COUNT(*) FROM forward_lines l WHERE l.target_inbound_id IN (
 	SELECT id FROM inbounds WHERE node_id=?
 	UNION SELECT user_inbound_id FROM node_reverse_links WHERE exit_id=?
 	UNION SELECT receiver_inbound_id FROM node_reverse_links WHERE exit_id=?

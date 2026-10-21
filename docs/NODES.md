@@ -6,7 +6,7 @@ out of it. Version notes name the bosun release a feature needs; Captain
 
 ## Groups and display order
 
-Use **Nodes → Groups and order** to create, rename, delete and reorder monitoring
+Use **Servers → Groups and order** to create, rename, delete and reorder monitoring
 groups. Drag a handle, use the up/down buttons, or focus a handle and use
 Space plus arrow keys. Select a group to reorder its nodes; select several
 nodes to move them together. Changes remain a draft until **Save**. **Cancel**
@@ -31,7 +31,7 @@ needed. The legacy `/api/admin/nodes/{id}/monitor-group` endpoint remains valid;
 
 ## Adding a node
 
-Admin → Nodes → new node gives you a one-time pairing code and two ways to
+Admin → Servers → Add server gives you a one-time pairing code and two ways to
 use it:
 
 ```sh
@@ -163,6 +163,9 @@ its worker is alive.
 
 ## Inbounds
 
+Open **Nodes → Manage inbounds**, then select the server. Server details show
+configured listeners and reported runtime status, with links to this editor.
+
 The **Core** selector filters choices by protocol, transport and features such
 as Shadowsocks 2022, ShadowTLS, PROXY protocol, fallbacks and Snell mode.
 **Automatic (recommended)** follows the node's configured core priority;
@@ -265,9 +268,10 @@ lowest-latency or calendar-based scheduling.
 
 `relay`, `nft` and `realm` are forwarding backends, not different kinds of
 reverse tunnel. This editor permits multiple next-hop candidates only with
-`relay`. `nft` requires literal same-family targets; `realm` is a managed
-userspace process. Listener/protocol, ingress ranges, reserved ports, existing
-listeners, monitor mode and agent version are checked before saving. A target
+`relay`. Managed `nft` lines require bosun ≥ 0.62 and a destination address in
+the same family as the listener; hostname destinations are resolved by the node
+when applying the rule. `realm` is a managed userspace process. Listener/protocol,
+ingress ranges, reserved ports, existing listeners, monitor mode and agent version are checked before saving. A target
 using mieru BOTH needs a dual-port model and is not supported by this editor.
 
 Line edits update owned forwards and all associated subscription endpoints in
@@ -275,6 +279,8 @@ one database transaction. Existing individual forwards remain independent and
 are never silently adopted. Owned forwards must be edited through their line;
 used lines and resources cannot be deleted accidentally. Updates carry a
 version so an outdated editor cannot overwrite another administrator's work.
+Runtime identities depend on the compiled rule, so renaming a line does not
+restart its forwarding sessions.
 Status describes each forward's **next-hop TCP probe**, not a full end-to-end
 proxy test; UDP is explicitly untested. Agent application and real connectivity
 must still be checked after saving.
@@ -309,7 +315,8 @@ first target whose health check passes, and a connection whose dial fails
 moves on to the next target before the client notices; *round-robin*
 spreads connections over the healthy targets by weight. Each target's
 health, RTT and connection count shows next to the rule. Built-in relay:
-both modes; realm: round-robin only (it does not retry another target);
+both modes for TCP; realm: TCP round-robin only (it does not retry another
+target, and its UDP path uses the primary target);
 nft: one target. A connection always uses one target, so this keeps a
 relay up and spreads load across lines — it does not make one download
 faster. Needs bosun ≥ 0.49. With bosun ≥ 0.62, the displayed measurement
@@ -336,7 +343,7 @@ connections to such an inbound fail, by design.
 ## Ingresses and port mappings (NAT / IPLC)
 
 A node behind NAT, an IPLC or a dedicated line may expose only provider-assigned
-ports. Node page → Ingresses and port mappings records the provider's existing
+ports. Nodes → Lines → NAT / dedicated-line ingress → select server records the provider's existing
 configuration; it does not create NAT mappings or change the provider firewall.
 Choose NAT or IPLC / dedicated line. Existing `mapped` records keep their old
 addresses, ranges and optional direct listeners after migration.
@@ -374,8 +381,9 @@ Enabling this switch or editing a port policy checks existing inbounds and
 forwards first, including disabled configurations. An incompatible edit is
 rejected without changing the saved configuration. An ingress still referenced
 by an inbound or forward cannot be deleted; reassign or remove those listeners
-first. Existing Captain subscription entries have explicit display addresses:
-review them after changing public mapping addresses or ports.
+first. Manually configured subscription nodes keep their explicit connection addresses:
+review them after changing public mapping addresses or ports. Nodes bound to a
+managed line are updated together with that line.
 
 The existing API routes and range/offset fields remain. New fields are
 `kind: nat|iplc|mapped`, `port_mappings` (rows with `local_from`, `local_to`,
@@ -409,7 +417,8 @@ so carrier latency is not measured through them.
 
 ## Node connections: VLESS Reverse
 
-Open **Nodes → exit B → Node connections · VLESS Reverse → Configure transits**.
+Open **Nodes → Lines → VLESS Reverse**, select exit server B, then
+**Configure transits**.
 Select up to 32 transit nodes A in one wizard. Each connection owns two Xray
 listeners on A: a user-facing inbound (VLESS + REALITY by default), and a
 separate VLESS + REALITY receiver for B's dedicated tunnel identity. It also
@@ -481,7 +490,7 @@ use this mode when those per-user speed guarantees are required.
 
 ## Outbounds, landing and egress
 
-**Outbounds & landing** (node page): add an exit from a share link — bosun
+**Nodes → Lines → Outbounds & routing → select server**: add an exit from a share link — bosun
 renders it in the serving core's dialect (sing-box takes every protocol,
 Xray vless/vmess/trojan/ss/socks/http) — chain exits with `via`, then pick
 a default exit for the whole node or add rules such as `inbound:tag`,
@@ -655,8 +664,8 @@ See [bosun core management](https://github.com/zeptop-dev/bosun/blob/master/docs
 
 ## Managed reverse WireGuard (Captain 1.20 / bosun 0.68)
 
-Open the exit node B, expand **Reverse WireGuard**, and create a connection to
-transit A. Both are Captain-managed full bosun nodes. A accepts VLESS REALITY
+Open **Nodes → Lines → Reverse WireGuard**, select exit server B, and create a
+connection to transit A. Both are Captain-managed full bosun nodes. A accepts VLESS REALITY
 subscribers, authenticates them and accounts their upload/download. B initiates
 a kernel WireGuard tunnel to A and provides the exit; tunnel overhead is not
 charged again. The existing VLESS Reverse option remains separate.

@@ -170,7 +170,7 @@ func (s *Store) SaveReverseLinks(ctx context.Context, exitID int64, expected map
 				return err
 			}
 			for _, inboundID := range []int64{userID, receiverID} {
-				if err = checkClientChainRemoval(ctx, tx, "inbound", inboundID); err != nil {
+				if err = checkReverseInboundRemoval(ctx, tx, inboundID); err != nil {
 					return err
 				}
 			}
@@ -180,6 +180,20 @@ func (s *Store) SaveReverseLinks(ctx context.Context, exitID int64, expected map
 		}
 	}
 	return tx.Commit()
+}
+
+func checkReverseInboundRemoval(ctx context.Context, tx *sql.Tx, id int64) error {
+	if err := checkClientChainRemoval(ctx, tx, "inbound", id); err != nil {
+		return err
+	}
+	var count int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM forward_lines WHERE target_inbound_id=?`, id).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return ErrLineInUse
+	}
+	return nil
 }
 
 func saveReverseInbound(ctx context.Context, tx *sql.Tx, ib *domain.Inbound) error {
@@ -197,7 +211,10 @@ func saveReverseInbound(ctx context.Context, tx *sql.Tx, ib *domain.Inbound) err
 		return nil
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE inbounds SET node_id=?,tag=?,protocol=?,listen=?,port=?,core=?,settings_json=?,group_id=?,enabled=?,ingress_id=?,updated_at=? WHERE id=?`, append(args, ib.ID)...)
-	return err
+	if err != nil {
+		return err
+	}
+	return refreshLinesForNodeTx(ctx, tx, ib.NodeID)
 }
 
 // PrivateAccessCapable is also used at state delivery: a downgraded node must

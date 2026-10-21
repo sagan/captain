@@ -31,6 +31,9 @@ func (h *handlers) startNodeRemoval(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "bad id")
 		return
 	}
+	if !h.requireNoNodeLines(w, r, id) {
+		return
+	}
 	n, err := h.Store.NodeByID(r.Context(), id)
 	if err != nil {
 		serverErr(w, err)

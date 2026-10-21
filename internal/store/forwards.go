@@ -14,7 +14,9 @@ import (
 // it with one click).
 type NodeForward struct {
 	spec.Forward
-	InboundID int64 `json:"inbound_id,omitempty"`
+	InboundID    int64  `json:"inbound_id,omitempty"`
+	LineID       int64  `json:"line_id,omitempty"`
+	LineMemberID string `json:"line_member_id,omitempty"`
 }
 
 // ForwardStatus is what the node last reported for one rule.
@@ -46,11 +48,16 @@ func (s *Store) NodeForwards(ctx context.Context, nodeID int64) ([]NodeForward, 
 }
 
 func (s *Store) SetNodeForwards(ctx context.Context, nodeID int64, list []NodeForward) error {
+	var err error
+	list, err = s.PreserveLineForwards(ctx, nodeID, list)
+	if err != nil {
+		return err
+	}
 	if list == nil {
 		list = []NodeForward{}
 	}
 	b, _ := json.Marshal(list)
-	_, err := s.db.ExecContext(ctx, `UPDATE nodes SET forwards_json = ?, updated_at = ? WHERE id = ?`, string(b), now(), nodeID)
+	_, err = s.db.ExecContext(ctx, `UPDATE nodes SET forwards_json = ?, updated_at = ? WHERE id = ?`, string(b), now(), nodeID)
 	if err == nil {
 		// Statuses of rules that no longer exist are noise.
 		keep := map[string]bool{}

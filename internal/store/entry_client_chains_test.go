@@ -147,6 +147,15 @@ func TestClientChainProtectsReverseResources(t *testing.T) {
 				remove = func() error { return s.SaveReverseLinks(ctx, b.ID, map[string]int64{"reverse": 1}, nil) }
 			}
 			dependent := &domain.Entry{Name: "chain", InboundID: inboundID, DisplayHost: "example.com", DisplayPort: 18443, ClientDialerEntryID: &frontID, Enabled: true}
+			if err = s.QueueNodeRemoval(ctx, "remove-exit", b.ID, NodeRemovalParams{Mode: "uninstall", ExpiresAt: time.Now().Add(time.Minute).Unix()}); err != nil {
+				t.Fatal(err)
+			}
+			if err = s.CreateEntry(ctx, dependent); !errors.Is(err, ErrEntryClientChain) {
+				t.Fatalf("chain through removing reverse exit: %v", err)
+			}
+			if _, err = conn.Exec(`DELETE FROM node_jobs WHERE id='remove-exit'`); err != nil {
+				t.Fatal(err)
+			}
 			if err = s.CreateEntry(ctx, dependent); err != nil {
 				t.Fatal(err)
 			}
@@ -167,5 +176,41 @@ func TestClientChainProtectsReverseResources(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestClientChainCannotMoveFrontToRemovingServer(t *testing.T) {
+	s, ns, ib, _ := lineFixture(t)
+	ctx := context.Background()
+	front := &domain.Entry{Name: "front", InboundID: ib.ID, DisplayHost: "example.com", DisplayPort: 443}
+	if err := s.CreateEntry(ctx, front); err != nil {
+		t.Fatal(err)
+	}
+	child := &domain.Entry{Name: "child", InboundID: ib.ID, DisplayHost: "example.com", DisplayPort: 443, ClientDialerEntryID: &front.ID}
+	if err := s.CreateEntry(ctx, child); err != nil {
+		t.Fatal(err)
+	}
+	other := &domain.Inbound{NodeID: ns[1].ID, Tag: "other", Protocol: spec.VLESS, Port: 443, Enabled: true}
+	if err := s.CreateInbound(ctx, other); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.QueueNodeRemoval(ctx, "remove", ns[1].ID, NodeRemovalParams{Mode: "uninstall", ExpiresAt: time.Now().Add(time.Minute).Unix()}); err != nil {
+		t.Fatal(err)
+	}
+	front.InboundID = other.ID
+	if err := s.UpdateEntry(ctx, front); !errors.Is(err, ErrEntryClientChain) {
+		t.Fatalf("moved referenced ordinary front: %v", err)
+	}
+	if _, err := s.db.Exec(`UPDATE node_jobs SET done_at=?,error='' WHERE id='remove'`, now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateEntry(ctx, front); !errors.Is(err, ErrEntryClientChain) {
+		t.Fatalf("successful removal allowed new path: %v", err)
+	}
+	if _, err := s.db.Exec(`UPDATE node_jobs SET error='failed' WHERE id='remove'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateEntry(ctx, front); err != nil {
+		t.Fatalf("failed removal still blocked path: %v", err)
 	}
 }

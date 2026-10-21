@@ -43,6 +43,12 @@ func (h *handlers) putNodeForwards(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, "node not found")
 		return
 	}
+	preserved, err := h.Store.PreserveLineForwards(r.Context(), id, in.Forwards)
+	if err != nil {
+		fail(w, 409, err.Error())
+		return
+	}
+	in.Forwards = preserved
 	// Every socket the node already opens, apart from the forwards this
 	// call replaces: the same model the inbound side checks against, so
 	// the two cannot disagree about who owns a port.

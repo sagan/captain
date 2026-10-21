@@ -163,6 +163,11 @@ func (s *Store) ReconcileNodeAddresses(ctx context.Context, id int64, at time.Ti
 			return nil, false, err
 		}
 	}
+	if changed {
+		if err = refreshLinesForNodeTx(ctx, tx, id); err != nil {
+			return nil, false, err
+		}
+	}
 	if err = tx.Commit(); err != nil {
 		return nil, false, err
 	}

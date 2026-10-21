@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"reflect"
 
 	"github.com/zeptop-dev/bosun/pkg/spec"
 
@@ -60,6 +61,9 @@ func (h *handlers) entryTags(w http.ResponseWriter, r *http.Request) {
 // domain (it has to point at the node anyway), else the node's public
 // address; a blank port is the inbound's port.
 func (h *handlers) fillEntryDefaults(ctx context.Context, e *domain.Entry) error {
+	if e.LineID != nil {
+		return h.Store.ResolveLineEntry(ctx, e)
+	}
 	if e.DisplayHost != "" && e.DisplayPort != 0 {
 		return nil
 	}
@@ -108,8 +112,12 @@ func (h *handlers) createEntry(w http.ResponseWriter, r *http.Request) {
 	h.Store.Topology.Lock()
 	defer h.Store.Topology.Unlock()
 	var e domain.Entry
-	if !decode(r, &e) || e.Name == "" || e.InboundID == 0 {
+	if !decode(r, &e) || e.Name == "" || (e.InboundID == 0 && e.LineID == nil) {
 		fail(w, http.StatusBadRequest, "name and inbound_id are required")
+		return
+	}
+	if e.LineID != nil && !userFrom(r).IsAdmin() {
+		fail(w, 403, "admin only: line binding")
 		return
 	}
 	if ib, err := h.Store.InboundByID(r.Context(), e.InboundID); err == nil && ib.Settings.Reverse != nil && ib.Settings.Reverse.Receiver {
@@ -139,25 +147,35 @@ func (h *handlers) updateEntry(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, "edit this entry through its reverse connection")
 		return
 	}
-	var input struct {
-		domain.Entry
-		ClientDialerEntryID json.RawMessage
-	}
-	if !okID || !decode(r, &input) || input.Name == "" || input.InboundID == 0 {
-		fail(w, http.StatusBadRequest, "name and inbound_id are required")
-		return
-	}
-	e := input.Entry
-	previous, err := h.Store.EntryByID(r.Context(), id)
+	cur, err := h.Store.EntryByID(r.Context(), id)
 	if err != nil {
 		fail(w, 404, "entry not found")
 		return
 	}
-	if len(input.ClientDialerEntryID) == 0 {
-		e.ClientDialerEntryID = previous.ClientDialerEntryID
-	} else if err := json.Unmarshal(input.ClientDialerEntryID, &e.ClientDialerEntryID); err != nil {
-		fail(w, 400, "invalid front node")
+	var input struct {
+		domain.Entry
+		ClientExtra json.RawMessage
+	}
+	raw, _ := json.Marshal(cur)
+	_ = json.Unmarshal(raw, &input.Entry)
+	if !okID || !decode(r, &input) || input.Name == "" || (input.InboundID == 0 && input.LineID == nil) {
+		fail(w, http.StatusBadRequest, "name and inbound_id are required")
 		return
+	}
+	e := input.Entry
+	if len(input.ClientExtra) > 0 {
+		e.ClientExtra = nil
+		if err := json.Unmarshal(input.ClientExtra, &e.ClientExtra); err != nil {
+			fail(w, 400, "invalid client extra fields")
+			return
+		}
+	}
+	if !userFrom(r).IsAdmin() && (cur.LineID != nil || e.LineID != nil) && (!reflect.DeepEqual(cur.LineID, e.LineID) || cur.LineMemberID != e.LineMemberID || cur.InboundID != e.InboundID || cur.DisplayHost != e.DisplayHost || cur.DisplayPort != e.DisplayPort || !reflect.DeepEqual(cur.ClientExtra, e.ClientExtra)) {
+		fail(w, 403, "admin only: line binding")
+		return
+	}
+	if e.LineID == nil {
+		e.LineMemberID = ""
 	}
 	if err := h.fillEntryDefaults(r.Context(), &e); err != nil {
 		fail(w, http.StatusBadRequest, err.Error())

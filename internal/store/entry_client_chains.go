@@ -21,9 +21,6 @@ func (s *Store) ValidateClientChain(ctx context.Context, proposed *domain.Entry)
 	if proposed.ClientDialerEntryID != nil && *proposed.ClientDialerEntryID == 0 {
 		proposed.ClientDialerEntryID = nil
 	}
-	if proposed.ClientDialerEntryID == nil {
-		return nil
-	}
 	entries, err := s.ListEntries(ctx)
 	if err != nil {
 		return err
@@ -44,7 +41,10 @@ func (s *Store) ValidateClientChain(ctx context.Context, proposed *domain.Entry)
 		}
 		checkedInbounds[e.InboundID] = true
 		var pending int
-		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM node_jobs WHERE kind='node_remove' AND done_at IS NULL AND node_id=(SELECT node_id FROM inbounds WHERE id=?)`, e.InboundID).Scan(&pending); err != nil {
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM node_jobs WHERE kind='node_remove' AND (done_at IS NULL OR error='') AND node_id IN (
+		 SELECT node_id FROM inbounds WHERE id=?
+		 UNION SELECT exit_id FROM node_reverse_links WHERE user_inbound_id=? OR receiver_inbound_id=?
+		 UNION SELECT exit_id FROM node_wireguard_links WHERE user_inbound_id=?)`, e.InboundID, e.InboundID, e.InboundID, e.InboundID).Scan(&pending); err != nil {
 			return err
 		}
 		if pending > 0 {

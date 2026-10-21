@@ -328,6 +328,9 @@ func (a *AgentState) Build(ctx context.Context, n *domain.Node, at time.Time) (*
 	st := &agentproto.State{Node: node, Users: users, Forwards: []spec.Forward{}, PullSeconds: a.PullSeconds, PushSeconds: a.PushSeconds}
 	if fwds, err := a.Store.NodeForwards(ctx, n.ID); err == nil {
 		for _, f := range fwds {
+			if !store.LineForwardSupported(n, f) {
+				continue
+			}
 			if f.Listen == "" && f.IngressID != "" {
 				for _, g := range ingresses {
 					if strconv.FormatInt(g.ID, 10) == f.IngressID {

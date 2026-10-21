@@ -208,17 +208,19 @@ func (i *Inbound) Spec() spec.Inbound {
 
 // Entry is a line in a user's subscription.
 type Entry struct {
-	ID          int64
-	Name        string
-	InboundID   int64
-	ChainID     *int64
-	DisplayHost string
-	DisplayPort int
-	Rate        float64
-	Sort        int
-	Enabled     bool
-	Tags        []string // free-form labels shown to users and used for filtering
-	Region      string   // ISO 3166-1 alpha-2; "" = detect from the name when auto flags are on
+	ID           int64
+	Name         string
+	InboundID    int64
+	ChainID      *int64
+	LineID       *int64
+	LineMemberID string
+	DisplayHost  string
+	DisplayPort  int
+	Rate         float64
+	Sort         int
+	Enabled      bool
+	Tags         []string // free-form labels shown to users and used for filtering
+	Region       string   // ISO 3166-1 alpha-2; "" = detect from the name when auto flags are on
 	// ClientExtra is merged into this entry's proxy in the map-shaped
 	// client formats (mihomo/Clash, Stash, sing-box): tfo, smux, dialer-proxy…
 	ClientExtra map[string]any

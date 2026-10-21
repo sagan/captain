@@ -274,6 +274,9 @@ func (h *handlers) deleteNode(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if !h.requireNoNodeLines(w, r, id) {
+		return
+	}
 	if err := h.Store.DeleteNode(r.Context(), id); err != nil {
 		if entryClientChainError(w, err) {
 			return
@@ -446,6 +449,13 @@ func (h *handlers) deleteInbound(w http.ResponseWriter, r *http.Request) {
 	}
 	if !okID {
 		fail(w, http.StatusBadRequest, "bad id")
+		return
+	}
+	if used, err := h.Store.InboundHasLines(r.Context(), id); err != nil {
+		serverErr(w, err)
+		return
+	} else if used {
+		fail(w, 409, store.ErrLineInUse.Error())
 		return
 	}
 	if err := h.Store.DeleteInbound(r.Context(), id); err != nil {

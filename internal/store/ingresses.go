@@ -131,9 +131,20 @@ func (s *Store) UpdateIngress(ctx context.Context, g *Ingress) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE ingresses SET name = ?, kind = ?, bind_ip = ?, line_ip = ?, entry_host = ?, entry_domain = ?, port_from = ?, port_to = ?, port_offset = ?, reserved_ports = ?, port_mappings_json = ?, require_ingress = ?, updated_at = ? WHERE id = ?`,
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx, `UPDATE ingresses SET name = ?, kind = ?, bind_ip = ?, line_ip = ?, entry_host = ?, entry_domain = ?, port_from = ?, port_to = ?, port_offset = ?, reserved_ports = ?, port_mappings_json = ?, require_ingress = ?, updated_at = ? WHERE id = ?`,
 		g.Name, g.Kind, g.BindIP, g.LineIP, g.EntryHost, g.EntryDomain, g.PortFrom, g.PortTo, g.PortOffset, joinPorts(g.ReservedPorts), string(mappings), g.RequireIngress, now(), g.ID)
-	return err
+	if err != nil {
+		return err
+	}
+	if err = refreshLinesForNodeTx(ctx, tx, g.NodeID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) DeleteIngress(ctx context.Context, id int64) error {

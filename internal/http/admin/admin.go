@@ -206,6 +206,13 @@ func Register(mux *http.ServeMux, d Deps) {
 	mux.HandleFunc("GET /api/admin/groups", h.requireAdmin(h.listGroups))
 	mux.HandleFunc("POST /api/admin/groups", h.requireAdmin(h.createGroup))
 
+	mux.HandleFunc("GET /api/admin/lines", h.requireAdmin(h.listLines))
+	mux.HandleFunc("POST /api/admin/lines", h.requireAdmin(h.saveLine))
+	mux.HandleFunc("GET /api/admin/lines/options", h.requireAdmin(h.lineOptions))
+	mux.HandleFunc("GET /api/admin/lines/{id}", h.requireAdmin(h.getLine))
+	mux.HandleFunc("PUT /api/admin/lines/{id}", h.requireAdmin(h.saveLine))
+	mux.HandleFunc("DELETE /api/admin/lines/{id}", h.requireAdmin(h.deleteLine))
+
 	mux.HandleFunc("GET /api/admin/entries", h.requireAdmin(h.listEntries))
 	mux.HandleFunc("POST /api/admin/entries", h.requireAdmin(h.createEntry))
 	mux.HandleFunc("PATCH /api/admin/entries/{id}", h.requireAdmin(h.updateEntry))
@@ -522,6 +529,9 @@ func fail(w http.ResponseWriter, code int, msg string) {
 // Operator: everything except settings, system, staff management and the
 // landing page. Support: tickets, plus read-only users, orders, dashboard.
 func allowed(role, method, path string) bool {
+	if (path == "/api/admin/lines" || strings.HasPrefix(path, "/api/admin/lines/")) && role != domain.RoleAdmin {
+		return false
+	}
 	switch role {
 	case domain.RoleAdmin:
 		return true

@@ -199,7 +199,7 @@ func (s *Store) DeleteWireGuardLink(ctx context.Context, exitID int64, id string
 	if err != nil {
 		return err
 	}
-	if err = checkClientChainRemoval(ctx, tx, "inbound", inboundID); err != nil {
+	if err = checkReverseInboundRemoval(ctx, tx, inboundID); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, `DELETE FROM node_wireguard_links WHERE id=? AND exit_id=? AND version=?`, id, exitID, version); err != nil {

@@ -246,6 +246,11 @@ func (s *Store) UpdateNode(ctx context.Context, n *domain.Node) error {
 	if err != nil {
 		return err
 	}
+	if n.PublicAddr != old.PublicAddr || n.V6Addr != old.V6Addr || n.Domain != old.Domain {
+		if err = refreshLinesForNodeTx(ctx, tx, n.ID); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
@@ -375,9 +380,20 @@ func (s *Store) UpdateInbound(ctx context.Context, ib *domain.Inbound) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE inbounds SET tag = ?, protocol = ?, listen = ?, port = ?, core = ?, settings_json = ?, group_id = ?, enabled = ?, sort = ?, ingress_id = ?, updated_at = ? WHERE id = ?`,
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx, `UPDATE inbounds SET tag = ?, protocol = ?, listen = ?, port = ?, core = ?, settings_json = ?, group_id = ?, enabled = ?, sort = ?, ingress_id = ?, updated_at = ? WHERE id = ?`,
 		ib.Tag, ib.Protocol, ib.Listen, ib.Port, ib.Core, string(settings), nullInt64(ib.GroupID), boolInt(ib.Enabled), ib.Sort, nullInt64(ib.IngressID), now(), ib.ID)
-	return err
+	if err != nil {
+		return err
+	}
+	if err = refreshLinesForNodeTx(ctx, tx, ib.NodeID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) DeleteInbound(ctx context.Context, id int64) error {

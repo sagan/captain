@@ -37,7 +37,27 @@ func (s *Store) ValidateClientChain(ctx context.Context, proposed *domain.Entry)
 		id = -1
 	}
 	byID[id] = proposed
+	checkedInbounds := map[int64]bool{}
+	checkRemoval := func(e *domain.Entry) error {
+		if checkedInbounds[e.InboundID] {
+			return nil
+		}
+		checkedInbounds[e.InboundID] = true
+		var pending int
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM node_jobs WHERE kind='node_remove' AND done_at IS NULL AND node_id=(SELECT node_id FROM inbounds WHERE id=?)`, e.InboundID).Scan(&pending); err != nil {
+			return err
+		}
+		if pending > 0 {
+			return fmt.Errorf("%w: server removal is pending", ErrEntryClientChain)
+		}
+		return nil
+	}
 	for root, e := range byID {
+		if e.ClientDialerEntryID != nil {
+			if err := checkRemoval(e); err != nil {
+				return err
+			}
+		}
 		seen := map[int64]bool{root: true}
 		for depth := 1; e.ClientDialerEntryID != nil; depth++ {
 			next := *e.ClientDialerEntryID
@@ -51,6 +71,9 @@ func (s *Store) ValidateClientChain(ctx context.Context, proposed *domain.Entry)
 			e = byID[next]
 			if e == nil {
 				return fmt.Errorf("%w: front node does not exist", ErrEntryClientChain)
+			}
+			if err := checkRemoval(e); err != nil {
+				return err
 			}
 		}
 	}

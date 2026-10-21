@@ -29,6 +29,9 @@ func (s *Store) LatestNodeRemoval(ctx context.Context, nodeID int64) (*NodeJob, 
 // QueueNodeRemoval uses a transaction so simultaneous clicks cannot queue
 // different destructive operations for the same node.
 func (s *Store) QueueNodeRemoval(ctx context.Context, id string, nodeID int64, p NodeRemovalParams) error {
+	if err := s.CheckClientChainRemoval(ctx, "node", nodeID); err != nil {
+		return err
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

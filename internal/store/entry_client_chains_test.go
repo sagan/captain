@@ -67,6 +67,9 @@ func TestClientChainStoreReferencesAndDepth(t *testing.T) {
 			t.Fatalf("%s reference not protected: %v", kind, err)
 		}
 	}
+	if err := s.QueueNodeRemoval(ctx, "blocked-removal", n.ID, NodeRemovalParams{Mode: "uninstall", ExpiresAt: time.Now().Add(time.Minute).Unix()}); !errors.Is(err, ErrEntryClientChainInUse) {
+		t.Fatalf("removal queued for referenced front: %v", err)
+	}
 	if err := s.DeleteEntry(ctx, entries[0].ID); !errors.Is(err, ErrEntryClientChainInUse) {
 		t.Fatal(err)
 	}

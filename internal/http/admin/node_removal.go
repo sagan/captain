@@ -63,6 +63,9 @@ func (h *handlers) startNodeRemoval(w http.ResponseWriter, r *http.Request) {
 	jobID := auth.Token(12)
 	p := store.NodeRemovalParams{Mode: in.Mode, KeepData: in.KeepData, ExpiresAt: time.Now().Add(5 * time.Minute).Unix()}
 	if err := h.Store.QueueNodeRemoval(r.Context(), jobID, id, p); err != nil {
+		if entryClientChainError(w, err) {
+			return
+		}
 		if errors.Is(err, store.ErrRemovalPending) {
 			fail(w, 409, err.Error())
 		} else {

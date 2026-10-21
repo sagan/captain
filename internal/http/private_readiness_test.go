@@ -1,6 +1,8 @@
 package http
 
 import (
+	"context"
+	"github.com/zeptop-dev/captain/internal/store"
 	"testing"
 	"time"
 
@@ -149,5 +151,71 @@ func TestAutomaticPrivateAccessAPIRequiresConsent(t *testing.T) {
 	body["Port"] = 18450
 	if code, _, _ := r.c.do("POST", base+"/inbounds", body, nil); code != 400 {
 		t.Fatal("old node accepted auto", code)
+	}
+}
+
+func TestCoreOnlyPrivateAccessSplitRoutingAPI(t *testing.T) {
+	r := newRig(t)
+	ctx := context.Background()
+	base := "/api/admin/nodes/" + itoa(r.nodeID)
+	routing := &store.NodeRouting{Outbounds: []spec.Outbound{{Tag: "warp-one", WARP: &spec.WARP{FromNode: true}}, {Tag: "warp-two", WARP: &spec.WARP{FromNode: true}}}, Routes: []spec.RouteRule{{Match: []string{"domain:example.com"}, Action: "outbound", Value: "warp-two"}}, DefaultOutbound: "warp-one"}
+	if err := r.st.SetNodeRouting(ctx, r.nodeID, routing); err != nil {
+		t.Fatal(err)
+	}
+	c := spec.CapabilitiesForCore("singbox")
+	c.PrivateAccess = false
+	c.PrivateAccessPolicy = &spec.PrivateAccessPolicyCapabilities{Scoped: true, IndependentDNS: true}
+	c.PrivateAccessReadiness = &spec.PrivateAccessReadiness{CheckedAt: time.Now().Unix(), EffectiveMode: "core_only"}
+	report := func() {
+		t.Helper()
+		if code, b, _ := r.agent.do("POST", "/api/agent/report", agentproto.Report{Cores: map[string]agentproto.CoreStatus{"singbox": {Capabilities: &c}}}, nil); code != 200 {
+			t.Fatalf("%d %s", code, b)
+		}
+	}
+	report()
+	body := map[string]any{"Tag": "split", "Protocol": "vless", "Core": "singbox", "Port": 18460, "Settings": map[string]any{"private_access": map[string]any{"mode": "internal", "enforcement": "auto", "allow_core_only": true}}}
+	if code, _, _ := r.c.do("POST", base+"/inbounds", body, nil); code != 400 {
+		t.Fatal("old node accepted expanded routing", code)
+	}
+	c.PrivateAccessPolicy.SplitRouting = true
+	report()
+	if code, b, _ := r.c.do("POST", base+"/inbounds", body, nil); code != 200 {
+		t.Fatalf("new capability rejected: %d %s", code, b)
+	}
+	delivered := func() bool {
+		t.Helper()
+		code, b, _ := r.agent.do("GET", "/api/agent/state", nil, nil)
+		if code != 200 {
+			t.Fatalf("%d %s", code, b)
+		}
+		st := mustJSON[agentproto.State](t, b)
+		for _, ib := range st.Node.Inbounds {
+			if ib.Tag == "split" {
+				return true
+			}
+		}
+		return false
+	}
+	if !delivered() {
+		t.Fatal("new node not delivered")
+	}
+	if code, b, _ := r.c.do("PUT", base+"/routing", routing, nil); code != 200 {
+		t.Fatalf("routing editor rejected supported combination: %d %s", code, b)
+	}
+	c.PrivateAccessPolicy.SplitRouting = false
+	report()
+	if code, _, _ := r.c.do("PUT", base+"/routing", routing, nil); code != 400 {
+		t.Fatal("routing editor bypassed old-node gate", code)
+	}
+	if delivered() {
+		t.Fatal("downgrade received unsupported topology")
+	}
+	c.PrivateAccessPolicy.SplitRouting = true
+	c.CoreOnlyPrivateAccess = false
+	c.PrivateAccess = true
+	c.PrivateAccessReadiness.EffectiveMode = "dual"
+	report()
+	if delivered() {
+		t.Fatal("guard re-enable silently weakened isolation")
 	}
 }

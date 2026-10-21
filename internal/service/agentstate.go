@@ -350,7 +350,7 @@ func (a *AgentState) finishState(ctx context.Context, n *domain.Node, st *agentp
 	st.Komari, st.DStatus = nil, nil
 	if jobs, err := a.Store.PendingNodeJobs(ctx, n.ID); err == nil {
 		for _, j := range jobs {
-			if !store.NodeProxyAllowed(n) && (j.Kind == spec.CoreManagementKind || j.Kind == "warp_register" || j.Kind == "reality_scan") {
+			if !store.NodeProxyAllowed(n) && (j.Kind == spec.WireGuardSetupKind || j.Kind == spec.CoreManagementKind || j.Kind == "warp_register" || j.Kind == "reality_scan") {
 				continue
 			}
 			st.Jobs = append(st.Jobs, agentproto.Job{ID: j.ID, Kind: j.Kind, Params: j.Params})

@@ -27,12 +27,14 @@ Captain v1.21 / bosun v0.69 add private three-carrier return-route diagnostics a
 
 Captain v1.20 / bosun v0.68 add managed reverse WireGuard: B initiates the tunnel, A authenticates and bills users, and explicit private-network grants use B-side SNAT. User speed limits are shared across ordinary egress and WG links on A. [WireGuard](docs/NODES.md#managed-reverse-wireguard-captain-120--bosun-068).
 
-**Unreleased WG improvements:** new connections default to IPv4 preference for
+**Captain v1.28 / bosun v0.75 WG improvements:** new connections default to IPv4 preference for
 dual-stack domains and explicit automatic UFW forwarding on B. Existing links
 keep their routing and manual rules until edited. Fresh node capabilities gate
 both options; unsupported firewalls/routing and disabled global auto-open report
 failure. Rule synchronization and tunnel handshakes do not prove client access.
-[Forwarding support and address-family limits](docs/NODES.md#automatic-forwarding-on-b-unreleased).
+[Forwarding support and address-family limits](docs/NODES.md#automatic-forwarding-on-b).
+
+Captain v1.28 / bosun v0.75 also add WG dependency checks and explicit package installation, faster initial IP/DNS synchronization, and supported core-only private grants that preserve WARP/proxy split routing.
 
 Captain is one Go binary with the admin console and the user portal embedded.
 It sells access (plans, orders, eight payment gateways, invites, coupons,

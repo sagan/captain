@@ -27,10 +27,10 @@ Captain v1.21 / bosun v0.69 新增管理员专用的三网回程探测，以及�
 
 Captain v1.20 / bosun v0.68 新增托管反向 WireGuard：B 主动建立隧道，A 鉴权计费，内网按网段、协议和端口授权，由 B 执行 SNAT。同一 A 上普通出口与多条 WG 共享用户限速。 [WireGuard](docs/NODES.md#managed-reverse-wireguard-captain-120--bosun-068).
 
-**尚未发布的 WG 改进**：新建连接默认对双栈域名优先使用 IPv4，并明确启用 B 的 UFW
+**v1.28 / v0.75 的 WG 改进**：新建连接默认对双栈域名优先使用 IPv4，并明确启用 B 的 UFW
 转发自动管理。旧连接保留原选路与手动规则，编辑时可主动开启。两项设置分别要求 A/B
 上报新鲜能力；不支持的防火墙、路由及关闭的全局自动放行会明确报错。规则同步成功与
-隧道握手均不代表客户端实际可用。[支持范围与地址族限制](docs/NODES.md#automatic-forwarding-on-b-unreleased)。
+隧道握手均不代表客户端实际可用。[支持范围与地址族限制](docs/NODES.md#automatic-forwarding-on-b)。
 
 Captain 是单个 Go 二进制文件，管理后台和用户前台都内嵌其中。
 它负责把服务卖出去（套餐、订单、八种支付网关、邀请、优惠券、
@@ -312,3 +312,5 @@ MIT —— 见 [LICENSE](LICENSE)。
 Captain 节点详情提供实际状态、单项修改及操作记录。原生 root Debian/Ubuntu systemd 节点支持受控管理；SSH、DNS、防火墙变更带本地超时恢复。其他环境只读，缺少的系统软件不会自动安装。
 
 节点探针支持金额、币种与付款周期分开填写，日历选择到期日，以及流量按到期日同日／次日每月重置。旧价格文本和手动重置设置保持兼容，详见[监控文档](docs/MONITORING.md#node-cost-and-expiry-linked-traffic-reset)。
+
+Captain v1.28 / bosun v0.75 增加 WG 两端依赖检查与管理员确认后的系统包安装，加快首次 IP 与 DNS 同步。明确确认的仅内核私网授权可保留 WARP、代理和负载均衡分流；双层防护仍只支持直连出站。

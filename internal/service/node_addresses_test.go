@@ -11,6 +11,7 @@ import (
 
 	"github.com/zeptop-dev/bosun/pkg/agentproto"
 	"github.com/zeptop-dev/captain/internal/dns"
+	"github.com/zeptop-dev/captain/internal/domain"
 	"github.com/zeptop-dev/captain/internal/store"
 )
 
@@ -106,4 +107,122 @@ func TestNodeAddressesDNSOnlyFollowsOptedInFamily(t *testing.T) {
 	if len(ingresses) != 1 || ingresses[0].EntryHost != "203.0.113.30" {
 		t.Fatal("NAT public entry changed")
 	}
+}
+
+// New IPv4-only nodes must create their first A record without waiting for IPv6.
+func TestNodeAddressesInitialIPv4OnlyDNS(t *testing.T) {
+	ctx := context.Background()
+	st, _ := dnsTestStore(t)
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	n := &domain.Node{Name: "new", Domain: "new.example.com"}
+	must(st.CreateNodeWithAddressPolicy(ctx, n, "new-pair", time.Hour, true, true))
+	_, err := st.RedeemPairCode(ctx, "new-pair", "token", "new", "test", "linux")
+	must(err)
+	dom := store.Domain{Name: "example.com", Provider: "cloudflare", CFToken: "test-token", AutoDNS: true}
+	must(st.CreateDomain(ctx, &dom))
+	var writes atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var result any
+		switch {
+		case r.URL.Path == "/zones":
+			result = []map[string]string{{"id": "zone"}}
+		case r.Method == "GET":
+			result = []dns.Record{}
+		default:
+			writes.Add(1)
+			var rec dns.Record
+			if err := json.NewDecoder(r.Body).Decode(&rec); err != nil {
+				t.Error(err)
+			}
+			if r.Method != "POST" || rec.Type != "A" || rec.Content != "198.51.100.20" || rec.Name != n.Domain {
+				t.Errorf("unexpected initial DNS write: %s %+v", r.Method, rec)
+			}
+			rec.ID = "record"
+			result = rec
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "result": result})
+	}))
+	defer srv.Close()
+	var checks atomic.Int32
+	health := &DNSHealth{Store: st, Lookup: func(_ context.Context, _, _ string) ([]string, error) {
+		checks.Add(1)
+		return []string{"198.51.100.20"}, nil
+	}}
+	worker := &NodeAddresses{Store: st, DNS: &DNS{Store: st, Base: srv.URL}, Health: health}
+	at := time.Now().Truncate(time.Second)
+	sample := func(when time.Time) {
+		must(st.ObserveNodeAddresses(ctx, n.ID, "token", &agentproto.PublicAddresses{SampledAt: when.Unix(), IPv4: "198.51.100.20"}, when))
+	}
+	sample(at)
+	worker.Tick(ctx, at)
+	if writes.Load() != 0 {
+		t.Fatal("unconfirmed address wrote DNS")
+	}
+	sample(at.Add(time.Minute))
+	worker.Tick(ctx, at.Add(5*time.Minute))
+	got, err := st.NodeAddresses(ctx, n.ID)
+	must(err)
+	if checks.Load() != 2 {
+		t.Fatalf("health lookups: %d", checks.Load())
+	}
+	if writes.Load() != 1 || got.EntryIPv4 != "198.51.100.20" || got.EntryIPv6 != "" || got.DNSPending {
+		t.Fatalf("initial sync: writes=%d addresses=%+v", writes.Load(), got)
+	}
+}
+
+func TestNodeAddressNotificationsAreBoundedAndNonblocking(t *testing.T) {
+	worker := &NodeAddresses{}
+	for range 1000 {
+		worker.Notify(1)
+	}
+	if len(worker.notifications()) != 256 {
+		t.Fatal("unexpected notification bound")
+	}
+	var absent *NodeAddresses
+	absent.Notify(1) // optional dependency in old API fixtures
+}
+
+func TestNodeAddressNotificationAppliesWithoutPeriodicSweep(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	st, n := dnsTestStore(t)
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, err := st.RedeemPairCode(ctx, "dns-test", "token", "node", "test", "linux")
+	must(err)
+	must(st.SetAddressPolicy(ctx, n.ID, true, false))
+	worker := &NodeAddresses{Store: st}
+	worker.Notify(0) // sentinel consumed only after the startup sweep
+	done := make(chan struct{})
+	go func() { defer close(done); worker.Run(ctx) }()
+	defer func() { cancel(); <-done }()
+	deadline := time.Now().Add(3 * time.Second)
+	for len(worker.notifications()) != 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if len(worker.notifications()) != 0 {
+		t.Fatal("worker did not start")
+	}
+	for _, ago := range []time.Duration{3 * time.Minute, time.Minute} {
+		at := time.Now().Add(-ago)
+		must(st.ObserveNodeAddresses(ctx, n.ID, "token", &agentproto.PublicAddresses{SampledAt: at.Unix(), IPv4: "198.51.100.20"}, at))
+	}
+	worker.Notify(n.ID)
+	for time.Now().Before(deadline) {
+		got, err := st.NodeByID(ctx, n.ID)
+		must(err)
+		if got.PublicAddr == "198.51.100.20" {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("address update waited for the one-minute sweep")
 }

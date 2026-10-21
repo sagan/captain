@@ -96,3 +96,50 @@ func TestNodeAddressFollowingPreservesFixedFamiliesAndRejectsOldIdentity(t *test
 		t.Fatal("pairing retained observation")
 	}
 }
+
+func TestInitialAddressConfirmationIsFastButChangesStayDebounced(t *testing.T) {
+	ctx := context.Background()
+	conn, err := db.Open("sqlite", filepath.Join(t.TempDir(), "addresses.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(db.Migrate(ctx, conn, "sqlite"))
+	s := New(conn)
+	n := &domain.Node{Name: "new"}
+	must(s.CreateNodeWithAddressPolicy(ctx, n, "pair", time.Hour, true, true))
+	_, err = s.RedeemPairCode(ctx, "pair", "token", "node", "test", "linux")
+	must(err)
+	at := time.Now().Truncate(time.Second)
+	sample := func(sampleSec, receiveSec int, ip string) {
+		must(s.ObserveNodeAddresses(ctx, n.ID, "token", &agentproto.PublicAddresses{SampledAt: at.Add(time.Duration(sampleSec) * time.Second).Unix(), IPv4: ip}, at.Add(time.Duration(receiveSec)*time.Second)))
+	}
+	check := func(sec int, want string) {
+		t.Helper()
+		node, _, err := s.ReconcileNodeAddresses(ctx, n.ID, at.Add(time.Duration(sec)*time.Second))
+		must(err)
+		if node.PublicAddr != want || node.V6Addr != "" {
+			t.Fatalf("at %d: %+v", sec, node)
+		}
+	}
+	sample(0, 0, "198.51.100.20")
+	check(0, "")
+	sample(29, 29, "198.51.100.20")
+	check(29, "")
+	sample(29, 30, "198.51.100.20")
+	check(30, "") // cached report cannot confirm
+	sample(30, 30, "198.51.100.20")
+	check(30, "198.51.100.20")
+	sample(60, 60, "203.0.113.30")
+	check(60, "198.51.100.20")
+	sample(90, 90, "203.0.113.30")
+	check(90, "198.51.100.20")
+	sample(180, 180, "203.0.113.30")
+	check(180, "203.0.113.30")
+}

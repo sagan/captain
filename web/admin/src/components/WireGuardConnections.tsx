@@ -11,6 +11,7 @@ import { SettingsDraftBoundary, useSettingsDirty } from '../lib/settings-draft'
 import { scanRealityViaNode } from '../lib/reality-scan'
 import { PrivateAccessFields } from './PrivateAccessFields'
 import { RealityScan } from './RealityScan'
+import { WireGuardReadiness, useWireGuardReadiness } from './WireGuardReadiness'
 
 type Policy = { mode: string; rules?: { cidr: string; protocol?: string; port_start?: number; port_end?: number }[] }
 type Forwarding = { state: string; backend?: string; reason?: string; checked_at: number }
@@ -49,6 +50,8 @@ function Connections({ node }: { node: Node }) {
   const groups = useQuery({ queryKey: ['groups'], queryFn: () => api.get<UserGroup[]>('/api/admin/groups') })
   const [draft, setDraft] = useState<Connection | null>(null)
   const [dirty, setDirty] = useState(false)
+  const exitReady = useWireGuardReadiness(node.id)
+  const transitReady = useWireGuardReadiness(draft?.transit_id ?? 0, true)
   useSettingsDirty(!!draft && dirty)
   const update = (value: Partial<Connection>) => { setDirty(true); setDraft(d => d && { ...d, ...value }) }
   const close = () => {
@@ -61,6 +64,7 @@ function Connections({ node }: { node: Node }) {
   const labels: Record<string, string> = { connected: t('reverse.connected'), disconnected: t('reverse.disconnected'), pending: t('reverse.pending'), disabled: t('reverse.disabled'), unavailable: t('wireguard.unavailable'), blocked: t('wireguard.blocked') }
   return <Stack>
     <Text size="sm" c="dimmed">{t('wireguard.hint')}</Text>
+    <WireGuardReadiness key={node.id} nodeID={node.id} query={exitReady} />
     {q.isError && <Alert color="red">{t('reverse.loadFailed')} <Button variant="subtle" onClick={() => q.refetch()}>{t('common.refresh')}</Button></Alert>}
     {(q.data ?? []).map(c => <Card key={c.id} withBorder p="sm"><Group justify="space-between" align="flex-start">
       <Stack gap={4}><Text fw={600}>{c.name}</Text><Text size="xs" c="dimmed">{c.endpoint}</Text>
@@ -82,6 +86,8 @@ function Connections({ node }: { node: Node }) {
           <TextInput required label={t('wireguard.endpoint')} placeholder="198.51.100.20:51820" value={draft.endpoint} onChange={e => update({ endpoint: e.currentTarget.value })} />
           <NumberInput required label="MTU" min={1280} max={1420} value={draft.mtu} onChange={n => update({ mtu: Number(n) })} />
         </SimpleGrid>
+        <WireGuardReadiness key={`B-${node.id}`} nodeID={node.id} role="B" query={exitReady} />
+        {draft.transit_id > 0 && <WireGuardReadiness key={`A-${draft.transit_id}`} nodeID={draft.transit_id} role="A" query={transitReady} />}
         <Text size="xs" c="dimmed">{t('wireguard.endpointHint')}</Text>
         <Switch label={t('wireguard.autoForwarding')} description={t('wireguard.autoForwardingHint')} checked={draft.auto_forwarding ?? false} onChange={e => update({ auto_forwarding: e.currentTarget.checked })} />
         <Select label={t('wireguard.domainPreference')} description={t('wireguard.domainPreferenceHint')} value={draft.domain_preference ?? ''} data={[
@@ -95,7 +101,7 @@ function Connections({ node }: { node: Node }) {
         <Select clearable label={t('inbounds.group')} placeholder={t('inbounds.groupAll')} value={draft.group_id ? String(draft.group_id) : null} data={(groups.data ?? []).map(g => ({ value: String(g.ID), label: g.Name }))} onChange={id => update({ group_id: id ? Number(id) : null })} />
         <PrivateAccessFields explicitOnly json={JSON.stringify({ private_access: draft.private_access })} onChange={json => update({ private_access: JSON.parse(json).private_access })} />
         <Switch label={t('common.enabled')} checked={draft.enabled} onChange={e => update({ enabled: e.currentTarget.checked })} />
-        <Group justify="flex-end"><Button variant="default" onClick={close}>{t('common.cancel')}</Button><Button loading={save.isPending} disabled={!draft.transit_id || !draft.name.trim() || !draft.endpoint || !draft.server_name.trim()} onClick={() => save.mutate(draft)}>{t('common.save')}</Button></Group>
+        <Group justify="flex-end"><Button variant="default" onClick={close}>{t('common.cancel')}</Button><Button loading={save.isPending} disabled={(draft.enabled && (!exitReady.data?.ready || !transitReady.data?.ready || exitReady.isError || transitReady.isError)) || !draft.transit_id || !draft.name.trim() || !draft.endpoint || !draft.server_name.trim()} onClick={() => save.mutate(draft)}>{t('common.save')}</Button></Group>
       </Stack>}
     </Modal>
   </Stack>

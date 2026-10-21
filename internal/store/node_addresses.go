@@ -77,8 +77,8 @@ func (s *Store) ObserveNodeAddresses(ctx context.Context, id int64, token string
 		return err
 	}
 	defer tx.Rollback()
-	var raw string
-	if err = tx.QueryRowContext(ctx, `SELECT address_json FROM nodes WHERE id=? AND token_hash=?`, id, token).Scan(&raw); err != nil {
+	var raw, entry4, entry6 string
+	if err = tx.QueryRowContext(ctx, `SELECT address_json,public_addr,v6_addr FROM nodes WHERE id=? AND token_hash=?`, id, token).Scan(&raw, &entry4, &entry6); err != nil {
 		return wrapNotFound(err)
 	}
 	var obs AddressObservation
@@ -88,7 +88,7 @@ func (s *Store) ObserveNodeAddresses(ctx context.Context, id int64, token string
 	if sample.SampledAt <= obs.SampledAt {
 		return nil
 	}
-	advance := func(f *AddressFamily, value string) {
+	advance := func(f *AddressFamily, value, entry string) {
 		if value != "" {
 			value = netip.MustParseAddr(value).String()
 		}
@@ -101,14 +101,18 @@ func (s *Store) ObserveNodeAddresses(ctx context.Context, id int64, token string
 			f.CandidateSince = at.Unix()
 			f.ConfirmedAt = 0
 		}
-		if at.Unix()-f.CandidateSince >= 120 {
+		confirmationSeconds := int64(120)
+		if entry == "" {
+			confirmationSeconds = 30
+		}
+		if at.Unix()-f.CandidateSince >= confirmationSeconds {
 			f.ConfirmedAt = at.Unix()
 		}
 		f.Address = value
 		f.LastSuccess = at.Unix()
 	}
-	advance(&obs.IPv4, sample.IPv4)
-	advance(&obs.IPv6, sample.IPv6)
+	advance(&obs.IPv4, sample.IPv4, entry4)
+	advance(&obs.IPv6, sample.IPv6, entry6)
 	obs.SampledAt = sample.SampledAt
 	obs.ReceivedAt = at.Unix()
 	buf, _ := json.Marshal(obs)

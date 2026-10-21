@@ -22,11 +22,16 @@ export function NodeAddressesCard({ nodeID, canWrite }: { nodeID: number; canWri
         const value = q.data!.observed[family]
         const following = family === 'ipv4' ? q.data!.auto_ipv4 : q.data!.auto_ipv6
         const current = fresh && value.last_success === q.data!.observed.received_at
+        const entry = family === 'ipv4' ? q.data!.entry_ipv4 : q.data!.entry_ipv6
+        const confirming = following && current && !value.confirmed_at
+        const applying = following && current && !!value.confirmed_at && entry !== value.address
         return <Card key={family} withBorder p="sm"><Stack gap="xs">
           <Group justify="space-between"><Text fw={600}>{family === 'ipv4' ? 'IPv4' : 'IPv6'}</Text><Badge color={current ? 'teal' : 'gray'}>{t(current ? 'nodeAddresses.detected' : 'nodeAddresses.unknown')}</Badge></Group>
           <Text size="sm" style={{ overflowWrap: 'anywhere' }}>{t('nodeAddresses.machine')}: {value.address || '—'}</Text>
           <Text size="xs" c="dimmed">{t('nodeAddresses.lastSuccess')}: {value.last_success ? new Date(value.last_success * 1000).toLocaleString() : '—'}</Text>
           <Text size="sm" style={{ overflowWrap: 'anywhere' }}>{t('nodeAddresses.entry')}: {(family === 'ipv4' ? q.data!.entry_ipv4 : q.data!.entry_ipv6) || '—'}</Text>
+          {confirming && <Text size="xs" c="orange">{t('nodeAddresses.confirming')}</Text>}
+          {applying && <Text size="xs" c="orange">{t('nodeAddresses.applying')}</Text>}
           {canWrite && <Switch label={t('nodeAddresses.follow')} checked={following} disabled={save.isPending || (!following && !fresh)} onChange={e => save.mutate(family === 'ipv4' ? { auto_ipv4: e.currentTarget.checked } : { auto_ipv6: e.currentTarget.checked })} />}
         </Stack></Card>
       })}</SimpleGrid>

@@ -31,9 +31,10 @@ import (
 
 // Deps are the handlers' dependencies.
 type Deps struct {
-	Store *store.Store
-	Log   *slog.Logger
-	State *service.AgentState
+	Store     *store.Store
+	Addresses *service.NodeAddresses
+	Log       *slog.Logger
+	State     *service.AgentState
 	// BaseURL is the public panel address baked into install scripts.
 	BaseURL string
 	// Probe takes host beats; nil ignores them.
@@ -211,6 +212,9 @@ func (h *handlers) report(w http.ResponseWriter, r *http.Request) {
 	if err := h.Store.ObserveNodeAddresses(r.Context(), n.ID, tokenHash, rep.PublicAddresses, time.Now()); err != nil {
 		fail(w, 400, "invalid address observation or node identity")
 		return
+	}
+	if rep.PublicAddresses != nil {
+		h.Addresses.Notify(n.ID)
 	}
 	if err := h.Store.ObserveNodeHostname(r.Context(), n.ID, tokenHash, rep.Hostname); err != nil {
 		h.Log.Error("save node hostname", "err", err)

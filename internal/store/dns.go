@@ -130,13 +130,14 @@ type DNSAnswer struct {
 }
 
 type DNSTarget struct {
-	Key      string      `json:"key"`
-	Host     string      `json:"host"`
-	Label    string      `json:"label"`
-	Mode     string      `json:"mode"` // direct | shared | resolve_only | conflict
-	Expected []string    `json:"expected"`
-	Status   string      `json:"status"` // ok | mismatch | missing | inconsistent | unknown | conflict | invalid
-	Answers  []DNSAnswer `json:"answers"`
+	PropagationPending bool        `json:"propagation_pending,omitempty"` // response-only, derived from successful write history
+	Key                string      `json:"key"`
+	Host               string      `json:"host"`
+	Label              string      `json:"label"`
+	Mode               string      `json:"mode"` // direct | shared | resolve_only | conflict
+	Expected           []string    `json:"expected"`
+	Status             string      `json:"status"` // ok | mismatch | missing | inconsistent | unknown | conflict | invalid
+	Answers            []DNSAnswer `json:"answers"`
 }
 
 type DNSHealth struct {

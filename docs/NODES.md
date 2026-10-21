@@ -576,7 +576,7 @@ a non-root core account, enabled egress protection and sing-box or Xray.
 Capabilities reflect the node's runtime prerequisites. Native Hysteria, mita
 and snell-server, WireGuard inbounds, shared-key Snell and Xray SOCKS/HTTP
 inbounds do not support this policy. Hysteria2 may use sing-box instead.
-Currently the whole node must use direct/freedom outbounds: proxy chains,
+For dual-layer enforcement, the whole node must use direct/freedom outbounds: proxy chains,
 remote proxies, WARP, balancers, GeoIP split rules, global private grants and
 raw overrides of routing, DNS, policy, inbounds or outbounds are rejected.
 This restriction avoids claiming enforcement when a remote proxy or override
@@ -626,6 +626,17 @@ root network-administration privileges and enabled egress protection with
 non-root proxy cores. A also needs Xray. The panel waits for fresh capability
 reports from both nodes; upgrading the panel alone cannot enable this feature.
 
+The prerequisite cards show A and B separately, including missing `ip`, `wg`,
+`nft`, `tc`, `sysctl`, service PATH, core identity and privileges. With a bosun
+that reports setup support, **Install missing dependencies** queues a bounded
+five-minute task and refreshes the report on completion without clearing the
+connection draft. Only full administrators can request it. The installer uses
+fixed package names on native root Debian/Ubuntu, Alpine and supported dnf
+systems; it does not rerun the bosun installer. Containers, service PATH issues,
+kernel support and core/guard configuration require manual attention. Binary
+updates do not silently install new OS packages. Tool readiness is not a tunnel
+connectivity test; host firewall forwarding still needs the checks below.
+
 Choose A, a subscriber TCP port, a separate local WireGuard UDP port, the literal
 IP and UDP port reachable from B, MTU (1280–1420), and a REALITY server name.
 Run the REALITY check from A. If external NAT maps A's UDP port, enter the public
@@ -640,7 +651,7 @@ A fresh handshake can therefore show **Connected** while subscriber requests
 still fail. Check the host firewall before changing the tunnel or private-access
 grants.
 
-### Automatic forwarding on B (unreleased)
+### Automatic forwarding on B
 
 The new connection form enables **Automatically manage forwarding on B**
 (`auto_forwarding`) by default. Migration 78 leaves existing connections in
@@ -712,7 +723,7 @@ existing established/related rules do not already allow them. Bosun still
 restricts destinations before these rules. Remove the corresponding manual
 rules when retiring the link; automatic cleanup does not own them.
 
-### Domain address preference (unreleased)
+### Domain address preference
 
 New connections select **Prefer IPv4** (`domain_preference: "ipv4"`). This fixes
 dual-stack domains choosing IPv6 when B only has a working IPv4 exit. Select
@@ -763,7 +774,8 @@ ownership conflicts are rejected rather than overwritten.
 
 The **Machine public addresses and entry** card keeps the bosun-observed public
 IPv4/IPv6 separate from the node's published entry addresses. Updated full and
-monitor-only Captain agents probe every five minutes using two independent HTTPS
+monitor-only Captain agents probe every 30 seconds for the first three minutes
+after startup, then every five minutes, using two independent HTTPS
 responders per family, with direct, family-specific sockets and no environment
 HTTP proxy. These are outbound public addresses, not proof of inbound reachability
 or the node's private interface addresses. OS-level VPN routing can still affect
@@ -773,7 +785,12 @@ Existing node addresses remain fixed by default. Administrators can enable
 following separately for IPv4 and IPv6 after a fresh agent report. A changed
 address must agree across responders and be confirmed on two distinct sampling
 cycles before Captain updates the enabled family. Cached reports do not count
-again. Failed, disagreeing, stale or missing observations retain the last known
+again. A family with no published address can confirm after 30 seconds; replacing
+an existing address still requires at least two minutes of stable observations.
+The fast startup schedule requires an updated bosun; older agents keep their
+five-minute cadence. Reports are normally minute-spaced, so first publication
+typically takes one to two minutes, plus DNS provider and resolver latency.
+Failed, disagreeing, stale or missing observations retain the last known
 address and never delete A/AAAA records. The card shows the last successful
 observation time; older agents cannot enable following until upgraded. A large
 agent clock error also prevents accepting observations.
@@ -786,12 +803,18 @@ are not rewritten. For dynamic direct nodes, use the node domain in subscription
 entries and enable automatic DNS for that domain. For fixed NAT public entries,
 leave following off: machine observations still update independently.
 
-Captain reconciles confirmed changes every minute and invalidates cached node
-state. DNS synchronization uses the existing Cloudflare auto-DNS configuration,
+Address reports wake a bounded background worker immediately; a one-minute sweep
+remains as recovery for missed notifications. Confirmed changes invalidate cached
+node state. DNS synchronization uses the existing Cloudflare auto-DNS configuration,
 shared-domain/CDN/multiple-record guards and durable change history. It runs
 outside agent report/billing acknowledgements and retries failures at most every
 five minutes. DNS changes and node address changes are not an atomic external
 transaction; a pending indication and DNS health/history expose failures.
+Successful synchronization triggers a DNS health check. For up to ten minutes
+after a matching successful write, unresolved results are rechecked about every
+30 seconds and displayed as awaiting propagation. Existing failure statuses and
+the five-minute/ten-minute alert thresholds remain intact; skipped or failed
+writes are never presented as successful propagation.
 Re-pairing clears observations and requires new confirmations. Source-restricted
 networks or unavailable public responders leave observations unknown rather than
 guessing an inbound address from the Captain connection.
@@ -949,8 +972,8 @@ forward, WG link, certificate or system-listener sources and last synchronizatio
 time. Refresh host state for a fresh snapshot. Older nodes show an upgrade hint.
 Only active UFW/firewalld listener allowances are managed; cloud security groups,
 NAT mappings, raw nftables/iptables policies and WG forwarding rules are separate.
-The unreleased per-connection WG forwarding option is described
-[above](#automatic-forwarding-on-b-unreleased); listener auto-open alone does not
+The per-connection WG forwarding option is described
+[above](#automatic-forwarding-on-b); listener auto-open alone does not
 enable it on existing connections.
 An outbound destination port is not a local listener. TCP and UDP are separate,
 and shared rules remain until their last listener disappears. Synchronization
@@ -1002,12 +1025,14 @@ Changing this node configuration requires restarting bosun; the panel does not
 disable a firewall remotely.
 
 Automatic intent and acknowledgement are stored separately from the derived mode.
-Re-enabling the guard restores dual protection. Removing permission clears the
+Re-enabling the guard restores dual protection for supported direct topologies;
+a WARP/proxy topology is blocked rather than silently losing isolation. Removing permission clears the
 acknowledgement. Existing policies retain their original behavior until edited;
 older nodes without automatic-policy capabilities cannot receive new automatic
 policies. Adapter features and runtime prerequisites are reported separately.
 
-This mode currently supports direct sing-box / Extended exits. It uses core
+This mode supports sing-box / Extended exits. Upgraded nodes retain existing
+WARP, proxy-chain, balancer and direct routing choices. It uses core
 address/transport/port rules instead of nft destination isolation, while retaining
 the non-root account and existing control API protection. It therefore does not
 remove every nft or agent capability prerequisite. Global exemptions remain
@@ -1019,3 +1044,13 @@ are rejected. An enabled authorization belongs to the entire inbound's permitted
 users, as before. Changing the scope or protection mode interrupts existing proxy
 connections so old permissions cannot linger. Old nodes without the new explicit
 capability cannot receive this policy.
+
+
+Core-only split routing uses the additive `private_access_policy.split_routing`
+capability. Captain refuses the expanded combination for old/stale nodes, both
+when saving and delivering state. Multiple WARP exits can coexist with per-inbound
+permissions. Destinations are interpreted at the selected exit: granting a LAN
+CIDR does not automatically route it directly to this server's LAN. Add an explicit
+direct split rule if that is the intended path. The authorization check consumes
+resolved addresses before routing, including mixed-answer rejection; remote
+proxies receive checked IPs rather than a domain to resolve independently.

@@ -78,7 +78,7 @@
     "fixedHint": "固定公网入口不随探测变化。NAT / 专线请填写服务商入口，并另行配置端口映射。",
     "internalHint": "选填。识别内网中转来源，避免重复计算设备数；不会建立内网连接，不影响 bosun 配对。",
     "title": "机器公网地址与入口",
-    "hint": "bosun 每 5 分钟独立探测公网 IPv4 / IPv6。探测到的是出站公网地址，NAT 出口可能不同于用户连接的入口。",
+    "hint": "bosun 启动后前 3 分钟每 30 秒探测公网 IPv4 / IPv6，随后每 5 分钟一次。探测到的是出站公网地址，NAT 出口可能不同于用户连接的入口。",
     "waiting": "等待新版 bosun 的新鲜地址报告；旧值仅供参考。",
     "detected": "探测成功",
     "unknown": "未确认",
@@ -87,7 +87,9 @@
     "entry": "当前公网入口地址",
     "follow": "入口自动跟随探测地址",
     "behavior": "现有入口默认固定。开启后，连续两次探测确认才更新该地址及符合条件的自动 DNS；探测失败保留旧值。手动修改节点地址会关闭对应跟随。单独设置的 NAT/专线入口、订阅地址和 WG 端点保持不变。",
-    "dnsPending": "地址已更新，DNS 同步待处理或重试；可查看 DNS 健康与变更历史。"
+    "dnsPending": "地址已更新，DNS 同步待处理或重试；可查看 DNS 健康与变更历史。",
+    "confirming": "已检测到地址，等待下一次独立采样确认。",
+    "applying": "地址已确认，等待更新入口和同步 DNS。"
   },
   "app": {
     "logout": "退出登录"
@@ -2229,7 +2231,7 @@
     "dual": "双层防护（默认）",
     "coreOnly": "仅内核策略",
     "enforcementHint": "仅内核策略要求显式关闭 cores.egress_guard，并有新鲜的节点能力上报。",
-    "coreOnlyHint": "仅支持 sing-box／Extended 直连出站。不使用 nft 目的地址隔离，仍要求非 root 账户和控制 API 保护。不支持 Xray、托管反向隧道或代理链。修改策略会中断连接。",
+    "coreOnlyHint": "支持 sing-box／Extended；升级后的节点可沿用原有出站分流，包括 WARP 和代理出站。不使用 nft 目的地址隔离，仍要求非 root 账户和控制 API 保护。不支持 Xray 和托管反向隧道。修改策略会中断连接。",
     "actualMode": "实际防护方式",
     "runtimeUnknown": "运行状态未知",
     "confirmCoreOnly": "我理解当前未启用 nft 目的地址隔离，同意此入站在仅内核防护下授权私网访问。"
@@ -2320,7 +2322,8 @@
     "actions": {
       "created": "新增",
       "updated": "更新"
-    }
+    },
+    "propagationPending": "DNS 已写入，等待解析生效；近期写入会加快复查，缓存可能仍返回旧结果。"
   },
   "nodeMode": {
     "title": "节点模式",
@@ -2630,5 +2633,39 @@
       "guardDisabled": "仅在准备自行管理目的地址防护时设置 cores.egress_guard: false，再重启 bosun；控制 API 保护仍保留。"
     },
     "kernelPending": "内核 nftables 访问：尚未检测，点击“重新检查”验证。"
+  },
+  "wgSetup": {
+    "title": "反向 WireGuard 运行条件",
+    "ready": "已就绪",
+    "notReady": "需要处理",
+    "paired": "已配对",
+    "full": "完整节点模式",
+    "fresh": "能力报告未过期",
+    "root": "bosun 以 root 运行",
+    "shaper": "流量整形可用",
+    "runtime": "反向 WG 运行环境就绪",
+    "xray": "A：Xray 支持反向 WG",
+    "path": "服务可执行文件 PATH",
+    "loadError": "运行条件加载失败，请刷新后再保存。",
+    "loading": "正在检查运行条件…",
+    "upgrade": "请升级 bosun，以查看具体缺项并在此安装缺失工具。",
+    "packages": "缺失软件包",
+    "manual": "剩余条件需要手动配置。自动安装支持原生 root Debian/Ubuntu、Alpine 和受支持的 dnf 系统；容器和服务 PATH 问题需手动处理。",
+    "reported": "上次上报",
+    "installing": "正在安装缺失软件包，完成后节点会自动复检并上报…",
+    "checking": "等待节点复检并上报…",
+    "jobFailed": "任务失败或已过期，请检查节点和系统包管理器后重试。",
+    "installed": "依赖安装完成。上方运行条件以节点最新上报为准。",
+    "checked": "复检完成。",
+    "recheck": "重新检查",
+    "install": "安装缺失依赖",
+    "confirm": "使用此节点的系统包管理器安装 {{packages}}？仅补装缺失工具，不会重跑 bosun 完整安装流程；当前连接表单会保留。",
+    "errors": {
+      "busy": "另一项依赖安装正在运行，请等待完成后重试。",
+      "unsupported": "此环境需要手动安装或修正服务 PATH。",
+      "timeout": "安装超时，请检查系统包管理器后重试。",
+      "install_failed": "包管理器执行失败，请检查软件源网络、包管理锁和磁盘空间。",
+      "tools_missing": "安装后仍有工具不可用，请检查服务 PATH 和已安装软件包。"
+    }
   }
 }

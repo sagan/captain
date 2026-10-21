@@ -83,5 +83,16 @@ func (h *handlers) checkPrivateAccess(ctx context.Context, id int64, proposed *d
 	if err = n.ValidatePrivateAccessNode(); err != nil {
 		return err.Error()
 	}
+	if err = h.checkPrivateRouting(ctx, id, n); err != nil {
+		return err.Error()
+	}
 	return ""
+}
+
+func (h *handlers) checkPrivateRouting(ctx context.Context, id int64, policy *spec.Node) error {
+	n, err := h.Store.NodeByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	return policy.ValidatePrivateAccessRouting(h.nodeCoreCandidates(ctx, n))
 }

@@ -78,7 +78,7 @@
     "fixedHint": "Fixed public entries do not follow detected changes. For NAT / private lines, enter the provider entry and configure port mappings separately.",
     "internalHint": "Optional. Identifies private-network relays to avoid counting each relay as a device. Does not establish connectivity or affect bosun pairing.",
     "title": "Machine public addresses and entry",
-    "hint": "Bosun probes public IPv4 / IPv6 every 5 minutes. These are outbound public addresses; a NAT exit may differ from the subscriber entry.",
+    "hint": "bosun probes public IPv4 / IPv6 every 30 seconds for the first 3 minutes after startup, then every 5 minutes. These are outbound public addresses; NAT egress may differ from the client entry address.",
     "waiting": "Waiting for a fresh address report from an updated bosun. Old values are for reference only.",
     "detected": "Detected",
     "unknown": "Unconfirmed",
@@ -87,7 +87,9 @@
     "entry": "Current public entry address",
     "follow": "Automatically follow observed address",
     "behavior": "Existing entries stay fixed by default. Following requires two consecutive confirmed probes before updating this address and eligible automatic DNS. Failed probes retain old values. Manually editing a node address disables following for that family. Explicit NAT/line entries, subscription addresses and WG endpoints stay unchanged.",
-    "dnsPending": "Address updated; DNS sync is pending or retrying. See DNS health and change history."
+    "dnsPending": "Address updated; DNS sync is pending or retrying. See DNS health and change history.",
+    "confirming": "Address detected; waiting for another independent sample to confirm it.",
+    "applying": "Address confirmed; waiting to update the entry address and synchronize DNS."
   },
   "app": {
     "logout": "Log out"
@@ -2229,7 +2231,7 @@
     "dual": "Dual protection (default)",
     "coreOnly": "Core policy only",
     "enforcementHint": "Core-only requires explicitly disabled cores.egress_guard and a current capability report.",
-    "coreOnlyHint": "Only sing-box / Extended with direct exits. No nft destination isolation; non-root and control API protection remain required. Xray, managed reverse tunnels and proxy chains are unsupported. Changing policy interrupts connections.",
+    "coreOnlyHint": "Supports sing-box / Extended. Upgraded nodes preserve existing split routing, including WARP and proxy exits. No nft destination isolation; non-root and control API protection remain required. Xray and managed reverse tunnels are unsupported. Changing policy interrupts connections.",
     "actualMode": "Effective protection",
     "runtimeUnknown": "Runtime unknown",
     "confirmCoreOnly": "I understand nft destination isolation is disabled and authorize this inbound to use core-only protection."
@@ -2320,7 +2322,8 @@
     "actions": {
       "created": "Create",
       "updated": "Update"
-    }
+    },
+    "propagationPending": "DNS records written; waiting for resolution to reflect the change. Recent writes are checked more frequently; caches may still return old answers."
   },
   "nodeMode": {
     "title": "Node mode",
@@ -2630,5 +2633,39 @@
       "guardDisabled": "Set cores.egress_guard: false only if you intend to manage destination protection yourself, then restart bosun. Control API protection remains enabled."
     },
     "kernelPending": "Kernel nftables access has not been tested. Use Recheck to verify it."
+  },
+  "wgSetup": {
+    "title": "Reverse WireGuard prerequisites",
+    "ready": "Ready",
+    "notReady": "Needs attention",
+    "paired": "Paired",
+    "full": "Full node mode",
+    "fresh": "Recent capability report",
+    "root": "bosun runs as root",
+    "shaper": "Traffic shaping available",
+    "runtime": "Reverse WG runtime ready",
+    "xray": "A: Xray reverse WG capability",
+    "path": "Service executable PATH",
+    "loadError": "Could not load prerequisites. Refresh before saving.",
+    "loading": "Checking prerequisites…",
+    "upgrade": "Upgrade bosun to see detailed prerequisites and install missing tools from this page.",
+    "packages": "Missing packages",
+    "manual": "These remaining conditions need manual configuration. Automatic installation supports native root Debian/Ubuntu, Alpine and supported dnf systems; containers and service PATH issues require manual handling.",
+    "reported": "Last report",
+    "installing": "Installing missing packages; the node will recheck and report when finished…",
+    "checking": "Waiting for the node to recheck and report…",
+    "jobFailed": "The task failed or expired. Recheck the node and its system package manager before retrying.",
+    "installed": "Dependency installation finished. Readiness above is based on the latest node report.",
+    "checked": "Recheck finished.",
+    "recheck": "Recheck",
+    "install": "Install missing dependencies",
+    "confirm": "Install {{packages}} on this node using its system package manager? This installs only the missing tool packages, not the full bosun installation. Your connection form will be preserved.",
+    "errors": {
+      "busy": "Another dependency installation is running. Try again when it finishes.",
+      "unsupported": "This environment requires manual installation or service PATH correction.",
+      "timeout": "Installation timed out. Check the package manager before retrying.",
+      "install_failed": "The package manager failed. Check repository connectivity, package locks and disk space.",
+      "tools_missing": "Some tools are still unavailable after installation. Check the service PATH and installed packages."
+    }
   }
 }

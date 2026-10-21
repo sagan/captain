@@ -2,7 +2,7 @@ module github.com/zeptop-dev/captain
 
 go 1.26.0
 
-toolchain go1.26.9
+toolchain go1.26.10
 
 require (
 	filippo.io/age v1.3.2
@@ -13,7 +13,7 @@ require (
 	github.com/go-webauthn/webauthn v0.18.2
 	github.com/libdns/cloudflare v0.2.2
 	github.com/pressly/goose/v3 v3.29.0
-	github.com/zeptop-dev/bosun v0.74.0
+	github.com/zeptop-dev/bosun v0.75.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/net v0.61.0

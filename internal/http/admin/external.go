@@ -301,6 +301,10 @@ func (h *handlers) putNodeRouting(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err.Error())
 		return
 	}
+	if err := h.checkPrivateRouting(r.Context(), idOf(r), policyNode); err != nil {
+		fail(w, 400, err.Error())
+		return
+	}
 	if err := h.Store.SetNodeRouting(r.Context(), idOf(r), &nr); err != nil {
 		serverErr(w, err)
 		return
@@ -364,6 +368,10 @@ func (h *handlers) putNodeOverrides(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := policyNode.ValidatePrivateAccessNode(); err != nil {
+		fail(w, 400, err.Error())
+		return
+	}
+	if err := h.checkPrivateRouting(r.Context(), idOf(r), policyNode); err != nil {
 		fail(w, 400, err.Error())
 		return
 	}

@@ -139,7 +139,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger, opts ...Options)
 	s.nodeRegions = &service.NodeRegions{Store: st, Probe: s.probeSvc}
 	s.dnsHealth = &service.DNSHealth{Store: st, Probe: s.probeSvc, Log: log}
 	s.state = &service.AgentState{Store: st, PullSeconds: cfg.Agent.PullSeconds, PushSeconds: cfg.Agent.PushSeconds, EnforceDevices: cfg.EnforceDevices(), Probe: s.probeSvc}
-	s.nodeAddresses = &service.NodeAddresses{Store: st, DNS: &service.DNS{Store: st, Log: log, Base: dnsBase}, State: s.state, Log: log}
+	s.nodeAddresses = &service.NodeAddresses{Health: s.dnsHealth, Store: st, DNS: &service.DNS{Store: st, Log: log, Base: dnsBase}, State: s.state, Log: log}
 
 	resolve := func(r *http.Request) *domain.User {
 		c, err := r.Cookie("captain_session")
@@ -224,7 +224,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger, opts ...Options)
 	portal.Register(s.mux, portal.Deps{Store: st, Log: log, Sessions: sessions, Orders: orders, Subscription: subSvc, BaseURL: base, Gateways: names, Registration: cfg.Portal.Registration, Logins: logins, Secure: secure, SubLinks: s.subLinks, Mail: mailer, SiteName: cfg.SiteName, Notify: notifier, Bot: s.bot})
 	paymenthttp.Register(s.mux, paymenthttp.Deps{Log: log, Orders: orders, ReturnTo: base + "/portal/orders", Gateways: gateways, Store: st})
 	sub.Register(s.mux, sub.Deps{Store: st, Log: log, Service: subSvc, Name: cfg.SiteName})
-	agent.Register(s.mux, agent.Deps{Pairs: ratelimit.New(),
+	agent.Register(s.mux, agent.Deps{Addresses: s.nodeAddresses, Pairs: ratelimit.New(),
 		Store: st, Log: log, BaseURL: base,
 		State: s.state, Probe: s.probeSvc, Hooks: s.hooks, Notify: notifier,
 		Dyn: dyn,

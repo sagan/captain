@@ -131,13 +131,71 @@ func (d *DNSHealth) Snapshot(ctx context.Context, id int64) (*store.DNSHealth, e
 		return nil, err
 	}
 	if h == nil || h.Fingerprint != fingerprint {
-		return &store.DNSHealth{NodeID: id, Node: n.Name, Targets: targets, Stale: true}, nil
+		h = &store.DNSHealth{NodeID: id, Node: n.Name, Targets: targets, Stale: true}
 	}
 	h.Node = n.Name
 	age := d.now().Sub(time.Unix(h.CheckedAt, 0))
-	h.Stale = age < 0 || age > 3*dnsInterval
+	h.Stale = h.Stale || age < 0 || age > 3*dnsInterval
+	d.markPropagation(ctx, h)
 	return h, nil
 }
+
+// Only successful writes to the CURRENT expected addresses may be presented as
+// propagation. Never infer success from a cleared pending flag or a skipped write.
+func (d *DNSHealth) markPropagation(ctx context.Context, h *store.DNSHealth) {
+	needsHistory := false
+	for _, target := range h.Targets {
+		if target.Mode == "direct" && len(target.Expected) > 0 && (h.Stale || target.Status != "ok") {
+			needsHistory = true
+			break
+		}
+	}
+	if !needsHistory {
+		return
+	}
+	changes, err := d.Store.DNSChanges(ctx, h.NodeID, 0)
+	if err != nil {
+		return
+	}
+	latest := map[string]store.DNSChange{}
+	for _, c := range changes {
+		key := c.Name + "/" + c.Wanted.Type
+		if _, exists := latest[key]; !exists {
+			latest[key] = c
+		}
+	}
+	for i := range h.Targets {
+		t := &h.Targets[i]
+		t.PropagationPending = false
+		if t.Mode != "direct" || len(t.Expected) == 0 || (!h.Stale && t.Status == "ok") {
+			continue
+		}
+		pending := true
+		for _, expected := range t.Expected {
+			ip := net.ParseIP(expected)
+			kind := "AAAA"
+			if ip.To4() != nil {
+				kind = "A"
+			}
+			c, exists := latest[t.Host+"/"+kind]
+			age := d.now().Sub(time.Unix(c.FinishedAt, 0))
+			if !exists || c.Outcome != "success" || c.After == nil || c.After.Proxied || ip == nil || !ip.Equal(net.ParseIP(c.After.Content)) || age < 0 || age > 10*time.Minute {
+				pending = false
+				break
+			}
+		}
+		t.PropagationPending = pending
+	}
+}
+func dnsCheckInterval(h *store.DNSHealth) time.Duration {
+	for _, target := range h.Targets {
+		if target.PropagationPending {
+			return 30 * time.Second
+		}
+	}
+	return dnsInterval
+}
+
 func (d *DNSHealth) Snapshots(ctx context.Context) ([]store.DNSHealth, error) {
 	nodes, err := d.Store.ListNodes(ctx)
 	if err != nil {
@@ -386,7 +444,7 @@ func (d *DNSHealth) Run(ctx context.Context) {
 					for id := range jobs {
 						d.Store.Accounts.RLock()
 						h, e := d.Snapshot(ctx, id)
-						if e == nil && (h.Stale || h.CheckedAt == 0 || d.now().Sub(time.Unix(h.CheckedAt, 0)) >= dnsInterval) {
+						if e == nil && (h.Stale || h.CheckedAt == 0 || d.now().Sub(time.Unix(h.CheckedAt, 0)) >= dnsCheckInterval(h)) {
 							_, e = d.Check(ctx, id)
 						}
 						d.Store.Accounts.RUnlock()
@@ -412,6 +470,6 @@ func (d *DNSHealth) Run(ctx context.Context) {
 			d.Log.Warn("DNS history retention", "err", e)
 		}
 		d.Store.Accounts.RUnlock()
-		timer.Reset(time.Minute)
+		timer.Reset(30 * time.Second)
 	}
 }

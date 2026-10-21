@@ -134,6 +134,7 @@ features it has never heard of, which the node page shows as an orange
 
 | Captain | needs bosun | for |
 |---|---|---|
+| 1.28.0 | ≥ 0.75.0 for core-only split routing, WG prerequisites and managed forwarding | Additive capabilities; migration 78 preserves legacy WG options. Existing agents remain usable for previous features; new combinations require fresh support. |
 | 1.27.0 | ≥ 0.74.0 for automatic private access and prerequisite checks | Scoped policy features are independent of nft runtime status; core-only authorization needs administrator acknowledgement and supported direct sing-box/Extended. Existing policies/older agents retain prior behavior. No migration. |
 | 1.26.0 | ≥ 0.73.0 for live hostname updates | Older agents retain their last paired hostname. Node cost and reset settings need no agent update. |
 | 1.24.0 | ≥ 0.72.0 for detailed firewall status | Automatic listener ownership, references and synchronization diagnostics. Older host-management snapshots remain supported. No migration. |
@@ -360,7 +361,7 @@ Captain v1.20.0 similarly retains a v1.20.0 built-in rollback floor: older panel
 would discard the WG fields while rebuilding desired node state. Higher
 administrator-configured floors remain in effect on both applications.
 
-### Managed WG forwarding and address preference (unreleased, migration 78)
+### Managed WG forwarding and address preference (Captain 1.28 / bosun 0.75, migration 78)
 
 Migration 78 adds `node_wireguard_links.domain_preference` with an empty default
 and `auto_forwarding` with a false default. Existing connections retain their
@@ -391,11 +392,15 @@ family of AAAA-only answers. It supplies neither IPv6 connectivity nor a retry
 of another family after connection failure. Forwarding checks have their own
 timestamp: a new heartbeat does not make an old successful check current. Saved
 configuration, applied rules and a recent WG handshake do not prove subscriber
-connectivity. No release version is assigned to these additions yet.
+connectivity. Available in Captain v1.28.0 / bosun v0.75.0.
 
-For development, this branch reserves built-in update/rollback floors of
-Captain `v1.28.0` and bosun `v0.75.0`, so an older binary cannot ignore the new
-saved options or ownership journal. These are provisional next-release numbers,
-not published versions. If release numbering changes, update both floors and
-their regression expectations before publishing; higher configured floors still
-apply. Manual binary replacement is outside that protection.
+Built-in update/rollback floors are Captain `v1.28.0` and bosun `v0.75.0`, so
+older binaries cannot ignore the new saved options or ownership journal. Higher
+configured floors still apply. Manual binary replacement is outside that protection.
+
+The additive `private_access_policy.split_routing` capability gates core-only
+private authorization with WARP, proxy exits and balancers at save and delivery.
+Old agents keep existing direct-only behavior; missing or stale capability cannot
+silently enable a combination they cannot enforce. Dual protection stays direct-only.
+WireGuard prerequisite reports and typed jobs are additive and administrator-only;
+unsupported or older agents cannot execute installation jobs.

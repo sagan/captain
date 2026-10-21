@@ -195,5 +195,13 @@ func (s *Store) PrivateAccessCapable(ctx context.Context, nodeID int64, ib spec.
 		return false
 	}
 	_, err = spec.SelectCore(ib, candidates)
-	return err == nil
+	if err != nil {
+		return false
+	}
+	routing, err := s.NodeRouting(ctx, nodeID)
+	if err != nil {
+		return false
+	}
+	policy := &spec.Node{Inbounds: []spec.Inbound{ib}, Outbounds: routing.Outbounds, Routes: routing.Routes}
+	return policy.ValidatePrivateAccessRouting(candidates) == nil
 }

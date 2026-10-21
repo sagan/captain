@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/zeptop-dev/captain/internal/db"
+	"github.com/zeptop-dev/captain/internal/dns"
 	"github.com/zeptop-dev/captain/internal/domain"
 	"github.com/zeptop-dev/captain/internal/notify"
 	"github.com/zeptop-dev/captain/internal/store"
@@ -316,4 +317,58 @@ func TestDNSHealthBackwardClockStartsNewObservation(t *testing.T) {
 	if err != nil || h.CheckedAt != at.Unix() || h.FailureSince != at.Unix() || h.FailureCount != 1 {
 		t.Fatalf("reused future baseline %+v %v", h, err)
 	}
+}
+
+func TestDNSPropagationRequiresCurrentSuccessfulWrite(t *testing.T) {
+	ctx := context.Background()
+	st, n := dnsTestStore(t)
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	at := time.Now()
+	answers := []string{"198.51.100.20"}
+	health := &DNSHealth{Store: st, Now: func() time.Time { return at }, Lookup: func(context.Context, string, string) ([]string, error) { return answers, nil }}
+	write := func(outcome, ip string) {
+		rec := dns.Record{ID: "record", Type: "A", Name: n.Domain, Content: ip, TTL: 600}
+		change := store.DNSChange{NodeID: &n.ID, Name: n.Domain, Source: "node_address", Wanted: rec}
+		must(st.BeginDNSChange(ctx, &change))
+		must(st.FinishDNSChange(ctx, change.ID, outcome, &rec))
+	}
+	check := func(want bool) {
+		t.Helper()
+		h, err := health.Snapshot(ctx, n.ID)
+		must(err)
+		if len(h.Targets) != 1 || h.Targets[0].PropagationPending != want {
+			t.Fatalf("propagation=%v want %v", h.Targets, want)
+		}
+		if (dnsCheckInterval(h) == 30*time.Second) != want {
+			t.Fatal("unexpected recheck interval")
+		}
+	}
+	_, err := health.Check(ctx, n.ID)
+	must(err)
+	check(false) // no history is not success
+	write("success", n.PublicAddr)
+	check(true)
+	write("failed", n.PublicAddr)
+	check(false) // do not resurrect older success
+	write("success", "203.0.113.30")
+	check(false) // old configuration must not leak
+	write("success", n.PublicAddr)
+	check(true)
+	at = at.Add(time.Minute)
+	answers = []string{n.PublicAddr}
+	_, err = health.Check(ctx, n.ID)
+	must(err)
+	check(false) // stop accelerated checks once both resolvers agree
+	at = at.Add(time.Minute)
+	answers = []string{"198.51.100.20"}
+	_, err = health.Check(ctx, n.ID)
+	must(err)
+	check(true)
+	at = at.Add(10 * time.Minute)
+	check(false) // never mask a persistent failure
 }

@@ -32,6 +32,8 @@ type wireGuardInput struct {
 }
 
 func (h *handlers) registerWireGuard(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/admin/settings/nodes/{id}/wireguard-readiness", h.requireAdmin(h.wireGuardReadiness))
+	mux.HandleFunc("POST /api/admin/settings/nodes/{id}/wireguard-setup", h.requireAdmin(h.wireGuardSetup))
 	const path = "/api/admin/settings/nodes/{id}/wireguard-connections"
 	mux.HandleFunc("GET "+path, h.requireAdmin(h.listWireGuard))
 	mux.HandleFunc("POST "+path, h.requireAdmin(h.saveWireGuard))
@@ -187,16 +189,35 @@ func (h *handlers) saveWireGuard(w http.ResponseWriter, r *http.Request) {
 	if in.AutoForwarding != nil {
 		write.Link.AutoForwarding = *in.AutoForwarding
 	}
+	if in.Enabled {
+		for _, side := range []struct {
+			id      int64
+			transit bool
+			label   string
+		}{{in.TransitID, true, "A"}, {exitID, false, "B"}} {
+			state, err := h.Store.WireGuardReadiness(r.Context(), side.id, side.transit)
+			if err != nil {
+				serverErr(w, err)
+				return
+			}
+			if !state.Ready {
+				missing := []string{}
+				for _, c := range state.Checks {
+					if !c.OK {
+						missing = append(missing, c.ID)
+					}
+				}
+				fail(w, 409, "reverse WireGuard node "+side.label+" ("+state.Name+") prerequisites not met: "+strings.Join(missing, ", "))
+				return
+			}
+		}
+	}
 	if in.Enabled && write.Link.AutoForwarding && !h.Store.WireGuardForwardingCapable(r.Context(), exitID) {
 		fail(w, 409, "exit needs a fresh automatic WireGuard forwarding capability report; update bosun on B")
 		return
 	}
 	if in.Enabled && write.Link.DomainPreference != "" && !h.Store.WireGuardDomainPreferenceCapable(r.Context(), in.TransitID) {
 		fail(w, 409, "transit needs a fresh WireGuard domain-preference capability report; update bosun on A")
-		return
-	}
-	if in.Enabled && (!h.Store.WireGuardCapable(r.Context(), in.TransitID, true) || !h.Store.WireGuardCapable(r.Context(), exitID, false)) {
-		fail(w, 409, "both nodes need fresh reverse WireGuard capability reports")
 		return
 	}
 	for _, nid := range []int64{exitID, in.TransitID} {

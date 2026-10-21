@@ -206,6 +206,22 @@ func (s *Store) SetWireGuardReport(ctx context.Context, id int64, tokenHash stri
 	if rep != nil && len(rep.Links) > 64 {
 		return fmt.Errorf("too many WireGuard statuses")
 	}
+	if rep != nil && rep.Setup != nil {
+		setup := rep.Setup
+		if len(setup.Checks) > 32 || len(setup.Packages) > 16 || len(setup.Manager) > 32 {
+			return fmt.Errorf("invalid WireGuard setup report")
+		}
+		for _, check := range setup.Checks {
+			if len(check.ID) > 64 {
+				return fmt.Errorf("invalid WireGuard check")
+			}
+		}
+		for _, pkg := range setup.Packages {
+			if len(pkg) > 64 {
+				return fmt.Errorf("invalid WireGuard package")
+			}
+		}
+	}
 	raw, err := json.Marshal(rep)
 	if err != nil {
 		return err

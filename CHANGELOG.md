@@ -6,8 +6,12 @@ Merge commits and formatting-only commits are left out. Binaries and
 `SHA256SUMS` for every tag are on the GitHub Release; the in-app updater
 installs them (Settings → Backups and maintenance → Version and updates).
 
-- **Unreleased** — Add per-connection managed WG forwarding and domain address preference (migration 78). New UI connections select IPv4 preference and automatic forwarding; existing links retain empty/IPv6-first routing and manual firewall management. Preserve omitted/null update fields, accept explicit resets, and require fresh A/B capabilities at save and delivery; withhold both transports and the entire subscriber inbound when support disappears.
+- **v1.28.0** (2026-10-20) — Add per-connection managed WG forwarding and domain address preference (migration 78). New UI connections select IPv4 preference and automatic forwarding; existing links retain empty/IPv6-first routing and manual firewall management. Preserve omitted/null update fields, accept explicit resets, and require fresh A/B capabilities at save and delivery; withhold both transports and the entire subscriber inbound when support disappears.
   - Show B's forwarding check separately from the handshake, reject stale checks, and surface automatic setup failures. Support UFW with unambiguous main-table routes; firewalld, multiple backends, custom policy routing and disabled global auto-open require explicit resolution. Domain preference does not translate literals, provide IPv6 connectivity or retry another family after failure.
+  - Gate core-only private grants with split routing on fresh bosun capabilities; preserve existing WARP, proxy and balancer decisions instead of adding direct routes.
+  - Show both WireGuard endpoints’ prerequisites and offer explicit fixed-package installation jobs with expiry, deduplication and administrator checks.
+  - Accelerate initial automatic addresses and DNS updates through bounded report notifications, shorter initial confirmation and propagation-aware health rechecks. Existing-IP changes retain the longer confirmation window.
+  - Build with Go 1.26.10 and require bosun v0.75.0 for the new capabilities.
 
 - **v1.27.0** (2026-10-20) — Fix private-access configuration being conflated with the node egress-guard switch (#25). Show independent runtime prerequisites and read-only rechecks; automatically derive protection mode, requiring explicit administrator acknowledgement for supported core-only authorization. Retain scoped address/protocol/port grants and legacy policies, reject stale/old capabilities at save and delivery, and clear acknowledgement when authorization is revoked. Requires bosun v0.74.0 for the new capabilities; no database migration.
 

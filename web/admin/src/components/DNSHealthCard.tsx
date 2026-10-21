@@ -9,7 +9,7 @@ import { toast } from '../lib/notify'
 
 interface DNSRecord { id?: string; type: string; name: string; content: string; ttl: number; proxied: boolean }
 interface DNSChange { id: number; node_id: number | null; source: string; actor: string; zone: string; name: string; action: string; before: DNSRecord | null; wanted: DNSRecord; after: DNSRecord | null; outcome: string; created_at: number; finished_at: number }
-interface DNSTarget { key: string; host: string; label: string; mode: string; expected: string[]; status: string; answers: { source: string; addresses: string[]; error?: string }[] }
+interface DNSTarget { propagation_pending?: boolean; key: string; host: string; label: string; mode: string; expected: string[]; status: string; answers: { source: string; addresses: string[]; error?: string }[] }
 interface DNSHealth { node_id: number; node: string; checked_at: number; stale: boolean; targets: DNSTarget[]; failure_count: number }
 const date = (at: number) => at ? new Date(at * 1000).toLocaleString() : '—'
 const failure = (status: string) => ['mismatch', 'missing', 'conflict', 'invalid'].includes(status)
@@ -26,6 +26,7 @@ function DNSResult({ health }: { health: DNSHealth }) {
     {health.targets.map(target => <Card key={target.key} withBorder padding="sm">
       <Stack gap="xs">
         <Group justify="space-between" align="flex-start"><div style={{ minWidth: 0 }}><Text fw={600} style={{ overflowWrap: 'anywhere' }}>{target.host}</Text><Text size="xs" c="dimmed">{target.label} · {t(`dnsHealth.modes.${target.mode}`)}</Text></div><Badge color={health.stale ? 'gray' : failure(target.status) ? 'red' : target.status === 'ok' ? 'teal' : 'orange'}>{t(`dnsHealth.statuses.${health.stale ? 'unknown' : target.status}`)}</Badge></Group>
+        {target.propagation_pending && <Text size="sm" c="orange">{t('dnsHealth.propagationPending')}</Text>}
         <Text size="sm" style={{ overflowWrap: 'anywhere' }}>{t('dnsHealth.expected')}: {addressList(target.expected) || t('dnsHealth.resolveOnly')}</Text>
         <SimpleGrid cols={{ base: 1, sm: 2 }}>{target.answers.map(answer => <div key={answer.source}><Text size="xs" c="dimmed">{t(`dnsHealth.sources.${answer.source}`)}</Text><Text size="sm" style={{ overflowWrap: 'anywhere' }}>{answer.error ? t(`dnsHealth.errors.${answer.error}`) : addressList(answer.addresses) || '—'}</Text></div>)}</SimpleGrid>
         {target.status === 'inconsistent' && <Text size="xs" c="orange">{t('dnsHealth.inconsistentHint')}</Text>}

@@ -33,6 +33,9 @@ func (s *Store) CreateNodeJob(ctx context.Context, id string, nodeID int64, kind
 
 // PendingNodeJobs lists jobs the node has not answered yet.
 func (s *Store) PendingNodeJobs(ctx context.Context, nodeID int64) ([]NodeJob, error) {
+	if err := s.expireWireGuardSetup(ctx, nodeID); err != nil {
+		return nil, err
+	}
 	if err := s.expireHostOperations(ctx, nodeID); err != nil {
 		return nil, err
 	}

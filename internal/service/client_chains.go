@@ -138,7 +138,7 @@ func ClientLines(lines []PublishedLine, format string, templates ...string) ([]s
 		}
 		if format != "singbox" {
 			switch strings.ToUpper(l.Name) {
-			case "DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE", "GLOBAL":
+			case "DIRECT", "REJECT", "REJECT-DROP", "PASS", "PASS-RULE", "COMPATIBLE", "GLOBAL":
 				return false
 			}
 		}

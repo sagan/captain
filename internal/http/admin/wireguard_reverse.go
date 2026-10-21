@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zeptop-dev/bosun/pkg/agentproto"
 	"github.com/zeptop-dev/bosun/pkg/spec"
 	"github.com/zeptop-dev/captain/internal/auth"
 	"github.com/zeptop-dev/captain/internal/domain"
@@ -15,17 +16,19 @@ import (
 )
 
 type wireGuardInput struct {
-	Version       int64               `json:"version"`
-	TransitID     int64               `json:"transit_id"`
-	Name          string              `json:"name"`
-	Port          int                 `json:"port"`
-	TunnelPort    int                 `json:"tunnel_port"`
-	Endpoint      string              `json:"endpoint"`
-	MTU           int                 `json:"mtu"`
-	ServerName    string              `json:"server_name"`
-	GroupID       *int64              `json:"group_id"`
-	PrivateAccess *spec.PrivateAccess `json:"private_access"`
-	Enabled       bool                `json:"enabled"`
+	Version          int64               `json:"version"`
+	TransitID        int64               `json:"transit_id"`
+	Name             string              `json:"name"`
+	Port             int                 `json:"port"`
+	TunnelPort       int                 `json:"tunnel_port"`
+	Endpoint         string              `json:"endpoint"`
+	MTU              int                 `json:"mtu"`
+	ServerName       string              `json:"server_name"`
+	GroupID          *int64              `json:"group_id"`
+	PrivateAccess    *spec.PrivateAccess `json:"private_access"`
+	Enabled          bool                `json:"enabled"`
+	DomainPreference *string             `json:"domain_preference,omitempty"`
+	AutoForwarding   *bool               `json:"auto_forwarding,omitempty"`
 }
 
 func (h *handlers) registerWireGuard(mux *http.ServeMux) {
@@ -53,15 +56,18 @@ func (h *handlers) listWireGuard(w http.ResponseWriter, r *http.Request) {
 			serverErr(w, err)
 			return
 		}
-		in := wireGuardInput{Version: link.Version, TransitID: link.TransitID, Name: entry.Name, Port: ib.Port, TunnelPort: link.ListenPort, Endpoint: link.Endpoint, MTU: link.MTU, GroupID: ib.GroupID, PrivateAccess: ib.Settings.PrivateAccess, Enabled: ib.Enabled}
+		in := wireGuardInput{Version: link.Version, TransitID: link.TransitID, Name: entry.Name, Port: ib.Port, TunnelPort: link.ListenPort, Endpoint: link.Endpoint, MTU: link.MTU, GroupID: ib.GroupID, PrivateAccess: ib.Settings.PrivateAccess, Enabled: ib.Enabled, DomainPreference: &link.DomainPreference, AutoForwarding: &link.AutoForwarding}
 		if ib.Settings.TLS != nil {
 			in.ServerName = ib.Settings.TLS.ServerName
 		}
 		state := "pending"
+		forwarding := h.wireGuardForwarding(r, link)
 		if !ib.Enabled {
 			state = "disabled"
-		} else if !h.Store.WireGuardCapable(r.Context(), link.TransitID, true) || !h.Store.WireGuardCapable(r.Context(), link.ExitID, false) {
+		} else if !h.Store.WireGuardCapable(r.Context(), link.TransitID, true) || !h.Store.WireGuardCapable(r.Context(), link.ExitID, false) || (link.DomainPreference != "" && !h.Store.WireGuardDomainPreferenceCapable(r.Context(), link.TransitID)) || (link.AutoForwarding && !h.Store.WireGuardForwardingCapable(r.Context(), link.ExitID)) {
 			state = "unavailable"
+		} else if forwarding != nil && (forwarding.State == "error" || forwarding.State == "unsupported") {
+			state = "blocked"
 		} else {
 			rep, at, err := h.Store.WireGuardReport(r.Context(), link.TransitID)
 			node, nerr := h.Store.NodeByID(r.Context(), link.TransitID)
@@ -71,7 +77,7 @@ func (h *handlers) listWireGuard(w http.ResponseWriter, r *http.Request) {
 					for _, status := range rep.Links {
 						if status.Slot == link.Slot {
 							state = "disconnected"
-							if status.Connected && status.Error == "" && h.wireGuardPeerApplied(r, link.ExitID) {
+							if status.Connected && status.Error == "" && h.wireGuardPeerApplied(r, link.ExitID, link.AutoForwarding) {
 								state = "connected"
 							}
 						}
@@ -81,12 +87,13 @@ func (h *handlers) listWireGuard(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, struct {
 			wireGuardInput
-			ID            string `json:"id"`
-			ExitID        int64  `json:"exit_id"`
-			Slot          int    `json:"slot"`
-			UserInboundID int64  `json:"user_inbound_id"`
-			State         string `json:"state"`
-		}{in, link.ID, link.ExitID, link.Slot, ib.ID, state})
+			ID            string                                `json:"id"`
+			ExitID        int64                                 `json:"exit_id"`
+			Slot          int                                   `json:"slot"`
+			UserInboundID int64                                 `json:"user_inbound_id"`
+			State         string                                `json:"state"`
+			Forwarding    *agentproto.WireGuardForwardingStatus `json:"forwarding,omitempty"`
+		}{in, link.ID, link.ExitID, link.Slot, ib.ID, state, forwarding})
 	}
 	ok(w, out)
 }
@@ -167,6 +174,26 @@ func (h *handlers) saveWireGuard(w http.ResponseWriter, r *http.Request) {
 		}
 		write.Link = store.WireGuardLink{ID: auth.UUID(), ExitID: exitID, TransitID: in.TransitID}
 		write.User = domain.Inbound{Tag: "wg-user-" + write.Link.ID, Protocol: spec.VLESS, Settings: spec.Inbound{Flow: "xtls-rprx-vision", TLS: &spec.TLS{Mode: spec.TLSReality, Reality: &spec.Reality{HandshakePort: 443}}}}
+	}
+	if in.DomainPreference != nil {
+		switch *in.DomainPreference {
+		case "", "ipv4", "ipv6":
+			write.Link.DomainPreference = *in.DomainPreference
+		default:
+			fail(w, 400, "invalid WireGuard domain preference")
+			return
+		}
+	}
+	if in.AutoForwarding != nil {
+		write.Link.AutoForwarding = *in.AutoForwarding
+	}
+	if in.Enabled && write.Link.AutoForwarding && !h.Store.WireGuardForwardingCapable(r.Context(), exitID) {
+		fail(w, 409, "exit needs a fresh automatic WireGuard forwarding capability report; update bosun on B")
+		return
+	}
+	if in.Enabled && write.Link.DomainPreference != "" && !h.Store.WireGuardDomainPreferenceCapable(r.Context(), in.TransitID) {
+		fail(w, 409, "transit needs a fresh WireGuard domain-preference capability report; update bosun on A")
+		return
 	}
 	if in.Enabled && (!h.Store.WireGuardCapable(r.Context(), in.TransitID, true) || !h.Store.WireGuardCapable(r.Context(), exitID, false)) {
 		fail(w, 409, "both nodes need fresh reverse WireGuard capability reports")
@@ -306,10 +333,16 @@ func (h *handlers) deleteWireGuard(w http.ResponseWriter, r *http.Request) {
 }
 
 // A recent handshake alone may belong to the previous private-access policy.
-func (h *handlers) wireGuardPeerApplied(r *http.Request, id int64) bool {
+func (h *handlers) wireGuardPeerApplied(r *http.Request, id int64, automatic bool) bool {
 	rep, at, err := h.Store.WireGuardReport(r.Context(), id)
 	if err != nil || rep == nil || !rep.Applied || time.Since(at) < 0 || time.Since(at) > 3*time.Minute {
 		return false
+	}
+	if automatic {
+		forwarding := h.wireGuardForwarding(r, store.WireGuardLink{ExitID: id, AutoForwarding: true})
+		if forwarding == nil || (forwarding.State != "synced" && forwarding.State != "external" && forwarding.State != "not_required") {
+			return false
+		}
 	}
 	n, err := h.Store.NodeByID(r.Context(), id)
 	if err != nil {
@@ -317,4 +350,31 @@ func (h *handlers) wireGuardPeerApplied(r *http.Request, id int64) bool {
 	}
 	desired, err := h.State.Cached(r.Context(), n, time.Now())
 	return err == nil && n.AppliedRevision == desired.Revision
+}
+
+func (h *handlers) wireGuardForwarding(r *http.Request, link store.WireGuardLink) *agentproto.WireGuardForwardingStatus {
+	if !link.AutoForwarding {
+		return &agentproto.WireGuardForwardingStatus{State: "manual"}
+	}
+	rep, at, err := h.Store.WireGuardReport(r.Context(), link.ExitID)
+	if err != nil || rep == nil || rep.Forwarding == nil || time.Since(at) < 0 || time.Since(at) > 3*time.Minute {
+		return nil
+	}
+	status := *rep.Forwarding
+	age := time.Since(time.Unix(status.CheckedAt, 0))
+	if status.CheckedAt <= 0 || age < 0 || age > 3*time.Minute {
+		return nil
+	}
+	switch status.State {
+	case "synced", "external", "not_required", "manual", "unsupported", "error":
+	default:
+		return nil
+	}
+	if status.Backend != "ufw" && status.Backend != "firewalld" {
+		status.Backend = ""
+	}
+	if len(status.Reason) > 64 || strings.IndexFunc(status.Reason, func(r rune) bool { return (r < 'a' || r > 'z') && r != '_' }) >= 0 {
+		status.Reason = "forwarding_check_failed"
+	}
+	return &status
 }

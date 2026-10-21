@@ -26,6 +26,12 @@ func (a *AgentState) wireGuardState(ctx context.Context, nodeID int64) ([]spec.W
 		if !a.Store.WireGuardCapable(ctx, link.TransitID, true) || !a.Store.WireGuardCapable(ctx, link.ExitID, false) {
 			continue
 		}
+		if link.DomainPreference != "" && !a.Store.WireGuardDomainPreferenceCapable(ctx, link.TransitID) {
+			continue
+		}
+		if link.AutoForwarding && !a.Store.WireGuardForwardingCapable(ctx, link.ExitID) {
+			continue
+		}
 		config, err := link.Config(nodeID == link.ExitID, ib.Settings.PrivateAccess)
 		if err != nil {
 			return nil, nil, err

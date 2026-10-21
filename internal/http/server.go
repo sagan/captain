@@ -540,11 +540,11 @@ func limitBodies(next http.Handler) http.Handler {
 
 func (s *Server) DNSHealth() *service.DNSHealth { return s.dnsHealth }
 
-// Older panels discard the managed WireGuard routing fields when rebuilding
-// node state. Keep rollback above that boundary even when no link is active yet.
+// Older panels discard WG domain preferences and automatic forwarding policy
+// when rebuilding node state. Keep rollback above that compatibility boundary.
 func captainUpdateFloor(configured string) string {
-	if !selfupdate.ValidTag(configured) || selfupdate.Newer("v1.20.0", configured) {
-		return "v1.20.0"
+	if !selfupdate.ValidTag(configured) || selfupdate.Newer("v1.28.0", configured) {
+		return "v1.28.0"
 	}
 	return configured
 }

@@ -15,25 +15,27 @@ import (
 )
 
 type WireGuardLink struct {
-	Slot          int    `json:"slot"`
-	ID            string `json:"id"`
-	ExitID        int64  `json:"exit_id"`
-	TransitID     int64  `json:"transit_id"`
-	UserInboundID int64  `json:"user_inbound_id"`
-	EntryID       int64  `json:"entry_id"`
-	Version       int64  `json:"version"`
-	TransitKey    string `json:"-"`
-	ExitKey       string `json:"-"`
-	Endpoint      string `json:"endpoint"`
-	ListenPort    int    `json:"listen_port"`
-	MTU           int    `json:"mtu"`
+	Slot             int    `json:"slot"`
+	ID               string `json:"id"`
+	ExitID           int64  `json:"exit_id"`
+	TransitID        int64  `json:"transit_id"`
+	UserInboundID    int64  `json:"user_inbound_id"`
+	EntryID          int64  `json:"entry_id"`
+	Version          int64  `json:"version"`
+	TransitKey       string `json:"-"`
+	ExitKey          string `json:"-"`
+	Endpoint         string `json:"endpoint"`
+	ListenPort       int    `json:"listen_port"`
+	MTU              int    `json:"mtu"`
+	DomainPreference string `json:"domain_preference"`
+	AutoForwarding   bool   `json:"auto_forwarding"`
 }
 
-const wireGuardColumns = "slot,id,exit_id,transit_id,user_inbound_id,entry_id,version,transit_key,exit_key,endpoint,listen_port,mtu"
+const wireGuardColumns = "slot,id,exit_id,transit_id,user_inbound_id,entry_id,version,transit_key,exit_key,endpoint,listen_port,mtu,domain_preference,auto_forwarding"
 
 func scanWireGuard(row interface{ Scan(...any) error }) (WireGuardLink, error) {
 	var l WireGuardLink
-	err := row.Scan(&l.Slot, &l.ID, &l.ExitID, &l.TransitID, &l.UserInboundID, &l.EntryID, &l.Version, &l.TransitKey, &l.ExitKey, &l.Endpoint, &l.ListenPort, &l.MTU)
+	err := row.Scan(&l.Slot, &l.ID, &l.ExitID, &l.TransitID, &l.UserInboundID, &l.EntryID, &l.Version, &l.TransitKey, &l.ExitKey, &l.Endpoint, &l.ListenPort, &l.MTU, &l.DomainPreference, &l.AutoForwarding)
 	return l, wrapNotFound(err)
 }
 func (s *Store) WireGuardLinks(ctx context.Context, nodeID int64) ([]WireGuardLink, error) {
@@ -64,8 +66,10 @@ func (l WireGuardLink) Config(exit bool, grant *spec.PrivateAccess) (spec.WireGu
 	c := spec.WireGuardLink{Slot: l.Slot, Exit: exit, PrivateKey: key, PeerKey: peer, MTU: l.MTU, PrivateAccess: grant}
 	if exit {
 		c.Endpoint = l.Endpoint
+		c.AutoForwarding = l.AutoForwarding
 	} else {
 		c.ListenPort = l.ListenPort
+		c.DomainPreference = l.DomainPreference
 	}
 	return c, c.Validate()
 }
@@ -152,7 +156,7 @@ func (s *Store) SaveWireGuardLink(ctx context.Context, w *WireGuardWrite) error 
 		}
 	}
 	if l.Version == 0 {
-		result, err := tx.ExecContext(ctx, `INSERT INTO node_wireguard_links(id,exit_id,transit_id,user_inbound_id,entry_id,transit_key,exit_key,endpoint,listen_port,mtu) VALUES(?,?,?,?,?,?,?,?,?,?)`, l.ID, l.ExitID, l.TransitID, ib.ID, e.ID, l.TransitKey, l.ExitKey, l.Endpoint, l.ListenPort, l.MTU)
+		result, err := tx.ExecContext(ctx, `INSERT INTO node_wireguard_links(id,exit_id,transit_id,user_inbound_id,entry_id,transit_key,exit_key,endpoint,listen_port,mtu,domain_preference,auto_forwarding) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, l.ID, l.ExitID, l.TransitID, ib.ID, e.ID, l.TransitKey, l.ExitKey, l.Endpoint, l.ListenPort, l.MTU, l.DomainPreference, boolInt(l.AutoForwarding))
 		if err != nil {
 			return err
 		}
@@ -167,7 +171,7 @@ func (s *Store) SaveWireGuardLink(ctx context.Context, w *WireGuardWrite) error 
 			return err
 		}
 	} else {
-		_, err = tx.ExecContext(ctx, `UPDATE node_wireguard_links SET endpoint=?,listen_port=?,mtu=?,version=version+1 WHERE id=? AND version=?`, l.Endpoint, l.ListenPort, l.MTU, l.ID, l.Version)
+		_, err = tx.ExecContext(ctx, `UPDATE node_wireguard_links SET endpoint=?,listen_port=?,mtu=?,domain_preference=?,auto_forwarding=?,version=version+1 WHERE id=? AND version=?`, l.Endpoint, l.ListenPort, l.MTU, l.DomainPreference, boolInt(l.AutoForwarding), l.ID, l.Version)
 		if err != nil {
 			return err
 		}
@@ -231,6 +235,20 @@ func (s *Store) WireGuardReport(ctx context.Context, id int64) (*agentproto.Wire
 		return rep, time.Time{}, err
 	}
 	return rep, unix(stamp.Int64), err
+}
+
+// A nonempty preference must never be silently ignored by an older transit.
+// An absent field retains the routing used before preference support existed.
+func (s *Store) WireGuardDomainPreferenceCapable(ctx context.Context, id int64) bool {
+	rep, at, err := s.WireGuardReport(ctx, id)
+	age := time.Since(at)
+	return err == nil && rep != nil && rep.Available && rep.DomainPreferenceSupported && age >= 0 && age <= 3*time.Minute
+}
+
+func (s *Store) WireGuardForwardingCapable(ctx context.Context, id int64) bool {
+	rep, at, err := s.WireGuardReport(ctx, id)
+	age := time.Since(at)
+	return err == nil && rep != nil && rep.Available && rep.ForwardingSupported && age >= 0 && age <= 3*time.Minute
 }
 func (s *Store) WireGuardCapable(ctx context.Context, id int64, transit bool) bool {
 	n, err := s.NodeByID(ctx, id)

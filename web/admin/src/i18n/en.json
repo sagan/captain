@@ -2346,11 +2346,51 @@
     "selectTransitToScan": "Select transit node A first to auto-select a target or probe the current SNI.",
     "title": "Reverse WireGuard",
     "hint": "B actively connects to A. A authenticates and bills users; B provides public egress and explicitly authorized LAN access.",
-    "requirements": "Both nodes need Linux WireGuard support and a fresh capability report. The subscriber entry uses VLESS REALITY. Nodes requiring an ingress mapping cannot be used as A in this version.",
+    "requirements": "Both nodes need Linux WireGuard support and a fresh capability report. Users connect with VLESS REALITY. Automatic forwarding requires active UFW on B; other firewalls need manual setup. Nodes requiring an ingress mapping cannot be used as A.",
     "transit": "Transit node A",
     "endpoint": "Public UDP endpoint of A",
     "endpointHint": "Enter the IP and UDP port reachable from B. If NAT changes the port, enter the public mapped port here; the tunnel port above remains local.",
-    "unavailable": "Node unavailable or upgrade required"
+    "unavailable": "Node unavailable or upgrade required",
+    "domainPreference": "Preferred address family for domains",
+    "domainPreferenceHint": "For domains with IPv4 and IPv6 answers, prefer the family B can reach. This does not provide IPv6 connectivity or convert IPv6 addresses to IPv4. A must report support to save a new preference.",
+    "preferIPv4": "Prefer IPv4 (recommended for IPv4-only exits)",
+    "preferIPv6": "Prefer IPv6",
+    "legacyPreference": "Keep original behavior (prefer IPv6)",
+    "autoForwarding": "Automatically manage forwarding on B",
+    "autoForwardingHint": "Maintain forwarding rules for this connection on B. This also requires the node's global automatic firewall opening to be enabled. When off, manage forwarding manually. Existing manual rules are preserved.",
+    "blocked": "Forwarding not ready",
+    "forwardingTitle": "Firewall forwarding on B",
+    "forwardingStates": {
+      "synced": "Automatically allowed",
+      "external": "Existing rules detected",
+      "not_required": "No supported firewall active",
+      "manual": "Managed manually",
+      "unsupported": "Manual setup required",
+      "error": "Automatic setup failed",
+      "unknown": "Not reported",
+      "stale": "Check expired"
+    },
+    "forwardingHints": {
+      "synced": "B's forwarding rules were synchronized. Test client access to confirm the complete path works.",
+      "external": "Existing rules are preserved. Check that they permit forwarding for this connection.",
+      "not_required": "No active UFW or firewalld was detected. Other host rules may still block forwarding.",
+      "manual": "Automatic forwarding is off. Manage forwarding rules for this connection on B manually.",
+      "unsupported": "This firewall cannot be configured automatically. Switch to manual management and allow forwarding on B.",
+      "error": "Could not synchronize forwarding rules on B. Check the node error and firewall settings.",
+      "unknown": "No recent forwarding check is available. Upgrade B and wait for a fresh report.",
+      "stale": "This result is no longer current. Wait for B to check and report again."
+    },
+    "forwardingReasons": {
+      "policy_routing_unsupported": "B uses routing policies that need manual forwarding setup.",
+      "route_interface_ambiguous": "The outgoing interface on B is unclear. Check its routes before setting up forwarding.",
+      "private_grant_route_unavailable": "B has no usable route to an authorized private network.",
+      "no_forwarding_route": "B has no usable outgoing route. Check its network configuration.",
+      "ufw_forward_rule_conflict": "An existing UFW rule conflicts with automatic setup. It was preserved for manual review.",
+      "owned_rule_changed_retained": "An automatically managed rule was changed externally and preserved. Review the firewall rules.",
+      "inactive_backend_rules_retained": "Rules from a previous firewall configuration were retained. Review them manually.",
+      "automatic_forwarding_disabled": "Automatic firewall management is disabled on B. Enable it on the node or manage this connection's forwarding manually.",
+      "ufw_forward_runtime_verification_failed": "Saved UFW rules do not match the active rules. Check B's firewall before retrying."
+    }
   },
   "host": {
     "title": "Host management",

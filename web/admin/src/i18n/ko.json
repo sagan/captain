@@ -2346,11 +2346,51 @@
     "selectTransitToScan": "먼저 중계 노드 A를 선택한 후 자동 선택 또는 현재 SNI 검사를 실행하세요.",
     "title": "역방향 WireGuard",
     "hint": "B가 A에 연결합니다. A는 사용자 인증과 과금을 담당하고 B는 인터넷 출구 및 명시적으로 허용된 내부망 접근을 제공합니다.",
-    "requirements": "두 노드 모두 Linux WireGuard 지원과 최근 기능 보고가 필요합니다. 사용자 입구는 VLESS REALITY를 사용합니다. 이 버전에서는 입구 매핑 선택이 필수인 노드를 A로 사용할 수 없습니다.",
+    "requirements": "두 노드 모두 Linux WireGuard 지원과 최근 기능 보고가 필요합니다. 사용자 연결은 VLESS REALITY를 사용합니다. 전달 자동 관리는 B에서 실행 중인 UFW가 필요합니다. 다른 방화벽은 수동으로 설정하세요. 입구 매핑 선택이 필수인 노드는 A로 사용할 수 없습니다.",
     "transit": "중계 노드 A",
     "endpoint": "A의 공용 UDP 엔드포인트",
     "endpointHint": "B에서 접근 가능한 IP와 UDP 포트를 입력하세요. NAT가 포트를 변경하면 여기에는 공용 매핑 포트를, 위의 터널 포트에는 로컬 포트를 입력하세요.",
-    "unavailable": "노드를 사용할 수 없거나 업데이트 필요"
+    "unavailable": "노드를 사용할 수 없거나 업데이트 필요",
+    "domainPreference": "도메인 주소 계열 우선순위",
+    "domainPreferenceHint": "IPv4와 IPv6 주소가 모두 있는 도메인에서는 B가 연결할 수 있는 계열을 우선하세요. 이 설정은 IPv6 연결을 제공하거나 IPv6 주소를 IPv4로 변환하지 않습니다. 새 선택을 저장하려면 A의 지원 보고가 필요합니다.",
+    "preferIPv4": "IPv4 우선 (IPv4 전용 출구에 권장)",
+    "preferIPv6": "IPv6 우선",
+    "legacyPreference": "기존 동작 유지 (IPv6 우선)",
+    "autoForwarding": "B의 전달 규칙 자동 관리",
+    "autoForwardingHint": "B에서 이 연결의 전달 규칙을 자동으로 관리합니다. 노드 전체의 방화벽 자동 허용도 켜져 있어야 합니다. 끄면 관리자가 직접 관리해야 합니다. 기존 수동 규칙은 유지됩니다.",
+    "blocked": "전달 준비 안 됨",
+    "forwardingTitle": "B 노드의 전달 방화벽",
+    "forwardingStates": {
+      "synced": "자동 허용됨",
+      "external": "기존 규칙 발견",
+      "not_required": "지원 방화벽이 실행 중이 아님",
+      "manual": "수동 관리",
+      "unsupported": "수동 설정 필요",
+      "error": "자동 설정 실패",
+      "unknown": "보고 없음",
+      "stale": "확인 결과 만료"
+    },
+    "forwardingHints": {
+      "synced": "B의 전달 규칙을 동기화했습니다. 실제 연결은 클라이언트에서 테스트하세요.",
+      "external": "기존 규칙을 유지합니다. 이 연결의 전달을 허용하는지 확인하세요.",
+      "not_required": "실행 중인 UFW 또는 firewalld를 감지하지 못했습니다. 다른 호스트 규칙이 전달을 차단할 수 있습니다.",
+      "manual": "이 연결의 자동 관리가 꺼져 있습니다. B의 전달 규칙을 수동으로 관리하세요.",
+      "unsupported": "이 방화벽의 자동 설정은 지원되지 않습니다. 수동 관리로 전환하고 B에서 전달을 허용하세요.",
+      "error": "B의 전달 규칙을 동기화하지 못했습니다. 노드 오류와 방화벽 설정을 확인하세요.",
+      "unknown": "최근 전달 확인 결과가 없습니다. B를 업그레이드하고 새 보고를 기다리세요.",
+      "stale": "이 결과는 오래되었습니다. B의 재확인과 보고를 기다리세요."
+    },
+    "forwardingReasons": {
+      "policy_routing_unsupported": "B의 라우팅 정책에는 수동 전달 설정이 필요합니다.",
+      "route_interface_ambiguous": "B의 출구 인터페이스를 확인할 수 없습니다. 경로를 확인한 뒤 전달을 설정하세요.",
+      "private_grant_route_unavailable": "B에 허용된 사설 네트워크로 가는 사용 가능한 경로가 없습니다.",
+      "no_forwarding_route": "B에 사용 가능한 출구 경로가 없습니다. 네트워크 설정을 확인하세요.",
+      "ufw_forward_rule_conflict": "기존 UFW 규칙이 자동 설정과 충돌합니다. 규칙을 유지했으니 직접 확인하세요.",
+      "owned_rule_changed_retained": "자동 관리 규칙이 외부에서 변경되어 유지했습니다. 방화벽 규칙을 확인하세요.",
+      "inactive_backend_rules_retained": "이전 방화벽 설정의 규칙을 유지했습니다. 직접 확인하세요.",
+      "automatic_forwarding_disabled": "B 노드의 전역 방화벽 자동 허용이 꺼져 있습니다. 노드에서 켜거나 이 연결의 포워딩을 수동으로 관리하세요.",
+      "ufw_forward_runtime_verification_failed": "저장된 UFW 규칙과 실제 적용된 규칙이 일치하지 않습니다. B의 방화벽을 확인한 후 다시 시도하세요."
+    }
   },
   "host": {
     "title": "호스트 관리",

@@ -626,32 +626,116 @@ root network-administration privileges and enabled egress protection with
 non-root proxy cores. A also needs Xray. The panel waits for fresh capability
 reports from both nodes; upgrading the panel alone cannot enable this feature.
 
-The host firewall must also permit forwarding on B from the managed `bwg<slot>`
-interface to the intended public or LAN interface, including return traffic.
-Bosun's destination ACL and SNAT do not override a later UFW/firewalld default
-drop. Its port auto-open feature only opens listeners; it does not change the
-host's forwarding policy. A fresh handshake can therefore show **Connected**
-while subscriber requests still fail. Check the host firewall before changing
-the tunnel or private-access grants.
-
-For example, with UFW, link slot 1 and exit interface `eth0`, the administrator
-can allow just this interface pair and the supported transport protocols:
-
-```sh
-ufw route allow in on bwg1 out on eth0 proto tcp
-ufw route allow in on bwg1 out on eth0 proto udp
-```
-
-Use the actual slot and exit interface; an authorized LAN destination may use
-a different interface. Bosun still restricts destinations before these rules.
-Remove the corresponding host rules when retiring the link. Do not disable the
-host firewall or change its global forwarding policy just to enable a tunnel.
-
 Choose A, a subscriber TCP port, a separate local WireGuard UDP port, the literal
 IP and UDP port reachable from B, MTU (1280–1420), and a REALITY server name.
 Run the REALITY check from A. If external NAT maps A's UDP port, enter the public
 mapped endpoint separately. Nodes requiring an ingress mapping cannot serve as
 A in this initial editor. Restrict the subscriber entry's user group as needed.
+
+The host firewall must also permit forwarding on B from the managed `bwg<slot>`
+interface to the intended public or LAN interface, including return traffic.
+Bosun's destination ACL and SNAT do not override a later UFW/firewalld default
+drop. Listener port auto-open and host forwarding are separate operations.
+A fresh handshake can therefore show **Connected** while subscriber requests
+still fail. Check the host firewall before changing the tunnel or private-access
+grants.
+
+### Automatic forwarding on B (unreleased)
+
+The new connection form enables **Automatically manage forwarding on B**
+(`auto_forwarding`) by default. Migration 78 leaves existing connections in
+manual mode (`false`); enable this option explicitly when editing an existing
+connection to start automatic management. Older API clients that omit the field
+also create manual connections. Omitting it or sending `null` while editing
+preserves the saved choice; an explicit `false` returns to manual management.
+
+Automatic forwarding currently supports active UFW with unambiguous routes in
+the main routing table. Firewalld, simultaneous firewall backends, custom policy
+routing, and routes or private grants that cannot be assigned safely to one
+interface are rejected with a visible error. This includes a B that also serves
+as A for another managed WG connection: A's source-routing rules require manual
+forwarding management on that host. Do not change the global FORWARD policy or
+disable the host firewall to work around these limits.
+
+The node's global `firewall_auto_open` setting must also be enabled. If a
+connection requests automatic forwarding while that global setting is `false`,
+application fails and the managed WG data path is frozen; bosun does not report
+success or silently switch the connection to manual mode. To manage an
+unsupported host yourself, turn off the connection's automatic option and
+prepare its forwarding rules manually. With no active UFW or firewalld,
+the reported result is **No supported firewall active**, not proof that other
+iptables/nftables or Docker rules allow forwarding.
+
+Bosun derives rules for the exact managed WG interface, peer tunnel address,
+public or authorized LAN interface, and TCP/UDP protocol, including replies.
+Allowances for a separate LAN interface include its authorized destination and
+port scopes; grants reached through the public interface use that interface's
+allowance and remain restricted by the nft ACL.
+The existing nft destination ACL still controls every connection; host
+allowances do not grant extra private access or permit forwarding into another
+managed tunnel. Earlier host deny rules may still block traffic.
+
+An independent persistent ownership journal records intent before UFW changes.
+Only unchanged, provably owned rules are removed when a link is deleted,
+disabled, switched to manual management or cleaned up during restart/uninstall.
+Existing manual rules are retained rather than adopted. Conflicting or externally
+edited rules are preserved and reported for review; those retained rules still
+need an administrator's cleanup. Synchronization is retried while managed WG
+is active.
+
+UFW's official CLI updates its own user chains when adding or deleting rules.
+The preservation guarantee covers manual rules persistently created through
+UFW. Temporary rules inserted directly with iptables into UFW-managed chains
+are outside the supported ownership model and may be replaced by normal UFW
+synchronization.
+
+The connection card shows B's last forwarding check separately from the tunnel
+handshake, including manual management, unsupported configuration and failure.
+Old, missing and expired checks do not count as a successful check. Saving a
+connection, applying rules and completing a handshake each confirm different
+steps; test access from the actual subscriber client before declaring the path
+usable.
+
+### Manual forwarding
+
+For example, with UFW, link slot 1 and exit interface `eth0`, the administrator
+can allow this interface pair, A's tunnel address and the supported protocols:
+
+```sh
+ufw route allow in on bwg1 out on eth0 proto tcp from 10.10.0.5 to any
+ufw route allow in on bwg1 out on eth0 proto udp from 10.10.0.5 to any
+```
+
+Use the actual slot, peer address and exit interface; an authorized LAN
+destination may use a different interface. Also permit replies if the host's
+existing established/related rules do not already allow them. Bosun still
+restricts destinations before these rules. Remove the corresponding manual
+rules when retiring the link; automatic cleanup does not own them.
+
+### Domain address preference (unreleased)
+
+New connections select **Prefer IPv4** (`domain_preference: "ipv4"`). This fixes
+dual-stack domains choosing IPv6 when B only has a working IPv4 exit. Select
+IPv6 preference only when that is appropriate for B. Migration 78 keeps existing
+connections at the empty value, preserving their original IPv6-first rule order;
+the editor also offers that legacy setting. Omitted or `null` update fields
+preserve the saved choice; an explicit empty string restores the legacy behavior.
+
+The preference selects between DNS answer families. Literal IPv4/IPv6 addresses
+keep their family, and an AAAA-only domain still uses IPv6. It does not create an
+IPv6 exit, translate addresses, or retry the other family after a connection
+failure. In particular, choosing IPv4 preference does not make an IPv6-only
+destination reachable from an IPv4-only B, and failures never fall back to A's
+direct exit.
+
+Saving and delivering these new options requires fresh capability reports:
+domain preference from A and automatic forwarding from B. Upgrade the relevant
+node and wait for its report before enabling an option. If a required capability
+expires or disappears after a downgrade, Captain withholds both WG endpoint
+configurations and the entire managed subscriber inbound; it does not leave an
+inbound that could exit directly from A.
+
+### Private access and connection lifecycle
 
 Private access defaults off. To reach B's LAN, select **Explicit addresses** and
 add destination CIDRs, protocols and ports. This grants access to every authorized
@@ -865,6 +949,9 @@ forward, WG link, certificate or system-listener sources and last synchronizatio
 time. Refresh host state for a fresh snapshot. Older nodes show an upgrade hint.
 Only active UFW/firewalld listener allowances are managed; cloud security groups,
 NAT mappings, raw nftables/iptables policies and WG forwarding rules are separate.
+The unreleased per-connection WG forwarding option is described
+[above](#automatic-forwarding-on-b-unreleased); listener auto-open alone does not
+enable it on existing connections.
 An outbound destination port is not a local listener. TCP and UDP are separate,
 and shared rules remain until their last listener disappears. Synchronization
 runs on configuration changes and retries every minute.

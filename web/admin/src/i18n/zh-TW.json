@@ -2346,11 +2346,51 @@
     "selectTransitToScan": "請先選擇中轉節點 A，再自動優選或檢測目前的 SNI。",
     "title": "反向 WireGuard",
     "hint": "B 主動連線 A；A 負責使用者驗證與計費，B 提供公網出口及明確授權的內網存取。",
-    "requirements": "兩端須支援 Linux WireGuard 並有最新能力回報。使用者入口採用 VLESS REALITY。本版不支援將強制選擇入口映射的節點作為 A。",
+    "requirements": "兩端須支援 Linux WireGuard 並有最新能力回報。使用者入口採用 VLESS REALITY。自動管理轉送需要 B 已啟用 UFW，其他防火牆須手動設定。強制選擇入口對映的節點不能用作 A。",
     "transit": "中轉節點 A",
     "endpoint": "A 的公網 UDP 端點",
     "endpointHint": "填入 B 可連線的 IP 與 UDP 連接埠。若 NAT 改寫連接埠，此處填公網映射連接埠，上方隧道連接埠仍為本機連接埠。",
-    "unavailable": "節點無法使用或需要升級"
+    "unavailable": "節點無法使用或需要升級",
+    "domainPreference": "網域位址族優先順序",
+    "domainPreferenceHint": "網域同時有 IPv4 與 IPv6 位址時，優先選擇 B 能存取的位址族。此設定不會提供 IPv6 出口，也不會將 IPv6 位址轉換為 IPv4。儲存新選擇需要 A 回報支援能力。",
+    "preferIPv4": "優先 IPv4（僅 IPv4 出口建議）",
+    "preferIPv6": "優先 IPv6",
+    "legacyPreference": "保留原有行為（優先 IPv6）",
+    "autoForwarding": "自動管理 B 的轉送規則",
+    "autoForwardingHint": "自動維護此連線在 B 上的轉送規則，同時需要節點的全域自動放行已開啟。關閉後由管理員自行管理轉送。既有手動規則會保留。",
+    "blocked": "轉送尚未就緒",
+    "forwardingTitle": "B 節點轉送防火牆",
+    "forwardingStates": {
+      "synced": "已自動放行",
+      "external": "發現既有規則",
+      "not_required": "未啟用支援的防火牆",
+      "manual": "手動管理",
+      "unsupported": "須手動設定",
+      "error": "自動設定失敗",
+      "unknown": "尚未回報",
+      "stale": "檢查結果已過期"
+    },
+    "forwardingHints": {
+      "synced": "已同步 B 的轉送規則，實際存取仍須透過用戶端測試確認。",
+      "external": "已保留既有規則，請確認它們是否允許此連線轉送。",
+      "not_required": "未偵測到已啟用的 UFW 或 firewalld，其他主機規則仍可能阻止轉送。",
+      "manual": "此連線未啟用自動管理，請自行維護 B 的轉送規則。",
+      "unsupported": "此防火牆尚不支援自動設定，請切換為手動管理並在 B 放行轉送。",
+      "error": "無法同步 B 的轉送規則，請檢查節點錯誤與防火牆設定。",
+      "unknown": "暫無近期轉送檢查結果，請升級 B 並等待最新回報。",
+      "stale": "此結果已過期，請等待 B 重新檢查並回報。"
+    },
+    "forwardingReasons": {
+      "policy_routing_unsupported": "B 使用了須手動設定轉送的路由策略。",
+      "route_interface_ambiguous": "無法確定 B 的出口網卡，請先檢查路由再設定轉送。",
+      "private_grant_route_unavailable": "B 沒有到某個已授權內網的可用路由。",
+      "no_forwarding_route": "B 沒有可用的出口路由，請檢查網路設定。",
+      "ufw_forward_rule_conflict": "既有 UFW 規則與自動設定衝突，已保留，請人工確認。",
+      "owned_rule_changed_retained": "自動管理的規則被外部修改，已保留，請確認防火牆規則。",
+      "inactive_backend_rules_retained": "舊防火牆設定中的規則已保留，請人工確認。",
+      "automatic_forwarding_disabled": "B 節點的全域自動放行已關閉。請在節點開啟，或將此連線改為手動管理轉送。",
+      "ufw_forward_runtime_verification_failed": "UFW 已儲存的規則與實際執行規則不一致，請檢查 B 的防火牆後重試。"
+    }
   },
   "host": {
     "title": "主機管理",

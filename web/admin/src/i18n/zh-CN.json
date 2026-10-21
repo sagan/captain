@@ -2346,11 +2346,51 @@
     "selectTransitToScan": "请先选择中转节点 A，再自动优选或检测当前 SNI。",
     "title": "反向 WireGuard",
     "hint": "B 主动连接 A；A 负责用户鉴权和计费，B 提供公网出口与明确授权的内网访问。",
-    "requirements": "两端需支持 Linux WireGuard 并有新鲜能力上报。用户入口使用 VLESS REALITY。本版不支持将强制选择入口映射的节点用作 A。",
+    "requirements": "两端需支持 Linux WireGuard 并有新鲜能力上报。用户入口使用 VLESS REALITY。自动管理转发需要 B 已启用 UFW，其他防火墙需手动配置。强制选择入口映射的节点不能用作 A。",
     "transit": "中转节点 A",
     "endpoint": "A 的公网 UDP 端点",
     "endpointHint": "填写 B 可达的 IP 和 UDP 端口。若 NAT 改写端口，此处填公网映射端口，上方隧道端口仍为本地端口。",
-    "unavailable": "节点不可用或需要升级"
+    "unavailable": "节点不可用或需要升级",
+    "domainPreference": "域名地址族优先级",
+    "domainPreferenceHint": "域名同时有 IPv4 和 IPv6 地址时，优先选择 B 能访问的地址族。此设置不会提供 IPv6 出口，也不会把 IPv6 地址转换为 IPv4。保存新选择需要 A 上报支持能力。",
+    "preferIPv4": "优先 IPv4（仅 IPv4 出口推荐）",
+    "preferIPv6": "优先 IPv6",
+    "legacyPreference": "保留原有行为（优先 IPv6）",
+    "autoForwarding": "自动管理 B 的转发规则",
+    "autoForwardingHint": "自动维护此连接在 B 上的转发规则，同时需要节点的全局自动放行已开启。关闭后由管理员自行管理转发。已有手动规则会保留。",
+    "blocked": "转发未就绪",
+    "forwardingTitle": "B 节点转发防火墙",
+    "forwardingStates": {
+      "synced": "已自动放行",
+      "external": "发现已有规则",
+      "not_required": "未启用受支持防火墙",
+      "manual": "手动管理",
+      "unsupported": "需手动配置",
+      "error": "自动配置失败",
+      "unknown": "未上报",
+      "stale": "检查结果已过期"
+    },
+    "forwardingHints": {
+      "synced": "已同步 B 的转发规则，实际访问仍需通过客户端测试确认。",
+      "external": "已保留现有规则，请核对它们是否允许此连接转发。",
+      "not_required": "未检测到已启用的 UFW 或 firewalld，其他主机规则仍可能阻止转发。",
+      "manual": "此连接未启用自动管理，请自行维护 B 的转发规则。",
+      "unsupported": "此防火墙暂不支持自动配置，请切换为手动管理并在 B 放行转发。",
+      "error": "未能同步 B 的转发规则，请检查节点错误和防火墙设置。",
+      "unknown": "暂无近期转发检查结果，请升级 B 并等待新鲜上报。",
+      "stale": "该结果已过期，请等待 B 重新检查并上报。"
+    },
+    "forwardingReasons": {
+      "policy_routing_unsupported": "B 使用了需手动配置转发的路由策略。",
+      "route_interface_ambiguous": "无法确定 B 的出口网卡，请先检查路由再配置转发。",
+      "private_grant_route_unavailable": "B 没有到某个已授权内网的可用路由。",
+      "no_forwarding_route": "B 没有可用的出口路由，请检查网络配置。",
+      "ufw_forward_rule_conflict": "现有 UFW 规则与自动配置冲突，已保留，请人工核对。",
+      "owned_rule_changed_retained": "自动管理的规则被外部修改，已保留，请核对防火墙规则。",
+      "inactive_backend_rules_retained": "旧防火墙配置中的规则已保留，请人工核对。",
+      "automatic_forwarding_disabled": "B 节点的全局自动放行已关闭。请在节点开启，或将此连接改为手动管理转发。",
+      "ufw_forward_runtime_verification_failed": "UFW 已保存的规则与实际运行规则不一致，请检查 B 的防火墙后重试。"
+    }
   },
   "host": {
     "title": "主机管理",

@@ -359,3 +359,43 @@ cached desired state. Manual replacement outside the updater is not protected.
 Captain v1.20.0 similarly retains a v1.20.0 built-in rollback floor: older panels
 would discard the WG fields while rebuilding desired node state. Higher
 administrator-configured floors remain in effect on both applications.
+
+### Managed WG forwarding and address preference (unreleased, migration 78)
+
+Migration 78 adds `node_wireguard_links.domain_preference` with an empty default
+and `auto_forwarding` with a false default. Existing connections retain their
+original IPv6-first domain routing and administrator-managed forwarding rules.
+The new UI creates connections with IPv4 preference and automatic forwarding
+enabled. Legacy API creation without these fields retains the old defaults;
+updates that omit them or send `null` preserve saved intent. Explicit `""` and
+`false` restore the respective legacy behaviors. Unknown preference values are
+rejected. The connection API paths and existing response fields remain intact.
+
+`WireGuardLink.domain_preference`, `WireGuardLink.auto_forwarding`, and the
+`Report.wireguard` fields `domain_preference_supported`, `forwarding_supported`
+and `forwarding` are additive. Domain preference is delivered to A; automatic
+forwarding is delivered to B. Both save and state delivery require the relevant
+fresh capability, in addition to the existing transport checks. Missing,
+downgraded or expired capability withholds both transport configurations and
+the whole managed subscriber inbound, preventing direct fallback on A.
+
+Automatic forwarding is an explicit per-connection opt-in. It supports UFW and
+unambiguous main-table routing, retains manual rules, and uses a separate durable
+ownership journal for cleanup. Firewalld, simultaneous backends, custom policy
+routing (including a B also serving as A elsewhere), and ambiguous interfaces
+are unsupported and reported. A requested automatic connection also fails if
+global `firewall_auto_open` is disabled; it does not silently become manual.
+
+The preference changes DNS-family selection, not literal addresses or the
+family of AAAA-only answers. It supplies neither IPv6 connectivity nor a retry
+of another family after connection failure. Forwarding checks have their own
+timestamp: a new heartbeat does not make an old successful check current. Saved
+configuration, applied rules and a recent WG handshake do not prove subscriber
+connectivity. No release version is assigned to these additions yet.
+
+For development, this branch reserves built-in update/rollback floors of
+Captain `v1.28.0` and bosun `v0.75.0`, so an older binary cannot ignore the new
+saved options or ownership journal. These are provisional next-release numbers,
+not published versions. If release numbering changes, update both floors and
+their regression expectations before publishing; higher configured floors still
+apply. Manual binary replacement is outside that protection.

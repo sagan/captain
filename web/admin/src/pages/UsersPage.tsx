@@ -85,7 +85,7 @@ export default function UsersPage() {
       <Drawer opened={sel !== null} onClose={() => setSel(null)} position="right" size="lg" title={sel?.email}>
         {sel && (
           <Stack gap="lg">
-            {me?.role === 'admin' && <AccountIDEditor key={sel.id} id={sel.id} endpoint={`/api/admin/users/${sel.id}/id`} onChanged={() => setSel(null)} />}
+            {me?.role === 'admin' && <AccountIDEditor key={`account-id-${sel.id}`} id={sel.id} endpoint={`/api/admin/users/${sel.id}/id`} onChanged={() => setSel(null)} />}
             <Group gap="xl">
               <div><Text size="xs" c="dimmed">{t('users.uuid')}</Text><Group gap={4}><Code>{sel.uuid}</Code><Copy value={sel.uuid} /></Group></div>
               <div><Text size="xs" c="dimmed">{t('users.createdAt')}</Text><Text size="sm">{when(sel.created_at)}</Text></div>
@@ -134,7 +134,7 @@ export default function UsersPage() {
             <MetadataEditor endpoint={`/api/admin/users/${sel.id}/metadata`} />
             <UserEntries userID={sel.id} />
             <TempLinks userID={sel.id} />
-            <HwidDevices key={sel.id} userID={sel.id} devices={detail.data?.hwid_devices ?? []} limit={detail.data?.hwid_limit ?? null} requests={detail.data?.sub_requests ?? []} />
+            <HwidDevices key={`hwid-${sel.id}`} userID={sel.id} devices={detail.data?.hwid_devices ?? []} limit={detail.data?.hwid_limit ?? null} requests={detail.data?.sub_requests ?? []} />
             <UserConnections userID={sel.id} />
             <UserAudit userID={sel.id} />
             <Stack gap="sm">

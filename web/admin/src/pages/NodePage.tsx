@@ -77,10 +77,10 @@ export default function NodePage() {
         invalidate()
         qc.invalidateQueries({ queryKey: ['core-options'] })
       }} />}
-      {proxyAllowed && <PrivateAccessReadiness key={n.id} nodeID={n.id} />}
+      {proxyAllowed && <PrivateAccessReadiness key={`readiness-${n.id}`} nodeID={n.id} />}
       {proxyAllowed && <NodeWorkflow node={n} inbounds={d.inbounds} cores={d.status?.cores} />}
       {!n.paired && n.pair_code && <Card mb="lg"><Title order={5} mb="sm">{t('nodes.pairTitle')}</Title><PairCodeBox code={n.pair_code} mode={n.mode} /></Card>}
-      {n.paired && <NodeProbeCard key={n.id} nodeID={n.id} reportedHost={host} />}
+      {n.paired && <NodeProbeCard key={`probe-${n.id}`} nodeID={n.id} reportedHost={host} />}
       <NodeGroupCard key={`${n.id}:${n.monitor_group ?? ''}`} node={n} />
       <Card mb="lg"><MetadataEditor endpoint={`/api/admin/nodes/${n.id}/metadata`} /></Card>
       {d.status?.doctor && <DoctorCard report={d.status.doctor} />}
